@@ -2628,7 +2628,64 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_99_748460
 Public Function Proc_6_99_748460(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim roomId As Long
+    Dim dimmerFurnitureId As Long
+    Dim rowText As String
+    Dim fields() As String
+    Dim lightLevel As Long
+    Dim presetId As Long
+    Dim backgroundId As Long
+    Dim colourText As String
+    Dim productId As Long
+    Dim wallPosition As String
+    Dim currentSign As String
+    Dim currentState As Long
+    Dim nextState As Long
+    Dim signText As String
+
+    On Error GoTo DimmerToggleDone
+
+    socketIndex = HandlingSocketIndex(args)
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo DimmerToggleDone
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId <= 0 Then GoTo DimmerToggleDone
+    If Not HandlingUserOwnsRoom(userId, roomId) And Not HandlingUserHasRoomRight(userId, roomId) Then GoTo DimmerToggleDone
+
+    dimmerFurnitureId = CLng(Val(CStr(Proc_5_2_6D4690("SELECT furnitures.id FROM furnitures,products WHERE furnitures.id_room='" & CStr(roomId) & "' AND products.id_type='9' AND furnitures.id_product=products.id LIMIT 1", 0, 0))))
+    If dimmerFurnitureId <= 0 Then GoTo DimmerToggleDone
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT furnitures_dimmerpresets.id_light,furnitures_dimmerpresets.id_preset,furnitures_dimmerpresets.id_background,furnitures_dimmerpresets.colour,furnitures.id_product,furnitures.position_wall,furnitures.sign FROM furnitures_dimmerpresets,furnitures WHERE furnitures_dimmerpresets.id_furni='" & CStr(dimmerFurnitureId) & "' AND furnitures_dimmerpresets.id_state='2' AND furnitures.id=furnitures_dimmerpresets.id_furni LIMIT 1", 0, 0))
+    If Len(rowText) = 0 Then GoTo DimmerToggleDone
+
+    fields = Split(rowText, Chr$(9))
+    If UBound(fields) < 6 Then GoTo DimmerToggleDone
+
+    lightLevel = CLng(Val(HandlingField(fields, 0)))
+    presetId = CLng(Val(HandlingField(fields, 1)))
+    backgroundId = CLng(Val(HandlingField(fields, 2)))
+    colourText = HandlingField(fields, 3)
+    productId = CLng(Val(HandlingField(fields, 4)))
+    wallPosition = HandlingField(fields, 5)
+    currentSign = HandlingField(fields, 6)
+
+    currentState = CLng(Val(Left$(currentSign, 1)))
+    If currentState <= 0 Then currentState = 2
+    nextState = currentState - 1
+    If nextState < 1 Then nextState = 2
+
+    signText = CStr(nextState) & "," & CStr(presetId) & "," & CStr(backgroundId) & "," & colourText & "," & CStr(lightLevel)
+
+    Proc_5_0_6D3CD0 "UPDATE furnitures SET sign='" & Proc_10_11_80A9C0(signText, 0, 0) & "' WHERE id='" & CStr(dimmerFurnitureId) & "'", 0, 0
+    Proc_6_247_8027E0 socketIndex, "AU" & CStr(dimmerFurnitureId) & Chr$(2) & CStr(Proc_3_0_6D2AF0(productId, Empty, vbNullString)) & wallPosition & Chr$(2) & signText & Chr$(2), 0
+
+    Proc_6_99_748460 = nextState
+    Exit Function
+
+DimmerToggleDone:
     Proc_6_99_748460 = Empty
 End Function
 
