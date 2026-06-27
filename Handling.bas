@@ -824,13 +824,48 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_134_765B90
 Public Function Proc_6_134_765B90(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim itemId As Long
+    Dim giftEnabled As Long
+    Dim itemType As Long
+    Dim responsePayload As String
+
+    On Error GoTo CatalogGiftFailed
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+
+    Proc_10_5_809D80 packetPayload, 3, 0
+    itemId = CLng(Val(CStr(Proc_10_6_809F10(packetPayload, 0, 0))))
+    itemType = CLng(Val(CStr(Proc_9_1_8072B0(itemId, 9, 0))))
+    If itemType = 1 Then
+        giftEnabled = CLng(Val(CStr(Proc_10_0_809570("com.client.catalog.gifts.enabled", 0, 0))))
+    End If
+
+    responsePayload = CStr(Proc_3_0_6D2AF0(itemId, Empty, "In"))
+    responsePayload = CStr(Proc_3_0_6D2AF0(giftEnabled, Empty, responsePayload)) & Chr$(2)
+    Proc_6_244_801E80 socketIndex, responsePayload, 0
+
+CatalogGiftFailed:
     Proc_6_134_765B90 = Empty
 End Function
 
 ' Original declaration: Private Sub Proc_6_135_765D80
 Public Function Proc_6_135_765D80(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim defaultPayload As String
+    Dim giftWrapPrice As Long
+    Dim responsePayload As String
+
+    On Error GoTo CatalogWrapFailed
+    socketIndex = HandlingSocketIndex(args)
+    defaultPayload = "0" & CStr(Proc_3_0_6D2AF0(CLng(Val(CStr(Proc_10_0_809570("com.client.catalog.gifts.wrap.enabled", 0, 0)))), Empty, "Il"))
+    giftWrapPrice = CLng(Val(CStr(Proc_10_0_809570("com.client.catalog.gifts.wrap.price", defaultPayload, 0))))
+
+    responsePayload = CStr(Proc_3_0_6D2AF0(giftWrapPrice, Empty, vbNullString)) & global_00829260
+    Proc_6_244_801E80 socketIndex, responsePayload, 0
+
+CatalogWrapFailed:
     Proc_6_135_765D80 = Empty
 End Function
 

@@ -8,6 +8,7 @@ Option Explicit
 Public global_008292BC As Variant
 Public global_008292C0 As Variant
 Public global_00829258 As String
+Public global_00829260 As String
 Public global_00829268 As String
 Public global_00829204 As String
 Public global_00829208 As String

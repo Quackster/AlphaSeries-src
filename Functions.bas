@@ -11,6 +11,8 @@ Public global_008292A8 As Variant
 ' Original declaration: Private Sub Proc_10_0_809570
 Public Function Proc_10_0_809570(ParamArray args() As Variant) As Variant
     Dim keyName As String
+    Dim defaultValue As String
+    Dim settingValue As String
 
     On Error GoTo LookupFailed
     If UBound(args) < 0 Then
@@ -19,11 +21,17 @@ Public Function Proc_10_0_809570(ParamArray args() As Variant) As Variant
     End If
 
     keyName = CStr(args(0))
-    Proc_10_0_809570 = ReadSettingsValue(global_0082928C, keyName)
+    If UBound(args) >= 1 Then defaultValue = CStr(args(1))
+    settingValue = ReadSettingsValue(global_0082928C, keyName)
+    If Len(settingValue) = 0 Then
+        Proc_10_0_809570 = defaultValue
+    Else
+        Proc_10_0_809570 = settingValue
+    End If
     Exit Function
 
 LookupFailed:
-    Proc_10_0_809570 = vbNullString
+    Proc_10_0_809570 = defaultValue
 End Function
 
 ' Original declaration: Private  Proc_10_1_809790(arg_C, arg_10, arg_14) '809790
