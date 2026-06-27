@@ -269,7 +269,30 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_35_70F630
 Public Function Proc_6_35_70F630(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim categoryId As Long
+    Dim categoryPayload As String
+    Dim responsePayload As String
+
+    On Error GoTo SendFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) >= 3 Then
+        categoryId = CLng(Val(CStr(Proc_3_3_6D3240(Mid$(packetPayload, 3), 0, 0))))
+    End If
+
+    If IsArray(global_0082920C) Then
+        If categoryId >= LBound(global_0082920C) And categoryId <= UBound(global_0082920C) Then
+            categoryPayload = CStr(global_0082920C(categoryId))
+        End If
+    End If
+
+    responsePayload = CStr(Proc_3_0_6D2AF0(categoryId, Empty, "HJ")) & Chr$(2) & categoryPayload
+    Proc_6_244_801E80 socketIndex, responsePayload, 0
+
+SendFailed:
     Proc_6_35_70F630 = Empty
 End Function
 
@@ -1826,7 +1849,7 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
         Case "Fc"
             Proc_6_36_70F7B0 socketIndex
         Case "Fd"
-            Proc_6_35_70F630 socketIndex
+            Proc_6_35_70F630 socketIndex, "Fd", packetPayload
         Case "Af"
             Proc_6_136_765F10 socketIndex, "Af", packetPayload
         Case "oC"
