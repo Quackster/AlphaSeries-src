@@ -2947,7 +2947,44 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_88_73E4F0
 Public Function Proc_6_88_73E4F0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim roomId As Long
+    Dim modelType As Long
+    Dim payload As String
+
+    On Error GoTo SendFailed
+
+    socketIndex = HandlingSocketIndex(args)
+
+    If Len(global_0082908C) = 0 Or DateDiff("s", Now, global_00829090, vbSunday, vbFirstJan1) <= 0 Then
+        global_0082908C = CStr(Proc_5_2_6D4690("SELECT rooms.id,models.type FROM rooms_categories,rooms,models WHERE rooms_categories.is_newfriends='1' AND rooms.id_category=rooms_categories.id AND models.id=rooms.id_model ORDER BY rooms.visitors_now DESC LIMIT 15", 0, 0))
+        global_00829090 = DateAdd("s", 90, Now)
+    End If
+
+    If Len(global_0082908C) > 0 Then
+        rows = Split(global_0082908C, Chr$(13))
+        rowIndex = CLng(Val(CStr(Proc_10_4_809CA0(0, UBound(rows), 0))))
+        If rowIndex < LBound(rows) Then rowIndex = LBound(rows)
+        If rowIndex > UBound(rows) Then rowIndex = UBound(rows)
+
+        If Len(rows(rowIndex)) > 0 Then
+            fields = Split(rows(rowIndex), Chr$(9))
+            If UBound(fields) >= 1 Then
+                roomId = CLng(Val(CStr(fields(0))))
+                modelType = CLng(Val(CStr(fields(1))))
+            End If
+        End If
+    End If
+
+    payload = "L" & Chr$(127)
+    payload = CStr(Proc_3_0_6D2AF0(roomId, Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(modelType, Empty, payload))
+    Proc_6_244_801E80 socketIndex, payload, 0
+
+SendFailed:
     Proc_6_88_73E4F0 = Empty
 End Function
 
@@ -5615,6 +5652,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_124_754D90 socketIndex, "E~", packetPayload
         Case "EY"
             Proc_6_46_714D50 socketIndex, "EY", packetPayload
+        Case "@L"
+            Proc_6_88_73E4F0 socketIndex, "@L", packetPayload
         Case "E["
             Proc_6_45_714B60 socketIndex, "E[", packetPayload
         Case "A_"

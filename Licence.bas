@@ -60,6 +60,8 @@ Public global_00829040 As String
 Public global_00829044 As String
 Public global_00829048 As String
 Public global_00829080 As String
+Public global_0082908C As String
+Public global_00829090 As Date
 Public global_00829098 As String
 Public global_0082909C As String
 Public global_0082934C As Variant
