@@ -298,7 +298,47 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_36_70F7B0
 Public Function Proc_6_36_70F7B0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim searchText As String
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim resultCount As Long
+    Dim resultPayload As String
+    Dim responsePayload As String
+
+    On Error GoTo SearchFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) >= 3 Then
+        searchText = CStr(Proc_10_7_80A190(Mid$(packetPayload, 3), 0, 0))
+        searchText = CStr(Proc_10_11_80A9C0(searchText, 0, 0))
+    End If
+
+    If Len(searchText) < 3 Then
+        Proc_6_243_7FFEB0 socketIndex, 0, 0
+        GoTo SearchDone
+    End If
+
+    rows = Split(CStr(Proc_5_2_6D4690("SELECT id,name FROM faq WHERE name LIKE '" & Chr$(37) & searchText & Chr$(37) & "' LIMIT 25", 0, 0)), Chr$(13))
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(rows(rowIndex)) > 0 Then
+            fields = Split(rows(rowIndex), Chr$(9))
+            If UBound(fields) >= 1 Then
+                resultPayload = CStr(Proc_3_0_6D2AF0(CLng(Val(CStr(fields(0)))), Empty, resultPayload)) & CStr(fields(1)) & Chr$(2)
+                resultCount = resultCount + 1
+            End If
+        End If
+    Next rowIndex
+
+    responsePayload = CStr(Proc_3_0_6D2AF0(resultCount, Empty, "HI")) & resultPayload
+    Proc_6_244_801E80 socketIndex, responsePayload, 0
+
+SearchDone:
+
+SearchFailed:
     Proc_6_36_70F7B0 = Empty
 End Function
 
@@ -1847,7 +1887,7 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
         Case "Fb"
             Proc_6_37_70FC20 socketIndex
         Case "Fc"
-            Proc_6_36_70F7B0 socketIndex
+            Proc_6_36_70F7B0 socketIndex, "Fc", packetPayload
         Case "Fd"
             Proc_6_35_70F630 socketIndex, "Fd", packetPayload
         Case "Af"
