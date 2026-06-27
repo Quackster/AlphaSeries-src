@@ -325,8 +325,34 @@ End Function
 
 ' Original declaration: Private  Proc_10_20_80CF60(arg_C, arg_10) '80CF60
 Public Function Proc_10_20_80CF60(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_10_20_80CF60 = Empty
+    Dim userId As String
+    Dim socketIndex As Long
+    Dim payload As String
+
+    On Error GoTo SendFailed
+    If UBound(args) < 2 Then
+        Proc_10_20_80CF60 = 0
+        Exit Function
+    End If
+
+    userId = CStr(args(0))
+    If Len(userId) = 0 Then
+        Proc_10_20_80CF60 = 0
+        Exit Function
+    End If
+
+    socketIndex = CLng(Val(CStr(Proc_9_9_808AC0(userId))))
+    If socketIndex > 0 Then
+        payload = "Ba" & CStr(args(1)) & Chr$(2) & CStr(args(2)) & Chr$(2)
+        Proc_12_1_821AA0 CInt(socketIndex), payload
+        Proc_10_20_80CF60 = 1
+    Else
+        Proc_10_20_80CF60 = 0
+    End If
+    Exit Function
+
+SendFailed:
+    Proc_10_20_80CF60 = 0
 End Function
 
 ' Original declaration: Private  Proc_10_21_80D0A0(arg_C, arg_10) '80D0A0
