@@ -4875,13 +4875,89 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_199_7D54E0
 Public Function Proc_6_199_7D54E0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim userId As String
+    Dim roomId As Long
+    Dim pollId As Long
+    Dim offset As Long
+    Dim pollRow As String
+
+    On Error GoTo ExitFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "Ck" Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    pollId = ReadWireLong(requestPayload, offset)
+    If pollId <= 0 Then pollId = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    If pollId <= 0 Then GoTo ExitFailed
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo ExitFailed
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId <= 0 Then GoTo ExitFailed
+
+    pollRow = CStr(Proc_5_2_6D4690("SELECT id,description_title,description_thanks FROM poll WHERE id='" & CStr(pollId) & "' AND id_room='" & CStr(roomId) & "' LIMIT 1", 0, 0))
+    If Len(pollRow) = 0 Then GoTo ExitFailed
+
+    Proc_5_0_6D3CD0 "INSERT INTO poll_exit(id_user,id_poll) VALUES('" & Proc_10_11_80A9C0(userId, 0, 0) & "','" & CStr(pollId) & "')", 0, 0
+
+ExitFailed:
     Proc_6_199_7D54E0 = Empty
 End Function
 
 ' Original declaration: Private Sub Proc_6_200_7D5770
 Public Function Proc_6_200_7D5770(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim userId As String
+    Dim roomId As Long
+    Dim pollId As Long
+    Dim questionId As Long
+    Dim answerValue As Long
+    Dim answerText As String
+    Dim offset As Long
+    Dim pollRow As String
+
+    On Error GoTo AnswerFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "Cl" Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    pollId = ReadWireLong(requestPayload, offset)
+    questionId = ReadWireLong(requestPayload, offset)
+    answerValue = ReadWireLong(requestPayload, offset)
+    answerText = CStr(Proc_10_10_80A7F0(ReadWireString(requestPayload, offset), 0, 0))
+
+    If pollId <= 0 Then pollId = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    If pollId <= 0 Or questionId <= 0 Then GoTo AnswerFailed
+    If Len(answerText) = 0 And answerValue > 0 Then answerText = CStr(answerValue)
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo AnswerFailed
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId <= 0 Then GoTo AnswerFailed
+
+    pollRow = CStr(Proc_5_2_6D4690("SELECT id,description_title,description_thanks FROM poll WHERE id='" & CStr(pollId) & "' AND id_room='" & CStr(roomId) & "' LIMIT 1", 0, 0))
+    If Len(pollRow) = 0 Then GoTo AnswerFailed
+
+    Proc_5_0_6D3CD0 "INSERT INTO poll_results(id_poll,id_question,message_answer,id_user,timestamp) VALUES('" & CStr(pollId) & "','" & CStr(questionId) & "','" & Proc_10_11_80A9C0(answerText, 0, 0) & "','" & Proc_10_11_80A9C0(userId, 0, 0) & "',UNIX_TIMESTAMP())", 0, 0
+
+AnswerFailed:
     Proc_6_200_7D5770 = Empty
 End Function
 
@@ -5306,6 +5382,10 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_203_7D7F80 socketIndex, "F]", packetPayload
         Case "F^"
             Proc_6_202_7D6760 socketIndex, "F^", packetPayload
+        Case "Ck"
+            Proc_6_199_7D54E0 socketIndex, "Ck", packetPayload
+        Case "Cl"
+            Proc_6_200_7D5770 socketIndex, "Cl", packetPayload
         Case "EW"
             Proc_6_99_748460 socketIndex, "EW", packetPayload
         Case "EV"
