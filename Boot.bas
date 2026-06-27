@@ -94,7 +94,29 @@ End Function
 
 ' Original declaration: Private Sub Proc_1_6_6C5830
 Public Function Proc_1_6_6C5830(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+
+    On Error GoTo BuildFailed
+    global_008291EC = vbNullString
+
+    rows = Split(CStr(Proc_5_2_6D4690("SELECT product_pet,id_pet,breed,min_rank,min_hcrank,name FROM settings_petraces", 0, 0)), Chr$(13))
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(rows(rowIndex)) > 0 Then
+            fields = Split(rows(rowIndex), Chr$(9))
+            If UBound(fields) >= 5 Then
+                global_008291EC = global_008291EC & "[" & CStr(fields(0)) & Chr$(9)
+                global_008291EC = global_008291EC & CStr(Val(CStr(fields(1)))) & Chr$(9)
+                global_008291EC = global_008291EC & CStr(Val(CStr(fields(2)))) & Chr$(9)
+                global_008291EC = global_008291EC & CStr(Val(CStr(fields(3)))) & Chr$(9)
+                global_008291EC = global_008291EC & CStr(Val(CStr(fields(4)))) & Chr$(9)
+                global_008291EC = global_008291EC & CStr(fields(5)) & "]"
+            End If
+        End If
+    Next rowIndex
+
+BuildFailed:
     Proc_1_6_6C5830 = Empty
 End Function
 
