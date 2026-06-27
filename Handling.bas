@@ -5418,7 +5418,66 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_178_7C6E60
 Public Function Proc_6_178_7C6E60(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim rows As Variant
+    Dim fields As Variant
+    Dim figureParts As Variant
+    Dim rowIndex As Long
+    Dim petCount As Long
+    Dim petPayload As String
+    Dim payload As String
+    Dim petId As Long
+    Dim petName As String
+    Dim petFigure As String
+    Dim petType As Long
+    Dim petRace As Long
+    Dim petColor As String
+    Dim scratches As Long
+
+    On Error GoTo PetListFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo PetListFailed
+
+    rows = Split(CStr(Proc_5_2_6D4690("SELECT bots.id,bots.name,bots.figure,bots_petdata.scratches FROM bots,bots_petdata WHERE bots.id_user='" & _
+        Proc_10_11_80A9C0(userId, 0, 0) & "' AND bots.id_handle='3' AND bots.id_room IS NULL AND bots_petdata.id_bot=bots.id", 0, 0)), Chr$(13))
+
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(CStr(rows(rowIndex))) > 0 Then
+            fields = Split(CStr(rows(rowIndex)), Chr$(9))
+            If UBound(fields) >= 3 Then
+                petId = CLng(Val(CStr(fields(0))))
+                petName = CStr(fields(1))
+                petFigure = LCase$(CStr(fields(2)))
+                scratches = CLng(Val(CStr(fields(3))))
+
+                figureParts = Split(petFigure, Chr$(32))
+                petType = 0
+                petRace = 0
+                petColor = vbNullString
+                If UBound(figureParts) >= 0 Then petType = CLng(Val(CStr(figureParts(0))))
+                If UBound(figureParts) >= 1 Then petRace = CLng(Val(CStr(figureParts(1))))
+                If UBound(figureParts) >= 2 Then petColor = CStr(figureParts(2))
+
+                petPayload = petPayload & "0" & CStr(Proc_3_0_6D2AF0(petId, Empty, vbNullString)) & petName & Chr$(2)
+                petPayload = petPayload & CStr(Proc_3_0_6D2AF0(petType, Empty, vbNullString))
+                petPayload = petPayload & CStr(Proc_3_0_6D2AF0(petRace, Empty, vbNullString))
+                petPayload = petPayload & "0" & petColor & Chr$(2)
+                petPayload = petPayload & CStr(Proc_3_0_6D2AF0(scratches, Empty, vbNullString))
+                petCount = petCount + 1
+            End If
+        End If
+    Next rowIndex
+
+    payload = CStr(Proc_3_0_6D2AF0(petCount, Empty, "IX")) & petPayload
+    Proc_6_244_801E80 socketIndex, payload, 0
+
+    Proc_6_178_7C6E60 = payload
+    Exit Function
+
+PetListFailed:
     Proc_6_178_7C6E60 = Empty
 End Function
 
@@ -6457,6 +6516,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_174_7C3BC0 socketIndex, "@g", packetPayload
         Case "@h"
             Proc_6_171_7C1520 socketIndex, "@h", packetPayload
+        Case "nx"
+            Proc_6_178_7C6E60 socketIndex, "nx", packetPayload
         Case "E["
             Proc_6_45_714B60 socketIndex, "E[", packetPayload
         Case "A_"
