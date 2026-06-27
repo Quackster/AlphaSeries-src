@@ -60,26 +60,105 @@ End Function
 
 ' Original declaration: Private  Proc_10_5_809D80(arg_C) '809D80
 Public Function Proc_10_5_809D80(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_10_5_809D80 = Empty
+    Dim sourceValue As String
+    Dim startAt As Long
+    Dim fieldLength As Long
+
+    On Error GoTo ExtractFailed
+    If UBound(args) < 1 Then
+        Proc_10_5_809D80 = vbNullString
+        Exit Function
+    End If
+
+    sourceValue = CStr(args(0))
+    startAt = CLng(args(1))
+    If startAt < 1 Then startAt = 1
+
+    If UBound(args) >= 2 And Len(CStr(args(2))) > 0 Then
+        fieldLength = CLng(Val(CStr(args(2))))
+        If fieldLength > 0 Then
+            Proc_10_5_809D80 = Mid$(sourceValue, startAt, fieldLength)
+        Else
+            Proc_10_5_809D80 = Mid$(sourceValue, startAt)
+        End If
+    Else
+        Proc_10_5_809D80 = Mid$(sourceValue, startAt)
+    End If
+    Exit Function
+
+ExtractFailed:
+    Proc_10_5_809D80 = vbNullString
 End Function
 
 ' Original declaration: Private Sub Proc_10_6_809F10
 Public Function Proc_10_6_809F10(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_10_6_809F10 = Empty
+    Dim sourceValue As String
+    Dim encodedLengthSize As Long
+    Dim fieldLength As Long
+
+    On Error GoTo ExtractFailed
+    If UBound(args) < 0 Then
+        Proc_10_6_809F10 = vbNullString
+        Exit Function
+    End If
+
+    sourceValue = CStr(args(0))
+    encodedLengthSize = CLng(Proc_3_2_6D30A0(sourceValue))
+    fieldLength = CLng(Proc_3_3_6D3240(sourceValue))
+
+    If encodedLengthSize <= 0 Or fieldLength <= 0 Then
+        Proc_10_6_809F10 = vbNullString
+    Else
+        Proc_10_6_809F10 = Mid$(sourceValue, encodedLengthSize + 1, fieldLength)
+    End If
+    Exit Function
+
+ExtractFailed:
+    Proc_10_6_809F10 = vbNullString
 End Function
 
 ' Original declaration: Private Sub Proc_10_7_80A190
 Public Function Proc_10_7_80A190(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_10_7_80A190 = Empty
+    Dim sourceValue As String
+    Dim fieldLength As Long
+
+    On Error GoTo ExtractFailed
+    If UBound(args) < 0 Then
+        Proc_10_7_80A190 = vbNullString
+        Exit Function
+    End If
+
+    sourceValue = CStr(args(0))
+    fieldLength = CLng(Proc_3_4_6D3620(sourceValue))
+    If fieldLength <= 0 Then
+        Proc_10_7_80A190 = vbNullString
+    Else
+        Proc_10_7_80A190 = Mid$(sourceValue, 3, fieldLength)
+    End If
+    Exit Function
+
+ExtractFailed:
+    Proc_10_7_80A190 = vbNullString
 End Function
 
 ' Original declaration: Private  Proc_10_8_80A580(arg_C) '80A580
 Public Function Proc_10_8_80A580(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_10_8_80A580 = Empty
+    Dim firstValue As Long
+    Dim secondValue As Long
+
+    On Error GoTo BuildFailed
+    If UBound(args) < 0 Then
+        Proc_10_8_80A580 = vbNullString
+        Exit Function
+    End If
+
+    firstValue = CLng(Val(CStr(args(0))))
+    If UBound(args) >= 1 Then secondValue = CLng(Val(CStr(args(1))))
+    Proc_10_8_80A580 = CStr(Proc_3_0_6D2AF0(firstValue, 0, "Dk")) & CStr(Proc_3_0_6D2AF0(secondValue, 0, vbNullString))
+    Exit Function
+
+BuildFailed:
+    Proc_10_8_80A580 = vbNullString
 End Function
 
 ' Original declaration: Private Sub Proc_10_9_80A680
