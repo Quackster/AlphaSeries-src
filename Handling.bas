@@ -7995,7 +7995,102 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_233_7F5D60
 Public Function Proc_6_233_7F5D60(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim activeRow As String
+    Dim activeFields() As String
+    Dim questRows() As String
+    Dim questFields() As String
+    Dim questRow As String
+    Dim questIndex As Long
+    Dim currentQuestId As Long
+    Dim currentCampaignId As Long
+    Dim currentLevel As Long
+    Dim requestedQuestId As Long
+    Dim fallbackQuestId As Long
+    Dim fallbackCampaignId As Long
+    Dim fallbackLevel As Long
+    Dim rowQuestId As Long
+    Dim rowLevel As Long
+    Dim rowCampaignId As Long
+    Dim bestLevel As Long
+    Dim foundCurrent As Boolean
+
+    On Error GoTo QuestNextFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo QuestNextFailed
+
+    If Len(global_00829080) > 0 Then
+        questRows = Split(global_00829080, Chr$(13))
+    Else
+        questRows = Split(CStr(Proc_5_2_6D4690("SELECT id,level,name,NULL,reward,reward_type,require_action,id_additional,id_campaign,amount_activities,waitamount FROM quests ORDER BY id_campaign DESC,level ASC", 0, 0)), Chr$(13))
+    End If
+
+    activeRow = CStr(Proc_5_2_6D4690("SELECT id_quest,id_level FROM users_quests WHERE id_user='" & _
+        Proc_10_11_80A9C0(userId, 0, 0) & "' AND timestamp_accepted IS NOT NULL AND timestamp_done IS NULL LIMIT 1", 0, 0))
+    If Len(activeRow) = 0 Then
+        activeRow = CStr(Proc_5_2_6D4690("SELECT id_quest,id_level FROM users_quests WHERE id_user='" & _
+            Proc_10_11_80A9C0(userId, 0, 0) & "' ORDER BY timestamp_done DESC,timestamp_accepted DESC,id_level DESC LIMIT 1", 0, 0))
+    End If
+    If Len(activeRow) > 0 Then
+        activeFields = Split(activeRow, Chr$(9))
+        currentQuestId = CLng(Val(HandlingField(activeFields, 0)))
+        currentLevel = CLng(Val(HandlingField(activeFields, 1)))
+    End If
+
+    fallbackLevel = 2147483647
+    For questIndex = LBound(questRows) To UBound(questRows)
+        questRow = Trim$(CStr(questRows(questIndex)))
+        If Len(questRow) > 0 Then
+            questFields = Split(questRow, Chr$(9))
+            If UBound(questFields) >= 8 Then
+                rowQuestId = CLng(Val(HandlingField(questFields, 0)))
+                rowLevel = CLng(Val(HandlingField(questFields, 1)))
+                rowCampaignId = CLng(Val(HandlingField(questFields, 8)))
+                If fallbackQuestId <= 0 Or rowLevel < fallbackLevel Then
+                    fallbackQuestId = rowQuestId
+                    fallbackCampaignId = rowCampaignId
+                    fallbackLevel = rowLevel
+                End If
+                If rowQuestId = currentQuestId Then
+                    currentCampaignId = rowCampaignId
+                    currentLevel = rowLevel
+                    foundCurrent = True
+                End If
+            End If
+        End If
+    Next questIndex
+
+    If Not foundCurrent Then
+        currentCampaignId = fallbackCampaignId
+        currentLevel = fallbackLevel - 1
+    End If
+
+    bestLevel = 2147483647
+    For questIndex = LBound(questRows) To UBound(questRows)
+        questRow = Trim$(CStr(questRows(questIndex)))
+        If Len(questRow) > 0 Then
+            questFields = Split(questRow, Chr$(9))
+            If UBound(questFields) >= 8 Then
+                rowQuestId = CLng(Val(HandlingField(questFields, 0)))
+                rowLevel = CLng(Val(HandlingField(questFields, 1)))
+                rowCampaignId = CLng(Val(HandlingField(questFields, 8)))
+                If rowCampaignId = currentCampaignId And rowLevel > currentLevel And rowLevel < bestLevel Then
+                    requestedQuestId = rowQuestId
+                    bestLevel = rowLevel
+                End If
+            End If
+        End If
+    Next questIndex
+
+    If requestedQuestId <= 0 Then requestedQuestId = fallbackQuestId
+    If requestedQuestId <= 0 Then GoTo QuestNextFailed
+
+    Proc_6_232_7F45A0 socketIndex, "p^" & CStr(Proc_3_0_6D2AF0(requestedQuestId, Empty, vbNullString)), 0
+
+QuestNextFailed:
     Proc_6_233_7F5D60 = Empty
 End Function
 
