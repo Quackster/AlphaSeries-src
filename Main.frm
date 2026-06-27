@@ -365,7 +365,54 @@ End Sub
 
 ' Original declaration: Private Sub tmrSigner_Timer() '695150
 Private Sub tmrSigner_Timer()
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim furnitureMarkers As String
+    Dim markerIndex As Long
+    Dim furnitureId As Long
+    Dim rowText As String
+    Dim fields() As String
+    Dim roomId As Long
+    Dim signValue As Long
+    Dim nextSignValue As Long
+    Dim markerText As String
+
+    On Error GoTo SignerDone
+
+    tmrSigner.Enabled = False
+
+    furnitureMarkers = MainRepresentedEntityIds(CStr(global_008291FC))
+    For markerIndex = 0 To UBound(Split(furnitureMarkers, "]"))
+        furnitureId = MainRepresentedEntityIdAt(furnitureMarkers, markerIndex)
+        If furnitureId > 0 Then
+            rowText = CStr(Proc_5_2_6D4690("SELECT id_room,sign FROM furnitures WHERE id='" & CStr(furnitureId) & "' LIMIT 1", 0, 0))
+            If Len(rowText) > 0 Then
+                fields = Split(rowText, Chr$(9))
+                roomId = CLng(Val(MainArrayField(fields, 0)))
+                signValue = CLng(Val(MainArrayField(fields, 1)))
+
+                If roomId > 0 And signValue > 0 Then
+                    nextSignValue = signValue - 1
+                    Proc_5_0_6D3CD0 "UPDATE furnitures SET sign='" & CStr(nextSignValue) & "' WHERE id='" & CStr(furnitureId) & "' LIMIT 1", 0, 0
+                    Proc_6_151_78AC20 roomId, furnitureId, nextSignValue
+                    Proc_6_246_8024C0 roomId, "AX" & CStr(furnitureId) & Chr$(2) & CStr(nextSignValue) & Chr$(2), 0
+
+                    If nextSignValue <= 0 Then
+                        markerText = Chr$(1) & CStr(furnitureId) & Chr$(2)
+                        global_008291FC = Replace(global_008291FC, markerText, vbNullString, 1, -1, vbBinaryCompare)
+                        global_008291FC = MainRepresentedCacheRemove(global_008291FC, Chr$(1) & CStr(furnitureId) & Chr$(9))
+                        global_008291F8 = Replace(global_008291F8, Chr$(1) & CStr(roomId) & Chr$(2), vbNullString, 1, -1, vbBinaryCompare)
+                    End If
+                Else
+                    global_008291FC = Replace(global_008291FC, Chr$(1) & CStr(furnitureId) & Chr$(2), vbNullString, 1, -1, vbBinaryCompare)
+                End If
+            Else
+                global_008291FC = Replace(global_008291FC, Chr$(1) & CStr(furnitureId) & Chr$(2), vbNullString, 1, -1, vbBinaryCompare)
+            End If
+        End If
+    Next markerIndex
+
+SignerDone:
+    On Error Resume Next
+    tmrSigner.Enabled = True
 End Sub
 
 ' Original declaration: Private Sub tmrBots_Timer() '6923C0
@@ -876,6 +923,15 @@ Private Function MainMovementField(ByVal movementText As String, ByVal fieldInde
 
 LookupFailed:
     MainMovementField = 0
+End Function
+
+Private Function MainArrayField(ByRef fields() As String, ByVal fieldIndex As Long) As String
+    On Error GoTo LookupFailed
+    If fieldIndex <= UBound(fields) Then MainArrayField = CStr(fields(fieldIndex))
+    Exit Function
+
+LookupFailed:
+    MainArrayField = vbNullString
 End Function
 
 Private Function MainCurrentRoomIdForSlot(ByVal roomSlot As Long) As Long
