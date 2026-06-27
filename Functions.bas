@@ -301,14 +301,78 @@ End Function
 
 ' Original declaration: Private Sub Proc_10_16_80C480
 Public Function Proc_10_16_80C480(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_10_16_80C480 = Empty
+    Dim userId As String
+    Dim socketIndex As Long
+    Dim creditsValue As Long
+    Dim payload As String
+
+    On Error GoTo RefreshFailed
+    If UBound(args) < 0 Then
+        Proc_10_16_80C480 = 0
+        Exit Function
+    End If
+
+    userId = CStr(args(0))
+    If Len(userId) = 0 Then
+        Proc_10_16_80C480 = 0
+        Exit Function
+    End If
+
+    socketIndex = CLng(Val(CStr(Proc_9_9_808AC0(userId))))
+    If socketIndex = 0 Then
+        Proc_10_16_80C480 = 0
+        Exit Function
+    End If
+
+    creditsValue = CLng(Val(CStr(Proc_5_2_6D4690("SELECT credits FROM users WHERE id='" & userId & "' LIMIT 1"))))
+    payload = "@F" & CStr(creditsValue) & ".0" & Chr$(2)
+    Proc_12_1_821AA0 CInt(socketIndex), payload
+    Proc_10_16_80C480 = 1
+    Exit Function
+
+RefreshFailed:
+    Proc_10_16_80C480 = 0
 End Function
 
 ' Original declaration: Private Sub Proc_10_17_80C6B0
 Public Function Proc_10_17_80C6B0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_10_17_80C6B0 = Empty
+    Dim userId As String
+    Dim socketIndex As Long
+    Dim pointType As Long
+    Dim pointsValue As Long
+    Dim payload As String
+    Dim sentCount As Long
+
+    On Error GoTo RefreshFailed
+    If UBound(args) < 0 Then
+        Proc_10_17_80C6B0 = 0
+        Exit Function
+    End If
+
+    userId = CStr(args(0))
+    If Len(userId) = 0 Then
+        Proc_10_17_80C6B0 = 0
+        Exit Function
+    End If
+
+    socketIndex = CLng(Val(CStr(Proc_9_9_808AC0(userId))))
+    If socketIndex = 0 Then
+        Proc_10_17_80C6B0 = 0
+        Exit Function
+    End If
+
+    For pointType = 0 To 4
+        pointsValue = CLng(Val(CStr(Proc_5_2_6D4690("SELECT activitypoints_" & CStr(pointType) & " FROM users WHERE id='" & userId & "' LIMIT 1"))))
+        payload = CStr(Proc_3_0_6D2AF0(pointType, Empty, CStr(Proc_3_0_6D2AF0(pointsValue, Empty, "Fv")) & "H"))
+        Proc_12_1_821AA0 CInt(socketIndex), payload
+        sentCount = sentCount + 1
+    Next pointType
+
+    Proc_10_17_80C6B0 = sentCount
+    Exit Function
+
+RefreshFailed:
+    Proc_10_17_80C6B0 = 0
 End Function
 
 ' Original declaration: Private Sub Proc_10_18_80C9E0
