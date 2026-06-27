@@ -655,7 +655,8 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_106_74B750
 Public Function Proc_6_106_74B750(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    On Error Resume Next
+    If UBound(args) >= 0 Then Kill CStr(args(0))
     Proc_6_106_74B750 = Empty
 End Function
 
@@ -955,8 +956,28 @@ End Function
 
 ' Original declaration: Private  Proc_6_156_7972B0(arg_C, arg_10, arg_14, arg_18) '7972B0
 Public Function Proc_6_156_7972B0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_156_7972B0 = Empty
+    Dim baseValue As Long
+    Dim firstValue As Long
+    Dim secondValue As String
+    Dim thirdValue As String
+    Dim fourthValue As Long
+    Dim payload As String
+
+    On Error GoTo BuildFailed
+    If UBound(args) < 0 Then GoTo BuildFailed
+
+    baseValue = CLng(Val(CStr(args(0))))
+    If UBound(args) >= 1 Then firstValue = CLng(Val(CStr(args(1))))
+    If UBound(args) >= 2 Then secondValue = CStr(args(2))
+    If UBound(args) >= 3 Then thirdValue = CStr(args(3))
+    If UBound(args) >= 4 Then fourthValue = CLng(Val(CStr(args(4))))
+
+    payload = Proc_3_0_6D2AF0(firstValue, Empty, CStr(baseValue) & Chr$(2)) & secondValue & Chr$(2) & thirdValue & Chr$(2)
+    Proc_6_156_7972B0 = "0" & CStr(Proc_3_0_6D2AF0(fourthValue, Empty, payload))
+    Exit Function
+
+BuildFailed:
+    Proc_6_156_7972B0 = vbNullString
 End Function
 
 ' Original declaration: Private  Proc_6_157_7974B0(arg_C, arg_10, arg_14) '7974B0
