@@ -205,13 +205,25 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_33_70F4F0
 Public Function Proc_6_33_70F4F0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+
+    On Error GoTo SendFailed
+    socketIndex = HandlingSocketIndex(args)
+    Proc_6_244_801E80 socketIndex, "HF" & global_00829204, 0
+
+SendFailed:
     Proc_6_33_70F4F0 = Empty
 End Function
 
 ' Original declaration: Private Sub Proc_6_34_70F590
 Public Function Proc_6_34_70F590(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+
+    On Error GoTo SendFailed
+    socketIndex = HandlingSocketIndex(args)
+    Proc_6_244_801E80 socketIndex, "HG" & global_00829208, 0
+
+SendFailed:
     Proc_6_34_70F590 = Empty
 End Function
 

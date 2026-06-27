@@ -9,6 +9,8 @@ Public global_008292BC As Variant
 Public global_008292C0 As Variant
 Public global_00829258 As String
 Public global_00829268 As String
+Public global_00829204 As String
+Public global_00829208 As String
 Public global_0082919C As Long
 Public global_008291A0 As String
 Public global_00829190 As Boolean
