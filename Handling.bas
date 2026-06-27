@@ -2236,8 +2236,93 @@ End Function
 
 ' Original declaration: Private  Proc_6_57_71E8F0(arg_C, arg_10) '71E8F0
 Public Function Proc_6_57_71E8F0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_57_71E8F0 = Empty
+    Dim socketIndex As Integer
+    Dim roomId As Long
+    Dim suppliedPassword As String
+    Dim userId As String
+    Dim roomRow As String
+    Dim fields() As String
+    Dim visitorsNow As Long
+    Dim visitorsMax As Long
+    Dim doorStatus As Long
+    Dim roomPassword As String
+    Dim roomSlot As Long
+    Dim ownerUserId As String
+    Dim isOwner As Boolean
+    Dim isBanned As Boolean
+
+    On Error GoTo EnterFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 1 Then roomId = CLng(Val(CStr(args(1))))
+    If UBound(args) >= 2 Then suppliedPassword = CStr(args(2))
+    If roomId <= 0 Then
+        Proc_6_244_801E80 socketIndex, "C`H", 0
+        Proc_6_57_71E8F0 = 0
+        Exit Function
+    End If
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo EnterFailed
+
+    roomRow = CStr(Proc_5_2_6D4690("SELECT visitors_now,visitors_max,status_door,password,id_slot,id_owner FROM rooms WHERE rooms.id='" & CStr(roomId) & "' LIMIT 1", 0, 0))
+    If Len(roomRow) = 0 Then
+        Proc_6_244_801E80 socketIndex, "C`H", 0
+        Proc_6_57_71E8F0 = 0
+        Exit Function
+    End If
+
+    fields = Split(roomRow, Chr$(9))
+    If UBound(fields) < 5 Then GoTo EnterFailed
+
+    visitorsNow = CLng(Val(CStr(fields(0))))
+    visitorsMax = CLng(Val(CStr(fields(1))))
+    doorStatus = CLng(Val(CStr(fields(2))))
+    roomPassword = CStr(fields(3))
+    roomSlot = CLng(Val(CStr(fields(4))))
+    ownerUserId = CStr(Val(CStr(fields(5))))
+    isOwner = (ownerUserId = CStr(Val(userId)))
+
+    If Not isOwner Then
+        isBanned = (CLng(Val(CStr(Proc_5_2_6D4690("SELECT id_user FROM rooms_bans WHERE id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_room='" & CStr(roomId) & "' LIMIT 1", 0, 0)))) > 0)
+        If isBanned Then
+            Proc_6_53_718E00 socketIndex, 0, 0
+            Proc_6_244_801E80 socketIndex, "C`PA", 0
+            Proc_6_57_71E8F0 = 0
+            Exit Function
+        End If
+
+        If visitorsMax > 0 And visitorsNow >= visitorsMax Then
+            If Not HandlingUserHasPermission(userId, "fuse_enter_full_rooms") Then
+                Proc_6_53_718E00 socketIndex, 0, 0
+                Proc_6_244_801E80 socketIndex, "C`I", 0
+                Proc_6_57_71E8F0 = 0
+                Exit Function
+            End If
+        End If
+
+        If doorStatus = 1 Then
+            If Not HandlingUserHasPermission(userId, "fuse_enter_locked_rooms") Then
+                Proc_6_53_718E00 socketIndex, 0, 0
+                Proc_6_244_801E80 socketIndex, "C`H", 0
+                Proc_6_57_71E8F0 = 0
+                Exit Function
+            End If
+        ElseIf doorStatus = 2 Then
+            If StrComp(roomPassword, suppliedPassword, vbBinaryCompare) <> 0 Then
+                Proc_6_53_718E00 socketIndex, 0, 0
+                Proc_6_244_801E80 socketIndex, "@a" & "fhFF", 0
+                Proc_6_57_71E8F0 = 0
+                Exit Function
+            End If
+        End If
+    End If
+
+    Proc_6_57_71E8F0 = Proc_6_54_719050(socketIndex, roomId, roomSlot)
+    Exit Function
+
+EnterFailed:
+    Proc_6_57_71E8F0 = 0
 End Function
 
 ' Original declaration: Private Sub Proc_6_58_71FCA0
