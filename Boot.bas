@@ -33,6 +33,9 @@ End Function
 Public Function Proc_1_4_6C4F00(ParamArray args() As Variant) As Variant
     On Error GoTo BootStepFailed
     Proc_1_8_6C6850 0, 0, 0
+    Proc_1_19_6CF190 0, 0, 0
+    Proc_1_20_6CF830 0, 0, 0
+    Proc_1_21_6D08C0 0, 0, 0
     Proc_1_22_6D0F00 0, 0, 0
     Proc_1_11_6C8D10 0, 0, 0
     Proc_1_12_6C8EF0 0, 0, 0
@@ -280,7 +283,34 @@ End Function
 
 ' Original declaration: Private Sub Proc_1_21_6D08C0
 Public Function Proc_1_21_6D08C0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim maxFaqId As Long
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim faqId As Long
+    Dim descriptionText As String
+
+    On Error GoTo BuildFailed
+
+    maxFaqId = CLng(Val(CStr(Proc_5_2_6D4690("SELECT MAX(id) FROM faq", 0, 0))))
+    If maxFaqId < 0 Then maxFaqId = 0
+    ReDim global_00829210(0 To maxFaqId)
+
+    rows = Split(CStr(Proc_5_2_6D4690("SELECT id,description FROM faq", 0, 0)), Chr$(13))
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(rows(rowIndex)) > 0 Then
+            fields = Split(rows(rowIndex), Chr$(9))
+            If UBound(fields) >= 1 Then
+                faqId = CLng(Val(CStr(fields(0))))
+                If faqId >= LBound(global_00829210) And faqId <= UBound(global_00829210) Then
+                    descriptionText = Replace(CStr(fields(1)), Chr$(10), Chr$(13), 1, -1, vbBinaryCompare)
+                    global_00829210(faqId) = CStr(Proc_3_0_6D2AF0(faqId, Empty, vbNullString)) & descriptionText & Chr$(2)
+                End If
+            End If
+        End If
+    Next rowIndex
+
+BuildFailed:
     Proc_1_21_6D08C0 = Empty
 End Function
 

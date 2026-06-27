@@ -344,7 +344,29 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_37_70FC20
 Public Function Proc_6_37_70FC20(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim faqId As Long
+    Dim faqPayload As String
+
+    On Error GoTo SendFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) >= 3 Then
+        faqId = CLng(Val(CStr(Proc_10_6_809F10(Mid$(packetPayload, 3), 0, 0))))
+        If faqId = 0 Then faqId = CLng(Val(CStr(Proc_3_3_6D3240(Mid$(packetPayload, 3), 0, 0))))
+    End If
+
+    If IsArray(global_00829210) Then
+        If faqId >= LBound(global_00829210) And faqId <= UBound(global_00829210) Then
+            faqPayload = CStr(global_00829210(faqId))
+        End If
+    End If
+
+    Proc_6_244_801E80 socketIndex, "HH" & faqPayload, 0
+
+SendFailed:
     Proc_6_37_70FC20 = Empty
 End Function
 
@@ -1885,7 +1907,7 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
         Case "Fa"
             Proc_6_34_70F590 socketIndex
         Case "Fb"
-            Proc_6_37_70FC20 socketIndex
+            Proc_6_37_70FC20 socketIndex, "Fb", packetPayload
         Case "Fc"
             Proc_6_36_70F7B0 socketIndex, "Fc", packetPayload
         Case "Fd"
