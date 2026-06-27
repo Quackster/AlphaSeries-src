@@ -39,6 +39,7 @@ End Function
 ' Original declaration: Private  Proc_10_1_809790(arg_C, arg_10, arg_14) '809790
 Public Function Proc_10_1_809790(ParamArray args() As Variant) As Variant
     Dim rankIndex As Long
+    Dim hcLevel As Long
     Dim basePermissions As String
     Dim permissionName As String
     Dim permissionList As String
@@ -52,12 +53,21 @@ Public Function Proc_10_1_809790(ParamArray args() As Variant) As Variant
     rankIndex = CLng(Val(CStr(args(0))))
     basePermissions = CStr(args(1))
     permissionName = CStr(args(2))
+    If UBound(args) >= 3 Then hcLevel = CLng(Val(CStr(args(3))))
+    If rankIndex < 0 Then rankIndex = 0
+    If rankIndex > 20 Then rankIndex = 20
+    If hcLevel < 0 Then hcLevel = 0
+    If hcLevel > 2 Then hcLevel = 2
 
     permissionList = Chr$(2) & basePermissions & Chr$(2)
     If IsArray(global_008292A8) Then
-        If rankIndex >= LBound(global_008292A8) And rankIndex <= UBound(global_008292A8) Then
+        On Error Resume Next
+        permissionList = permissionList & CStr(global_008292A8(rankIndex, hcLevel))
+        If Err.Number <> 0 Then
+            Err.Clear
             permissionList = permissionList & CStr(global_008292A8(rankIndex))
         End If
+        On Error GoTo CheckFailed
     End If
 
     Proc_10_1_809790 = (InStr(1, permissionList, Chr$(2) & permissionName & Chr$(2), vbBinaryCompare) > 0)

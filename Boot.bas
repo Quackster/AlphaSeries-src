@@ -273,7 +273,26 @@ End Function
 
 ' Original declaration: Private Sub Proc_1_16_6CCA60
 Public Function Proc_1_16_6CCA60(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim rankIndex As Long
+    Dim hcLevel As Long
+    Dim privilegeRows As String
+
+    On Error GoTo BuildFailed
+
+    ReDim global_008292A8(0 To 20, 0 To 2)
+
+    For rankIndex = 0 To 20
+        For hcLevel = 0 To 2
+            privilegeRows = CStr(Proc_5_2_6D4690("SELECT privilege FROM level_privileges WHERE min_level <= '" & CStr(rankIndex) & "' AND min_level_hc <= '" & CStr(hcLevel) & "'", 0, 0))
+            If Len(privilegeRows) > 0 Then
+                global_008292A8(rankIndex, hcLevel) = Chr$(2) & Replace(privilegeRows, Chr$(13), Chr$(2), 1, -1, vbBinaryCompare) & Chr$(2)
+            Else
+                global_008292A8(rankIndex, hcLevel) = Chr$(2)
+            End If
+        Next hcLevel
+    Next rankIndex
+
+BuildFailed:
     Proc_1_16_6CCA60 = Empty
 End Function
 
