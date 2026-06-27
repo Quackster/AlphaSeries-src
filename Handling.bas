@@ -2644,7 +2644,61 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_102_749C50
 Public Function Proc_6_102_749C50(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim userId As String
+    Dim effectId As Long
+    Dim effectRow As String
+    Dim fields() As String
+    Dim effectRowId As Long
+    Dim rentSeconds As Long
+    Dim existingExpireTimestamp As Long
+    Dim broadcastPayload As String
+    Dim offset As Long
+
+    On Error GoTo ActivateDone
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Len(requestPayload) >= 3 Then requestPayload = CStr(Proc_10_5_809D80(requestPayload, 3, 0))
+    effectId = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    If effectId <= 0 Then
+        offset = 1
+        effectId = ReadWireLong(requestPayload, offset)
+    End If
+    If effectId <= 0 Then GoTo ActivateDone
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo ActivateDone
+
+    effectRow = CStr(Proc_5_2_6D4690("SELECT id,time_rent,timestamp_expire FROM users_effects WHERE id_user='" & _
+        Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_effect='" & CStr(effectId) & "' ORDER BY timestamp_expire DESC LIMIT 1", 0, 0))
+    If Len(effectRow) = 0 Then GoTo ActivateDone
+
+    fields = Split(effectRow, Chr$(9))
+    If UBound(fields) < 1 Then GoTo ActivateDone
+
+    effectRowId = CLng(Val(HandlingField(fields, 0)))
+    rentSeconds = CLng(Val(HandlingField(fields, 1)))
+    If UBound(fields) >= 2 Then existingExpireTimestamp = CLng(Val(HandlingField(fields, 2)))
+    If effectRowId <= 0 Or rentSeconds <= 0 Then GoTo ActivateDone
+
+    Proc_5_0_6D3CD0 "UPDATE users_effects SET timestamp_expire=UNIX_TIMESTAMP()+time_rent WHERE id='" & CStr(effectRowId) & "' LIMIT 1", 0, 0
+
+    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(rentSeconds, Empty, CStr(Proc_3_0_6D2AF0(effectId, Empty, "GN")))), 0
+
+    broadcastPayload = CStr(Proc_3_0_6D2AF0(socketIndex, Empty, "Ge"))
+    broadcastPayload = CStr(Proc_3_0_6D2AF0(effectId, Empty, broadcastPayload)) & "H"
+    Proc_6_247_8027E0 socketIndex, broadcastPayload, 0
+
+    Proc_6_102_749C50 = effectId
+    Exit Function
+
+ActivateDone:
     Proc_6_102_749C50 = Empty
 End Function
 
