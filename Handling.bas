@@ -6283,7 +6283,48 @@ End Function
 
 ' Original declaration: Private  Proc_6_151_78AC20(arg_C, arg_10) '78AC20
 Public Function Proc_6_151_78AC20(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim roomId As Long
+    Dim furnitureId As Long
+    Dim stateValue As Long
+    Dim markerText As String
+    Dim roomRecord As String
+    Dim roomCacheText As String
+
+    On Error GoTo StateDone
+
+    If UBound(args) >= 2 Then
+        roomId = CLng(Val(CStr(args(0))))
+        furnitureId = CLng(Val(CStr(args(1))))
+        stateValue = CLng(Val(CStr(args(2))))
+    ElseIf UBound(args) >= 1 Then
+        roomId = CLng(Val(CStr(args(0))))
+        furnitureId = CLng(Val(CStr(args(1))))
+    ElseIf UBound(args) >= 0 Then
+        furnitureId = CLng(Val(CStr(args(0))))
+    End If
+
+    If roomId <= 0 Or furnitureId <= 0 Then GoTo StateDone
+
+    markerText = Chr$(1) & CStr(roomId) & Chr$(2)
+    global_008291F8 = Replace(global_008291F8, markerText, vbNullString, 1, -1, vbBinaryCompare)
+    global_008291F8 = RemoveRepresentedCacheRecord(global_008291F8, Chr$(1) & CStr(roomId) & Chr$(9))
+    global_008291F8 = global_008291F8 & markerText
+
+    markerText = Chr$(1) & CStr(furnitureId) & Chr$(2)
+    global_008291FC = Replace(global_008291FC, markerText, vbNullString, 1, -1, vbBinaryCompare)
+    global_008291FC = global_008291FC & markerText
+
+    roomCacheText = CStr(global_00829310)
+    roomCacheText = RemoveRepresentedCacheRecord(roomCacheText, Chr$(1) & CStr(roomId) & Chr$(9))
+    roomCacheText = RemoveRepresentedCacheRecord(roomCacheText, Chr$(1) & CStr(furnitureId) & Chr$(2))
+    roomCacheText = RemoveRepresentedCacheRecord(roomCacheText, Chr$(1) & CStr(furnitureId) & Chr$(9))
+    roomRecord = Chr$(1) & CStr(roomId) & Chr$(9) & CStr(furnitureId) & Chr$(9) & CStr(stateValue) & Chr$(2)
+    global_00829310 = roomCacheText & roomRecord
+
+    Proc_6_106_74B750 App.Path & "\CACHE\ROOMS\" & CStr(roomId) & ".cache", 0, 0
+    Proc_6_106_74B750 App.Path & "\CACHE\PATHFINDER\" & CStr(roomId) & ".cache", 0, 0
+
+StateDone:
     Proc_6_151_78AC20 = Empty
 End Function
 
