@@ -358,14 +358,34 @@ End Function
 
 ' Original declaration: Public Function NewPremiumCheck(arg0, arg1) '68C820
 Public Function NewPremiumCheck(Optional ByVal arg0 As Variant, Optional ByVal arg1 As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    NewPremiumCheck = Empty
+    Dim encodedText As String
+    Dim seedValue As Long
+    Dim index As Long
+    Dim outputText As String
+
+    On Error GoTo DecodeFailed
+    encodedText = CStr(arg1)
+    If Len(encodedText) = 0 Then
+        NewPremiumCheck = vbNullString
+        Exit Function
+    End If
+
+    seedValue = Asc(Mid$(encodedText, 1, 1))
+    encodedText = Mid$(encodedText, 2)
+    For index = 1 To Len(encodedText)
+        outputText = outputText & Chr$(((Asc(Mid$(encodedText, index, 1)) - seedValue) + CLng(Val(CStr(arg0)))) And &HFF&)
+    Next index
+
+    NewPremiumCheck = outputText
+    Exit Function
+
+DecodeFailed:
+    NewPremiumCheck = vbNullString
 End Function
 
 ' Original declaration: Public Function CreateSuperEasyIdentity(arg1) '68CB10
 Public Function CreateSuperEasyIdentity(Optional ByVal arg1 As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    CreateSuperEasyIdentity = Empty
+    CreateSuperEasyIdentity = ShiftIdentityText(CStr(arg1), 2)
 End Function
 
 ' Original declaration: Public Function SuperEasyGetIdentity(arg1) '68CD20
@@ -375,8 +395,29 @@ End Function
 
 ' Original declaration: Public Function GetIdentity(arg1, arg2) '68CF20
 Public Function GetIdentity(Optional ByVal arg1 As Variant, Optional ByVal arg2 As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    GetIdentity = Empty
+    Dim encodedText As String
+    Dim seedValue As Long
+    Dim index As Long
+    Dim outputText As String
+
+    On Error GoTo DecodeFailed
+    encodedText = CStr(arg1)
+    If Len(encodedText) = 0 Then
+        GetIdentity = vbNullString
+        Exit Function
+    End If
+
+    seedValue = Asc(Mid$(encodedText, 1, 1)) - CLng(Val(CStr(arg2)))
+    encodedText = Mid$(encodedText, 2)
+    For index = 1 To Len(encodedText)
+        outputText = outputText & Chr$(((Asc(Mid$(encodedText, index, 1)) - index) - seedValue) And &HFF&)
+    Next index
+
+    GetIdentity = outputText
+    Exit Function
+
+DecodeFailed:
+    GetIdentity = vbNullString
 End Function
 
 ' Original declaration: Public Sub runServer() '68EC00
