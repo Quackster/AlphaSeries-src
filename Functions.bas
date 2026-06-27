@@ -820,8 +820,37 @@ End Function
 
 ' Original declaration: Private  Proc_10_25_80F5D0(arg_C, arg_10) '80F5D0
 Public Function Proc_10_25_80F5D0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_10_25_80F5D0 = Empty
+    Dim roomId As Long
+    Dim positionX As Long
+    Dim positionY As Long
+    Dim occupiedCount As Long
+    Dim botCount As Long
+
+    On Error GoTo CheckFailed
+    If UBound(args) < 2 Then GoTo CheckFailed
+
+    roomId = CLng(Val(CStr(args(0))))
+    positionX = CLng(Val(CStr(args(1))))
+    positionY = CLng(Val(CStr(args(2))))
+    If roomId <= 0 Then
+        Proc_10_25_80F5D0 = 1
+        Exit Function
+    End If
+
+    occupiedCount = CLng(Val(CStr(Proc_5_2_6D4690("SELECT COUNT(*) FROM furnitures WHERE id_room='" & _
+        CStr(roomId) & "' AND position_x='" & CStr(positionX) & "' AND position_y='" & CStr(positionY) & "'", 0, 0))))
+    If occupiedCount > 0 Then
+        Proc_10_25_80F5D0 = 0
+        Exit Function
+    End If
+
+    botCount = CLng(Val(CStr(Proc_5_2_6D4690("SELECT COUNT(*) FROM bots WHERE id_room='" & _
+        CStr(roomId) & "' AND position_x='" & CStr(positionX) & "' AND position_y='" & CStr(positionY) & "'", 0, 0))))
+    Proc_10_25_80F5D0 = IIf(botCount = 0, 1, 0)
+    Exit Function
+
+CheckFailed:
+    Proc_10_25_80F5D0 = 0
 End Function
 
 ' Original declaration: Private Sub Proc_10_26_81E4E0
