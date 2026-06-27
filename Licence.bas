@@ -96,26 +96,58 @@ End Function
 
 ' Original declaration: Private  Proc_9_6_808080(arg_C) '808080
 Public Function Proc_9_6_808080(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_9_6_808080 = Empty
+    On Error GoTo LookupFailed
+    If UBound(args) < 0 Then
+        Proc_9_6_808080 = vbNullString
+    Else
+        Proc_9_6_808080 = GetSessionRecordField("0:", CStr(args(0)), GetOptionalColumnIndex(args, 1, 0))
+    End If
+    Exit Function
+
+LookupFailed:
+    Proc_9_6_808080 = vbNullString
 End Function
 
 ' Original declaration: Private  Proc_9_7_808320(arg_C) '808320
 Public Function Proc_9_7_808320(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_9_7_808320 = Empty
+    On Error GoTo LookupFailed
+    If UBound(args) < 0 Then
+        Proc_9_7_808320 = 0
+    Else
+        Proc_9_7_808320 = CLng(Val(GetSessionRecordField("1:", CStr(args(0)), GetOptionalColumnIndex(args, 1, 1))))
+    End If
+    Exit Function
+
+LookupFailed:
+    Proc_9_7_808320 = 0
 End Function
 
 ' Original declaration: Private Sub Proc_9_8_8086A0
 Public Function Proc_9_8_8086A0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_9_8_8086A0 = Empty
+    On Error GoTo LookupFailed
+    If UBound(args) < 0 Then
+        Proc_9_8_8086A0 = 0
+    Else
+        Proc_9_8_8086A0 = CLng(Val(GetSessionLinkedValue(CStr(args(0)), True)))
+    End If
+    Exit Function
+
+LookupFailed:
+    Proc_9_8_8086A0 = 0
 End Function
 
 ' Original declaration: Private Sub Proc_9_9_808AC0
 Public Function Proc_9_9_808AC0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_9_9_808AC0 = Empty
+    On Error GoTo LookupFailed
+    If UBound(args) < 0 Then
+        Proc_9_9_808AC0 = 0
+    Else
+        Proc_9_9_808AC0 = CLng(Val(GetSessionLinkedValue(CStr(args(0)), False)))
+    End If
+    Exit Function
+
+LookupFailed:
+    Proc_9_9_808AC0 = 0
 End Function
 
 ' Original declaration: Private Sub Proc_9_10_808F30
@@ -169,6 +201,67 @@ Private Function GetSessionCacheField(ByVal keyName As String, ByVal columnIndex
     fields = Split(valueText, Chr$(2))
     If columnIndex < LBound(fields) Or columnIndex > UBound(fields) Then Exit Function
     GetSessionCacheField = fields(columnIndex)
+End Function
+
+Private Function GetSessionRecordField(ByVal recordPrefix As String, ByVal recordId As String, ByVal columnIndex As Long) As String
+    Dim payload As String
+    Dim fields() As String
+    Dim valueParts() As String
+
+    payload = GetSessionRecordPayload(recordPrefix, recordId)
+    If Len(payload) = 0 Then Exit Function
+
+    fields = Split(payload, Chr$(2))
+    If columnIndex < LBound(fields) Or columnIndex > UBound(fields) Then Exit Function
+
+    valueParts = Split(fields(columnIndex), "]")
+    GetSessionRecordField = valueParts(0)
+End Function
+
+Private Function GetSessionRecordPayload(ByVal recordPrefix As String, ByVal recordId As String) As String
+    Dim marker As String
+    Dim markerAt As Long
+    Dim payloadStart As Long
+    Dim payloadEnd As Long
+
+    If Len(global_00829268) = 0 Then Exit Function
+
+    marker = "[" & recordPrefix & recordId & Chr$(1)
+    markerAt = InStr(1, global_00829268, marker, vbTextCompare)
+    If markerAt = 0 Then Exit Function
+
+    payloadStart = markerAt + Len(marker)
+    payloadEnd = InStr(payloadStart, global_00829268, "]", vbBinaryCompare)
+    If payloadEnd = 0 Then payloadEnd = Len(global_00829268) + 1
+    GetSessionRecordPayload = Mid$(global_00829268, payloadStart, payloadEnd - payloadStart)
+End Function
+
+Private Function GetSessionLinkedValue(ByVal recordId As String, ByVal useBracketCount As Boolean) As String
+    Dim marker As String
+    Dim parts() As String
+    Dim sectionText As String
+    Dim bracketParts() As String
+    Dim valueParts() As String
+    Dim targetIndex As Long
+
+    If Len(global_00829268) = 0 Then Exit Function
+
+    marker = Chr$(2) & recordId & "]"
+    parts = Split(global_00829268, marker)
+    If UBound(parts) < 1 Then Exit Function
+
+    sectionText = parts(UBound(parts))
+    bracketParts = Split(sectionText, "[")
+    targetIndex = UBound(bracketParts)
+
+    If useBracketCount Then
+        valueParts = Split(sectionText, Chr$(1))
+    Else
+        valueParts = Split(sectionText, Chr$(0))
+    End If
+
+    If targetIndex < LBound(valueParts) Or targetIndex > UBound(valueParts) Then Exit Function
+    GetSessionLinkedValue = valueParts(targetIndex)
 End Function
 
 Private Function GetTableCell(ByRef tableCache As Variant, ByVal rowId As Long, ByVal columnIndex As Long) As String
