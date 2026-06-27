@@ -1128,7 +1128,35 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_124_754D90
 Public Function Proc_6_124_754D90(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim limitValue As Long
+    Dim queryText As String
+    Dim rowText As String
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim payload As String
+
+    On Error GoTo NavigatorFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    limitValue = NavigatorListLimit()
+    queryText = "SELECT SUM(get_one) as get_one,get_two FROM (SELECT SUM(rooms.visitors_now) as get_one,rooms.tag_1 as get_two FROM rooms,users WHERE rooms.tag_1 != '' AND rooms.visitors_max > 0 AND users.id=rooms.id_owner GROUP BY 2 UNION ALL SELECT SUM(rooms.visitors_now) as get_one,rooms.tag_2 as get_two FROM rooms,users WHERE rooms.tag_2 != '' AND rooms.visitors_max > 0 AND users.id=rooms.id_owner GROUP BY 2) as a GROUP BY get_two ORDER BY 1 DESC LIMIT " & CStr(limitValue)
+    rowText = CStr(Proc_5_2_6D4690(queryText, 0, 0))
+
+    If Len(rowText) > 0 Then
+        rows = Split(rowText, Chr$(13))
+        For rowIndex = LBound(rows) To UBound(rows)
+            If Len(rows(rowIndex)) > 0 Then
+                fields = Split(rows(rowIndex), Chr$(9))
+                payload = payload & CStr(Proc_3_0_6D2AF0(CLng(Val(NavigatorField(fields, 0))), Empty, vbNullString)) & NavigatorField(fields, 1) & Chr$(2)
+            End If
+        Next rowIndex
+    End If
+
+    Proc_6_244_801E80 socketIndex, "GD" & payload, 0
+
+NavigatorFailed:
     Proc_6_124_754D90 = Empty
 End Function
 
