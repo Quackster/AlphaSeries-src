@@ -2701,7 +2701,56 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_107_74B7E0
 Public Function Proc_6_107_74B7E0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim roomId As Long
+    Dim ownerUserId As String
+    Dim currentPicked As Long
+    Dim newPicked As Long
+    Dim categoryId As Long
+    Dim styleId As Long
+    Dim iconId As Long
+    Dim queryTail As String
+
+    On Error GoTo StaffPickFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo StaffPickFailed
+    If Not HandlingUserHasPermission(userId, "fuse_client_staff") Then GoTo StaffPickFailed
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId <= 0 Then GoTo StaffPickFailed
+
+    ownerUserId = CStr(Proc_5_2_6D4690("SELECT id_owner FROM rooms WHERE id='" & CStr(roomId) & "' LIMIT 1", 0, 0))
+    If Len(ownerUserId) = 0 Then GoTo StaffPickFailed
+
+    currentPicked = CLng(Val(CStr(Proc_5_2_6D4690("SELECT is_staff_picked FROM rooms WHERE id='" & CStr(roomId) & "' LIMIT 1", 0, 0))))
+    If currentPicked = 0 Then
+        newPicked = 1
+    Else
+        newPicked = 0
+    End If
+
+    categoryId = CLng(Val(CStr(Proc_10_0_809570("com.client.navigator.staff_picked.category.id.default", 0, 0))))
+    If categoryId <= 0 Then categoryId = 1
+
+    If newPicked = 0 Then
+        Proc_5_0_6D3CD0 "DELETE FROM rooms_official WHERE id_parent='" & CStr(categoryId) & "' AND id_room='" & CStr(roomId) & "' LIMIT 1", 0, 0
+    Else
+        styleId = CLng(Val(CStr(Proc_10_0_809570("com.client.navigator.staff_picked.style.default", 0, 0))))
+        iconId = CLng(Val(CStr(Proc_10_0_809570("com.client.navigator.staff_picked.category.icon.default", 0, 0))))
+        Proc_5_0_6D3CD0 "DELETE FROM rooms_official WHERE id_parent='" & CStr(categoryId) & "' AND id_room='" & CStr(roomId) & "' LIMIT 1", 0, 0
+        Proc_5_0_6D3CD0 "INSERT INTO rooms_official(id_parent,id_room,id_style,id_type,icon) VALUES('" & CStr(categoryId) & "','" & CStr(roomId) & "','" & CStr(styleId) & "','2','" & CStr(iconId) & "')", 0, 0
+        Proc_5_0_6D3CD0 "UPDATE users SET amount_staffpicked=amount_staffpicked+1 WHERE id='" & Proc_10_11_80A9C0(ownerUserId, 0, 0) & "'", 0, 0
+    End If
+
+    Proc_5_0_6D3CD0 "UPDATE rooms SET is_staff_picked='" & CStr(newPicked) & "' WHERE id='" & CStr(roomId) & "'", 0, 0
+    queryTail = "users,rooms,rooms_categories WHERE rooms.id='" & CStr(roomId) & "' AND users.id=rooms.id_owner AND rooms_categories.id=rooms.id_category LIMIT 1"
+    Proc_6_247_8027E0 socketIndex, CStr(Proc_6_112_74E0C0(queryTail, "GF", 0)), 0
+    Proc_6_247_8027E0 socketIndex, CStr(Proc_3_0_6D2AF0(roomId, Empty, "GH")), 0
+
+StaffPickFailed:
     Proc_6_107_74B7E0 = Empty
 End Function
 
