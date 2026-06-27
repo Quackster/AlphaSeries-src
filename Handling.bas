@@ -7820,7 +7820,86 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_235_7F77E0
 Public Function Proc_6_235_7F77E0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim activeRow As String
+    Dim activeFields() As String
+    Dim questRows() As String
+    Dim questFields() As String
+    Dim questRow As String
+    Dim questId As Long
+    Dim numericQuestId As Long
+    Dim progressValue As Long
+    Dim userQuestLevel As Long
+    Dim timeNextText As String
+    Dim amountRequired As Long
+    Dim waitAmount As Long
+    Dim questIndex As Long
+    Dim remainingWait As Long
+    Dim matchedQuest As Boolean
+
+    On Error GoTo QuestProgressFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo QuestProgressFailed
+
+    activeRow = CStr(Proc_5_2_6D4690("SELECT id_quest,id_numericquest,progress,id_level,time_next FROM users_quests WHERE id_user='" & _
+        Proc_10_11_80A9C0(userId, 0, 0) & "' AND timestamp_accepted IS NOT NULL AND timestamp_done IS NULL LIMIT 1", 0, 0))
+    If Len(activeRow) = 0 Then GoTo QuestProgressFailed
+
+    activeFields = Split(activeRow, Chr$(9))
+    questId = CLng(Val(HandlingField(activeFields, 0)))
+    numericQuestId = CLng(Val(HandlingField(activeFields, 1)))
+    progressValue = CLng(Val(HandlingField(activeFields, 2)))
+    userQuestLevel = CLng(Val(HandlingField(activeFields, 3)))
+    timeNextText = HandlingField(activeFields, 4)
+    If questId <= 0 Then GoTo QuestProgressFailed
+
+    If Len(global_00829080) > 0 Then
+        questRows = Split(global_00829080, Chr$(13))
+    Else
+        questRows = Split(CStr(Proc_5_2_6D4690("SELECT id,level,name,NULL,reward,reward_type,require_action,id_additional,id_campaign,amount_activities,waitamount FROM quests ORDER BY id_campaign DESC,level ASC", 0, 0)), Chr$(13))
+    End If
+
+    For questIndex = LBound(questRows) To UBound(questRows)
+        questRow = Trim$(CStr(questRows(questIndex)))
+        If Len(questRow) > 0 Then
+            questFields = Split(questRow, Chr$(9))
+            If UBound(questFields) >= 10 Then
+                If CLng(Val(HandlingField(questFields, 0))) = questId Then
+                    amountRequired = CLng(Val(HandlingField(questFields, 9)))
+                    waitAmount = CLng(Val(HandlingField(questFields, 10)))
+                    matchedQuest = True
+                    Exit For
+                End If
+            End If
+        End If
+    Next questIndex
+    If Not matchedQuest Then GoTo QuestProgressFailed
+
+    If Len(timeNextText) > 0 And timeNextText <> "0" Then
+        remainingWait = CLng(Val(CStr(Proc_5_2_6D4690("SELECT GREATEST(0,UNIX_TIMESTAMP('" & _
+            Proc_10_11_80A9C0(timeNextText, 0, 0) & "')-UNIX_TIMESTAMP())", 0, 0))))
+        If remainingWait > 0 Then
+            Proc_6_236_7F8540 socketIndex, Empty, Empty
+            GoTo QuestProgressFailed
+        End If
+    ElseIf waitAmount > 0 And progressValue > 0 And progressValue < amountRequired Then
+        Proc_5_0_6D3CD0 "UPDATE users_quests SET time_next=DATE_ADD(NOW(),INTERVAL " & CStr(waitAmount) & _
+            " SECOND) WHERE id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_quest='" & CStr(questId) & "' LIMIT 1", 0, 0
+        Proc_6_236_7F8540 socketIndex, Empty, Empty
+        GoTo QuestProgressFailed
+    End If
+
+    If amountRequired <= 0 Then amountRequired = 1
+    If progressValue >= amountRequired Then
+        Proc_6_164_7BC820 socketIndex, questId, numericQuestId
+    Else
+        Proc_6_236_7F8540 socketIndex, Empty, Empty
+    End If
+
+QuestProgressFailed:
     Proc_6_235_7F77E0 = Empty
 End Function
 
