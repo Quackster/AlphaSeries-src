@@ -5012,7 +5012,95 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_172_7C25B0
 Public Function Proc_6_172_7C25B0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim userId As String
+    Dim searchText As String
+    Dim escapedSearch As String
+    Dim whereClause As String
+    Dim rowText As String
+    Dim rows As Variant
+    Dim fields As Variant
+    Dim rowIndex As Long
+    Dim friendCount As Long
+    Dim otherCount As Long
+    Dim friendPayload As String
+    Dim otherPayload As String
+    Dim resultPayload As String
+    Dim targetUserId As String
+    Dim isFriend As Boolean
+    Dim isOnline As Long
+    Dim offset As Long
+    Dim dateFormat As String
+    Dim timeFormat As String
+
+    On Error GoTo SearchFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "@i" Then requestPayload = Mid$(requestPayload, 3)
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo SearchFailed
+
+    searchText = CStr(Proc_10_7_80A190(requestPayload, 0, 0))
+    If Len(searchText) = 0 Then
+        offset = 1
+        searchText = ReadWireString(requestPayload, offset)
+    End If
+    searchText = LCase$(Trim$(searchText))
+    If Len(searchText) = 0 Then GoTo SearchFailed
+
+    escapedSearch = LCase$(Proc_10_11_80A9C0(searchText, 0, 0))
+    If Len(searchText) > 3 Then
+        whereClause = "LOWER(name) LIKE '" & escapedSearch & "%'"
+    Else
+        whereClause = "LOWER(name)='" & escapedSearch & "'"
+    End If
+
+    dateFormat = CStr(Proc_10_0_809570("com.mysql.format.date", "%d-%m-%Y", 0))
+    timeFormat = CStr(Proc_10_0_809570("com.mysql.format.time", "%H:%i", 0))
+    rowText = CStr(Proc_5_2_6D4690("SELECT id,name,id_socket,figure,motto,nickname,DATE_FORMAT(FROM_UNIXTIME(lastonline_time), '" & _
+        Proc_10_11_80A9C0(dateFormat & " " & timeFormat, 0, 0) & "') FROM users WHERE " & whereClause & " LIMIT 50", 0, 0))
+
+    If Len(rowText) > 0 Then
+        rows = Split(rowText, Chr$(13))
+        For rowIndex = LBound(rows) To UBound(rows)
+            If Len(CStr(rows(rowIndex))) > 0 Then
+                fields = Split(CStr(rows(rowIndex)), Chr$(9))
+                If UBound(fields) >= 6 Then
+                    targetUserId = CStr(fields(0))
+                    If targetUserId <> userId Then
+                        isOnline = IIf(CInt(Val(CStr(fields(2)))) > 0, 1, 0)
+                        resultPayload = MessengerSearchResultPayload(targetUserId, CStr(fields(1)), CStr(fields(3)), CStr(fields(4)), CStr(fields(5)), CStr(fields(6)), isOnline)
+                        isFriend = (Len(CStr(Proc_5_2_6D4690("SELECT id_user FROM friendships WHERE has_accept='1' AND ((id_user='" & _
+                            Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_friend='" & Proc_10_11_80A9C0(targetUserId, 0, 0) & "') OR (id_user='" & _
+                            Proc_10_11_80A9C0(targetUserId, 0, 0) & "' AND id_friend='" & Proc_10_11_80A9C0(userId, 0, 0) & "')) LIMIT 1", 0, 0))) > 0)
+                        If isFriend Then
+                            friendPayload = friendPayload & resultPayload
+                            friendCount = friendCount + 1
+                        Else
+                            otherPayload = otherPayload & resultPayload
+                            otherCount = otherCount + 1
+                        End If
+                    End If
+                End If
+            End If
+        Next rowIndex
+    End If
+
+    resultPayload = CStr(Proc_3_0_6D2AF0(friendCount, Empty, "Fs")) & friendPayload
+    resultPayload = resultPayload & CStr(Proc_3_0_6D2AF0(otherCount, Empty, vbNullString)) & otherPayload
+    Proc_6_244_801E80 socketIndex, resultPayload, 0
+
+    Proc_6_172_7C25B0 = resultPayload
+    Exit Function
+
+SearchFailed:
     Proc_6_172_7C25B0 = Empty
 End Function
 
@@ -6172,6 +6260,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_168_7C05F0 socketIndex, "@b", packetPayload
         Case "@e"
             Proc_6_167_7BECA0 socketIndex, "@e", packetPayload
+        Case "@i"
+            Proc_6_172_7C25B0 socketIndex, "@i", packetPayload
         Case "E["
             Proc_6_45_714B60 socketIndex, "E[", packetPayload
         Case "A_"
@@ -6600,6 +6690,23 @@ Private Function MessengerFriendSummaryPayload(ByVal userId As String, ByVal rel
 
 BuildFailed:
     MessengerFriendSummaryPayload = vbNullString
+End Function
+
+Private Function MessengerSearchResultPayload(ByVal userId As String, ByVal userName As String, ByVal figureText As String, ByVal mottoText As String, ByVal nicknameText As String, ByVal lastOnlineText As String, ByVal isOnline As Long) As String
+    Dim payload As String
+
+    On Error GoTo BuildFailed
+
+    payload = CStr(Proc_3_0_6D2AF0(CLng(Val(userId)), Empty, vbNullString))
+    payload = payload & userName & Chr$(2) & mottoText & Chr$(2)
+    payload = "1" & CStr(Proc_3_0_6D2AF0(isOnline, Empty, payload)) & "H" & Chr$(2)
+    payload = payload & nicknameText & Chr$(2) & figureText & Chr$(2) & lastOnlineText & Chr$(2)
+
+    MessengerSearchResultPayload = payload
+    Exit Function
+
+BuildFailed:
+    MessengerSearchResultPayload = vbNullString
 End Function
 
 Private Function HandlingUserHasRoomRight(ByVal userId As String, ByVal roomId As Long) As Boolean
