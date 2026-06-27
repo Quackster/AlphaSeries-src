@@ -10787,20 +10787,38 @@ End Function
 
 ' Original declaration: Private  Proc_6_207_7DB0D0(arg_C, arg_10, arg_14, arg_18, arg_1C) '7DB0D0
 Public Function Proc_6_207_7DB0D0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_207_7DB0D0 = Empty
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim roomId As Long
+    Dim triggerCode As Long
+
+    On Error GoTo ExecuteDone
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex > 0 Then
+        userId = HandlingUserIdFromSocket(socketIndex)
+        If Len(userId) > 0 And userId <> "0" Then roomId = HandlingCurrentRoomId(socketIndex, userId)
+    End If
+
+    If UBound(args) >= 1 And roomId <= 0 Then roomId = CLng(Val(CStr(args(1))))
+    If UBound(args) >= 2 Then triggerCode = CLng(Val(CStr(args(2))))
+    If roomId <= 0 Then GoTo ExecuteDone
+
+    Proc_6_207_7DB0D0 = HandlingRepresentedWiredTrigger(roomId, triggerCode, socketIndex)
+    Exit Function
+
+ExecuteDone:
+    Proc_6_207_7DB0D0 = 0
 End Function
 
 ' Original declaration: Private  Proc_6_208_7DC030(arg_C, arg_10) '7DC030
 Public Function Proc_6_208_7DC030(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_208_7DC030 = Empty
+    Proc_6_208_7DC030 = HandlingRepresentedWiredActionCall(args, 506)
 End Function
 
 ' Original declaration: Private  Proc_6_209_7DE480(arg_C, arg_10) '7DE480
 Public Function Proc_6_209_7DE480(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_209_7DE480 = Empty
+    Proc_6_209_7DE480 = HandlingRepresentedWiredActionCall(args, 505)
 End Function
 
 ' Original declaration: Private Sub Proc_6_210_7E1DC0
@@ -10811,44 +10829,37 @@ End Function
 
 ' Original declaration: Private  Proc_6_211_7E1E40(arg_C) '7E1E40
 Public Function Proc_6_211_7E1E40(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_211_7E1E40 = Empty
+    Proc_6_211_7E1E40 = HandlingRepresentedWiredTriggerCall(args, 1004)
 End Function
 
 ' Original declaration: Private  Proc_6_212_7E36C0(arg_C) '7E36C0
 Public Function Proc_6_212_7E36C0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_212_7E36C0 = Empty
+    Proc_6_212_7E36C0 = HandlingRepresentedWiredTriggerCall(args, 1001)
 End Function
 
 ' Original declaration: Private  Proc_6_213_7E3FA0(arg_C) '7E3FA0
 Public Function Proc_6_213_7E3FA0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_213_7E3FA0 = Empty
+    Proc_6_213_7E3FA0 = HandlingRepresentedWiredTriggerCall(args, 1003)
 End Function
 
 ' Original declaration: Private  Proc_6_214_7E60C0(arg_C) '7E60C0
 Public Function Proc_6_214_7E60C0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_214_7E60C0 = Empty
+    Proc_6_214_7E60C0 = HandlingRepresentedWiredTriggerCall(args, 1002)
 End Function
 
 ' Original declaration: Private  Proc_6_215_7E6770(arg_C) '7E6770
 Public Function Proc_6_215_7E6770(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_215_7E6770 = Empty
+    Proc_6_215_7E6770 = HandlingRepresentedWiredActionCall(args, 503)
 End Function
 
 ' Original declaration: Private  Proc_6_216_7E8120(arg_C) '7E8120
 Public Function Proc_6_216_7E8120(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_216_7E8120 = Empty
+    Proc_6_216_7E8120 = HandlingRepresentedWiredActionCall(args, 502)
 End Function
 
 ' Original declaration: Private  Proc_6_217_7E9780(arg_C) '7E9780
 Public Function Proc_6_217_7E9780(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_217_7E9780 = Empty
+    Proc_6_217_7E9780 = HandlingRepresentedWiredActionCall(args, 501)
 End Function
 
 ' Original declaration: Private  Proc_6_218_7EA200(arg_C) '7EA200
@@ -14388,6 +14399,243 @@ Private Function HandlingRepresentedWiredEdit(ByRef args() As Variant, ByVal pac
 
 EditDone:
     HandlingRepresentedWiredEdit = Empty
+End Function
+
+Private Function HandlingRepresentedWiredTriggerCall(ByRef args() As Variant, ByVal triggerCode As Long) As Variant
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim roomId As Long
+
+    On Error GoTo TriggerDone
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex > 0 Then
+        userId = HandlingUserIdFromSocket(socketIndex)
+        If Len(userId) > 0 And userId <> "0" Then roomId = HandlingCurrentRoomId(socketIndex, userId)
+    End If
+    If roomId <= 0 And UBound(args) >= 1 Then roomId = CLng(Val(CStr(args(1))))
+    If roomId <= 0 Then GoTo TriggerDone
+
+    HandlingRepresentedWiredTriggerCall = HandlingRepresentedWiredTrigger(roomId, triggerCode, socketIndex)
+    Exit Function
+
+TriggerDone:
+    HandlingRepresentedWiredTriggerCall = 0
+End Function
+
+Private Function HandlingRepresentedWiredActionCall(ByRef args() As Variant, ByVal actionCode As Long) As Variant
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim roomId As Long
+    Dim selectedFurnitureId As Long
+
+    On Error GoTo ActionDone
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex > 0 Then
+        userId = HandlingUserIdFromSocket(socketIndex)
+        If Len(userId) > 0 And userId <> "0" Then roomId = HandlingCurrentRoomId(socketIndex, userId)
+    End If
+    If roomId <= 0 And UBound(args) >= 1 Then roomId = CLng(Val(CStr(args(1))))
+    If UBound(args) >= 2 Then selectedFurnitureId = CLng(Val(CStr(args(2))))
+    If roomId <= 0 Then GoTo ActionDone
+
+    HandlingRepresentedWiredActionCall = HandlingRepresentedWiredAction(roomId, actionCode, selectedFurnitureId, socketIndex)
+    Exit Function
+
+ActionDone:
+    HandlingRepresentedWiredActionCall = 0
+End Function
+
+Private Function HandlingRepresentedWiredTrigger(ByVal roomId As Long, ByVal triggerCode As Long, ByVal socketIndex As Integer) As Long
+    Dim triggerText As String
+    Dim triggerRows() As String
+    Dim triggerIndex As Long
+    Dim recordText As String
+    Dim recordCode As Long
+    Dim executedCount As Long
+
+    On Error GoTo TriggerDone
+    If roomId <= 0 Then GoTo TriggerDone
+
+    triggerText = CStr(Proc_6_239_7FC170(App.Path & "\cache\wired_trigger\" & CStr(roomId) & ".cache", 0, 0))
+    triggerRows = Split(Replace(triggerText, Chr$(13), vbNullString, 1, -1, vbBinaryCompare), Chr$(10))
+    For triggerIndex = LBound(triggerRows) To UBound(triggerRows)
+        recordText = Trim$(CStr(triggerRows(triggerIndex)))
+        If Len(recordText) > 0 Then
+            recordCode = CLng(Val(HandlingRepresentedWiredRecordField(recordText, 0)))
+            If triggerCode <= 0 Or recordCode = triggerCode Then
+                If HandlingRepresentedWiredConditionsPass(roomId) Then
+                    executedCount = executedCount + CLng(Val(CStr(HandlingRepresentedWiredAction(roomId, 0, 0, socketIndex))))
+                End If
+            End If
+        End If
+    Next triggerIndex
+
+TriggerDone:
+    HandlingRepresentedWiredTrigger = executedCount
+End Function
+
+Private Function HandlingRepresentedWiredConditionsPass(ByVal roomId As Long) As Boolean
+    Dim conditionText As String
+    Dim conditionRows() As String
+    Dim conditionIndex As Long
+    Dim recordText As String
+    Dim selectedIds As String
+
+    On Error GoTo ConditionsFailed
+    HandlingRepresentedWiredConditionsPass = True
+    If roomId <= 0 Then Exit Function
+
+    conditionText = CStr(Proc_6_239_7FC170(App.Path & "\cache\wired_condition\" & CStr(roomId) & ".cache", 0, 0))
+    conditionRows = Split(Replace(conditionText, Chr$(13), vbNullString, 1, -1, vbBinaryCompare), Chr$(10))
+    For conditionIndex = LBound(conditionRows) To UBound(conditionRows)
+        recordText = Trim$(CStr(conditionRows(conditionIndex)))
+        If Len(recordText) > 0 Then
+            selectedIds = HandlingRepresentedWiredRecordField(recordText, 2)
+            If Len(selectedIds) > 0 Then
+                If Not HandlingRepresentedWiredSelectedItemsExist(roomId, selectedIds) Then
+                    HandlingRepresentedWiredConditionsPass = False
+                    Exit Function
+                End If
+            End If
+        End If
+    Next conditionIndex
+    Exit Function
+
+ConditionsFailed:
+    HandlingRepresentedWiredConditionsPass = False
+End Function
+
+Private Function HandlingRepresentedWiredAction(ByVal roomId As Long, ByVal actionCode As Long, ByVal selectedFurnitureId As Long, ByVal socketIndex As Integer) As Long
+    Dim actionText As String
+    Dim actionRows() As String
+    Dim actionIndex As Long
+    Dim recordText As String
+    Dim recordCode As Long
+    Dim selectedIds As String
+    Dim parameterText As String
+    Dim actionCount As Long
+
+    On Error GoTo ActionDone
+    If roomId <= 0 Then GoTo ActionDone
+
+    actionText = CStr(Proc_6_239_7FC170(App.Path & "\cache\wired_action\" & CStr(roomId) & ".cache", 0, 0))
+    actionRows = Split(Replace(actionText, Chr$(13), vbNullString, 1, -1, vbBinaryCompare), Chr$(10))
+    For actionIndex = LBound(actionRows) To UBound(actionRows)
+        recordText = Trim$(CStr(actionRows(actionIndex)))
+        If Len(recordText) > 0 Then
+            recordCode = CLng(Val(HandlingRepresentedWiredRecordField(recordText, 0)))
+            If actionCode <= 0 Or recordCode = actionCode Then
+                selectedIds = HandlingRepresentedWiredRecordField(recordText, 2)
+                parameterText = HandlingRepresentedWiredRecordField(recordText, 3)
+                actionCount = actionCount + HandlingRepresentedWiredApplySelected(roomId, selectedIds, parameterText, selectedFurnitureId, socketIndex)
+            End If
+        End If
+    Next actionIndex
+
+ActionDone:
+    HandlingRepresentedWiredAction = actionCount
+End Function
+
+Private Function HandlingRepresentedWiredApplySelected(ByVal roomId As Long, ByVal selectedIds As String, ByVal parameterText As String, ByVal selectedFurnitureId As Long, ByVal socketIndex As Integer) As Long
+    Dim idParts() As String
+    Dim idIndex As Long
+    Dim furnitureId As Long
+    Dim stateValue As Long
+    Dim appliedCount As Long
+    Dim parameterParts() As String
+
+    On Error GoTo ApplyDone
+    If roomId <= 0 Then GoTo ApplyDone
+
+    If selectedFurnitureId > 0 Then
+        selectedIds = CStr(selectedFurnitureId)
+    ElseIf Len(selectedIds) = 0 Then
+        GoTo ApplyDone
+    End If
+
+    parameterParts = Split(parameterText & ";", ";")
+    stateValue = CLng(Val(CStr(parameterParts(0))))
+    idParts = Split(Replace(selectedIds, ",", ";", 1, -1, vbBinaryCompare), ";")
+    For idIndex = LBound(idParts) To UBound(idParts)
+        furnitureId = CLng(Val(CStr(idParts(idIndex))))
+        If furnitureId > 0 Then
+            If CLng(Val(CStr(Proc_5_2_6D4690("SELECT COUNT(*) FROM furnitures WHERE id='" & CStr(furnitureId) & _
+                "' AND id_room='" & CStr(roomId) & "' LIMIT 1", 0, 0)))) > 0 Then
+                Proc_5_0_6D3CD0 "UPDATE furnitures SET sign='" & CStr(stateValue) & "' WHERE id='" & CStr(furnitureId) & "' LIMIT 1", 0, 0
+                Proc_6_151_78AC20 roomId, furnitureId, stateValue
+                Proc_6_246_8024C0 roomId, "AX" & CStr(furnitureId) & Chr$(2) & CStr(stateValue) & Chr$(2), 0
+                appliedCount = appliedCount + 1
+            End If
+        End If
+    Next idIndex
+
+ApplyDone:
+    HandlingRepresentedWiredApplySelected = appliedCount
+End Function
+
+Private Function HandlingRepresentedWiredSelectedItemsExist(ByVal roomId As Long, ByVal selectedIds As String) As Boolean
+    Dim idParts() As String
+    Dim idIndex As Long
+    Dim furnitureId As Long
+
+    On Error GoTo ExistsFailed
+    HandlingRepresentedWiredSelectedItemsExist = True
+    If roomId <= 0 Or Len(selectedIds) = 0 Then Exit Function
+
+    idParts = Split(Replace(selectedIds, ",", ";", 1, -1, vbBinaryCompare), ";")
+    For idIndex = LBound(idParts) To UBound(idParts)
+        furnitureId = CLng(Val(CStr(idParts(idIndex))))
+        If furnitureId > 0 Then
+            If CLng(Val(CStr(Proc_5_2_6D4690("SELECT COUNT(*) FROM furnitures WHERE id='" & CStr(furnitureId) & _
+                "' AND id_room='" & CStr(roomId) & "' LIMIT 1", 0, 0)))) <= 0 Then
+                HandlingRepresentedWiredSelectedItemsExist = False
+                Exit Function
+            End If
+        End If
+    Next idIndex
+    Exit Function
+
+ExistsFailed:
+    HandlingRepresentedWiredSelectedItemsExist = False
+End Function
+
+Private Function HandlingRepresentedWiredRecordField(ByVal recordText As String, ByVal fieldIndex As Long) As String
+    Dim bodyText As String
+    Dim parts() As String
+    Dim restText As String
+
+    On Error GoTo MissingField
+    bodyText = recordText
+    If Left$(bodyText, 1) = Chr$(1) Then bodyText = Mid$(bodyText, 2)
+
+    parts = Split(bodyText, Chr$(2), 2)
+    If fieldIndex = 0 Then HandlingRepresentedWiredRecordField = CStr(parts(0)): Exit Function
+    If UBound(parts) < 1 Then GoTo MissingField
+
+    restText = CStr(parts(1))
+    parts = Split(restText, Chr$(3), 2)
+    If fieldIndex = 1 Then HandlingRepresentedWiredRecordField = CStr(parts(0)): Exit Function
+    If UBound(parts) < 1 Then GoTo MissingField
+
+    restText = CStr(parts(1))
+    parts = Split(restText, Chr$(4), 2)
+    If fieldIndex = 2 Then HandlingRepresentedWiredRecordField = CStr(parts(0)): Exit Function
+    If UBound(parts) < 1 Then GoTo MissingField
+
+    restText = CStr(parts(1))
+    parts = Split(restText, Chr$(5), 2)
+    If fieldIndex = 3 Then HandlingRepresentedWiredRecordField = CStr(parts(0)): Exit Function
+    If UBound(parts) < 1 Then GoTo MissingField
+
+    restText = CStr(parts(1))
+    parts = Split(restText, Chr$(6), 2)
+    If fieldIndex = 4 Then HandlingRepresentedWiredRecordField = CStr(parts(0)): Exit Function
+    If fieldIndex = 5 And UBound(parts) >= 1 Then HandlingRepresentedWiredRecordField = CStr(parts(1)): Exit Function
+
+MissingField:
+    HandlingRepresentedWiredRecordField = vbNullString
 End Function
 
 Private Function RemoveRepresentedLineRecord(ByVal cacheText As String, ByVal markerText As String) As String
