@@ -313,7 +313,17 @@ End Sub
 
 ' Original declaration: Private Sub Form_Resize() '68E3F0
 Private Sub Form_Resize()
-    ' TODO: Reconstruct behavior from decompiled reference.
+    On Error Resume Next
+
+    If Width < 11085 Then Width = 11085
+    If Height < 10245 Then Height = 10245
+
+    txtLog.Width = ScaleWidth
+    txtLog.Height = ScaleHeight - 525
+    txtLog.SelStart = Len(txtLog.Text)
+
+    Frame7.Width = ScaleWidth
+    Label7.Width = Frame7.Width
 End Sub
 
 ' Original declaration: Private Sub Form_QueryUnload(Cancel As Integer, UnloadMode As Integer) '68D210
