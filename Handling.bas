@@ -7900,7 +7900,96 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_232_7F45A0
 Public Function Proc_6_232_7F45A0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim offset As Long
+    Dim requestedQuestId As Long
+    Dim questRows() As String
+    Dim questFields() As String
+    Dim questRow As String
+    Dim questIndex As Long
+    Dim questId As Long
+    Dim existingLevelText As String
+    Dim progressValue As Long
+    Dim activityCount As Long
+    Dim waitAmount As Long
+    Dim timeNextText As String
+    Dim matchedQuest As Boolean
+
+    On Error GoTo QuestAcceptFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo QuestAcceptFailed
+
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "p^" Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    requestedQuestId = ReadWireLong(requestPayload, offset)
+    If requestedQuestId <= 0 Then requestedQuestId = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    If requestedQuestId <= 0 Then GoTo QuestAcceptFailed
+
+    If Len(global_00829080) > 0 Then
+        questRows = Split(global_00829080, Chr$(13))
+    Else
+        questRows = Split(CStr(Proc_5_2_6D4690("SELECT id,level,name,NULL,reward,reward_type,require_action,id_additional,id_campaign,amount_activities,waitamount FROM quests ORDER BY id_campaign DESC,level ASC", 0, 0)), Chr$(13))
+    End If
+
+    For questIndex = LBound(questRows) To UBound(questRows)
+        questRow = Trim$(CStr(questRows(questIndex)))
+        If Len(questRow) > 0 Then
+            questFields = Split(questRow, Chr$(9))
+            If UBound(questFields) >= 10 Then
+                questId = CLng(Val(HandlingField(questFields, 0)))
+                If questId = requestedQuestId Then
+                    activityCount = CLng(Val(HandlingField(questFields, 9)))
+                    waitAmount = CLng(Val(HandlingField(questFields, 10)))
+                    matchedQuest = True
+                    Exit For
+                End If
+            End If
+        End If
+    Next questIndex
+    If Not matchedQuest Then GoTo QuestAcceptFailed
+    If activityCount <= 0 Then activityCount = 1
+
+    Proc_5_0_6D3CD0 "UPDATE users_quests SET timestamp_accepted=NULL WHERE id_user='" & _
+        Proc_10_11_80A9C0(userId, 0, 0) & "' AND timestamp_accepted IS NOT NULL AND timestamp_done IS NULL LIMIT 1", 0, 0
+
+    existingLevelText = CStr(Proc_5_2_6D4690("SELECT id_level FROM users_quests WHERE id_user='" & _
+        Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_quest='" & CStr(questId) & "' LIMIT 1", 0, 0))
+    If Len(existingLevelText) > 0 Then
+        Proc_5_0_6D3CD0 "UPDATE users_quests SET timestamp_done=NULL,timestamp_accepted=UNIX_TIMESTAMP(),id_numericquest='" & _
+            CStr(requestedQuestId) & "',time_next=NULL WHERE id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & _
+            "' AND id_quest='" & CStr(questId) & "' LIMIT 1", 0, 0
+    Else
+        Proc_5_0_6D3CD0 "INSERT INTO users_quests(id_user,id_quest,id_level,id_numericquest,timestamp_accepted) VALUES('" & _
+            Proc_10_11_80A9C0(userId, 0, 0) & "','" & CStr(questId) & "','0','" & CStr(requestedQuestId) & "',UNIX_TIMESTAMP())", 0, 0
+    End If
+
+    progressValue = CLng(Val(CStr(Proc_5_2_6D4690("SELECT progress FROM users_quests WHERE id_user='" & _
+        Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_quest='" & CStr(questId) & "' LIMIT 1", 0, 0))))
+    If waitAmount > 0 And progressValue > 0 And progressValue < activityCount Then
+        timeNextText = CStr(Proc_5_2_6D4690("SELECT time_next FROM users_quests WHERE id_user='" & _
+            Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_quest='" & CStr(questId) & "' LIMIT 1", 0, 0))
+        If Len(timeNextText) = 0 Or timeNextText = "0" Then
+            Proc_5_0_6D3CD0 "UPDATE users_quests SET time_next=DATE_ADD(NOW(),INTERVAL " & CStr(waitAmount) & _
+                " SECOND) WHERE id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_quest='" & CStr(questId) & "' LIMIT 1", 0, 0
+        End If
+    End If
+
+    If progressValue >= activityCount Then
+        Proc_6_164_7BC820 socketIndex, questId, requestedQuestId
+    Else
+        Proc_6_236_7F8540 socketIndex, Empty, Empty
+    End If
+
+QuestAcceptFailed:
     Proc_6_232_7F45A0 = Empty
 End Function
 
