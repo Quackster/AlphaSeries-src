@@ -279,7 +279,24 @@ Option Explicit
 
 ' Original declaration: Private Sub DataProcess_Timer(Index As Integer) '68B2D0
 Private Sub DataProcess_Timer(Index As Integer)
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim packetData As String
+
+    On Error GoTo ProcessDone
+
+    DataProcess(Index).Enabled = False
+    If Proc_11_2_821390(Index, 1, Me) = 1 Then
+        packetData = PopGameServerPacketData(Index)
+        If Len(packetData) > 0 Then
+            Proc_0_25_68FBC0 Index, packetData
+        End If
+        DataProcess(Index).Enabled = True
+    End If
+
+ProcessDone:
+    On Error Resume Next
+    If Proc_11_2_821390(Index, 1, Me) = 1 Then
+        DataProcess(Index).Enabled = True
+    End If
 End Sub
 
 ' Original declaration contained invalid VB6 identifier text: Private Sub gameServer_C_q]<lkamWk&_uo_lLfj`j=nEge]( '68F5C0
@@ -512,6 +529,31 @@ Private Sub AppendGameServerPacketData(ByVal socketIndex As Long, ByVal fields A
 AppendFailed:
 End Sub
 
+Private Function PopGameServerPacketData(ByVal socketIndex As Long) As String
+    Dim marker As String
+    Dim recordStart As Long
+    Dim payloadStart As Long
+    Dim recordEnd As Long
+
+    On Error GoTo PopFailed
+
+    marker = "[" & CStr(socketIndex) & ":"
+    recordStart = InStr(1, global_00829350, marker, vbBinaryCompare)
+    If recordStart = 0 Then Exit Function
+
+    payloadStart = recordStart + Len(marker)
+    recordEnd = InStr(payloadStart, global_00829350, "]", vbBinaryCompare)
+    If recordEnd = 0 Then Exit Function
+
+    PopGameServerPacketData = Mid$(global_00829350, payloadStart, recordEnd - payloadStart)
+    global_00829350 = Left$(global_00829350, recordStart - 1) & Mid$(global_00829350, recordEnd + 1)
+
+    Exit Function
+
+PopFailed:
+    PopGameServerPacketData = vbNullString
+End Function
+
 ' Original declaration: Private  Proc_0_22_68C1A0(arg_C) '68C1A0
 Private Function Proc_0_22_68C1A0(Optional ByVal arg_C As Variant) As Variant
     Dim sourceText As String
@@ -546,7 +588,7 @@ Private Sub Proc_0_24_68EEF0()
 End Sub
 
 ' Original declaration: Private  Proc_0_25_68FBC0(arg_C, arg_10) '68FBC0
-Private Sub Proc_0_25_68FBC0()
+Private Sub Proc_0_25_68FBC0(Optional ByVal arg_C As Variant, Optional ByVal arg_10 As Variant)
     ' TODO: Reconstruct behavior from decompiled reference.
 End Sub
 
