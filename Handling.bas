@@ -1226,32 +1226,123 @@ End Function
 
 ' Original declaration: Private  Proc_6_24_6EA010(arg_C) '6EA010
 Public Function Proc_6_24_6EA010(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_24_6EA010 = Empty
+    Proc_6_24_6EA010 = HandlingRepresentedChatRoute(args, 0)
 End Function
 
 ' Original declaration: Private  Proc_6_25_6EEAC0(arg_C) '6EEAC0
 Public Function Proc_6_25_6EEAC0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_25_6EEAC0 = Empty
+    Proc_6_25_6EEAC0 = HandlingRepresentedChatRoute(args, 0)
 End Function
 
 ' Original declaration: Private Sub Proc_6_26_7034C0
 Public Function Proc_6_26_7034C0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_26_7034C0 = Empty
+    Proc_6_26_7034C0 = HandlingRepresentedChatRoute(args, 0)
 End Function
 
 ' Original declaration: Private Sub Proc_6_27_706920
 Public Function Proc_6_27_706920(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_27_706920 = Empty
+    Proc_6_27_706920 = HandlingRepresentedChatRoute(args, 1)
 End Function
 
 ' Original declaration: Private Sub Proc_6_28_709DA0
 Public Function Proc_6_28_709DA0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_28_709DA0 = Empty
+    Proc_6_28_709DA0 = HandlingRepresentedChatRoute(args, 2)
+End Function
+
+Private Function HandlingRepresentedChatRoute(ByRef args() As Variant, ByVal chatType As Long) As Variant
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim userId As String
+    Dim roomId As Long
+    Dim roomUserIndex As Long
+    Dim messageText As String
+    Dim filteredText As String
+    Dim targetName As String
+    Dim targetSocketIndex As Integer
+    Dim gestureId As Long
+    Dim payload As String
+    Dim offset As Long
+    Dim idType As Long
+    Dim userRank As Long
+    Dim hcLevel As Long
+
+    On Error GoTo ChatDone
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex <= 0 Then GoTo ChatDone
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "@t" Or Left$(requestPayload, 2) = "@w" Or Left$(requestPayload, 2) = "@x" Then
+        requestPayload = Mid$(requestPayload, 3)
+    End If
+    If Left$(requestPayload, 1) = "H" Or Left$(requestPayload, 1) = "I" Then requestPayload = Mid$(requestPayload, 2)
+
+    offset = 1
+    If chatType = 2 Then
+        targetName = Trim$(CStr(ReadWireString(requestPayload, offset)))
+        messageText = CStr(ReadWireString(requestPayload, offset))
+        If Len(messageText) = 0 Then
+            messageText = requestPayload
+            If InStr(1, messageText, Chr$(32), vbBinaryCompare) > 0 Then
+                targetName = Trim$(Left$(messageText, InStr(1, messageText, Chr$(32), vbBinaryCompare) - 1))
+                messageText = Mid$(messageText, Len(targetName) + 2)
+            End If
+        End If
+    Else
+        messageText = CStr(ReadWireString(requestPayload, offset))
+        If Len(messageText) = 0 Then messageText = requestPayload
+    End If
+
+    messageText = Left$(Trim$(CStr(Proc_10_10_80A7F0(messageText, 0, 0))), 122)
+    If Len(messageText) = 0 Then GoTo ChatDone
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo ChatDone
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    roomUserIndex = RepresentedRoomUserIndex(socketIndex, userId)
+    If roomId <= 0 Or roomUserIndex <= 0 Then GoTo ChatDone
+
+    userRank = HandlingUserRank(userId)
+    hcLevel = HandlingUserHcLevel(userId)
+    If Len(Proc_6_21_6E8BA0(messageText, 0, 0)) > 0 Then
+        If Not CBool(Proc_10_1_809790(userRank, vbNullString, "fuse_can_chat_links", hcLevel)) Then GoTo ChatDone
+    End If
+
+    filteredText = CStr(Proc_6_22_6E9300(messageText, 0, 0))
+    If Len(filteredText) = 0 Then filteredText = messageText
+    gestureId = CLng(Val(CStr(Proc_6_23_6E9A90(filteredText, 0, 0))))
+
+    idType = chatType
+    Proc_5_1_6D4110 "INSERT INTO logs_chat(id_user,id_room,timestamp,description,id_type,id_session) VALUES('" & _
+        Proc_10_11_80A9C0(userId, 0, 0) & "','" & CStr(roomId) & "',UNIX_TIMESTAMP(),'" & _
+        Proc_10_11_80A9C0(filteredText, 0, 0) & "','" & CStr(idType) & "','" & _
+        Proc_10_11_80A9C0(HandlingUserSessionId(userId), 0, 0) & "')", 0, 0
+
+    payload = CStr(Proc_3_0_6D2AF0(roomUserIndex, Empty, IIf(chatType = 1, "@Y", "@X")))
+    payload = payload & filteredText & Chr$(2)
+    payload = CStr(Proc_3_0_6D2AF0(gestureId, Empty, payload))
+
+    If chatType = 2 Then
+        targetSocketIndex = HandlingSocketIndexForUserName(targetName)
+        If targetSocketIndex > 0 Then
+            Proc_6_244_801E80 targetSocketIndex, payload, 0
+            Proc_6_244_801E80 socketIndex, payload, 0
+        Else
+            Proc_6_244_801E80 socketIndex, payload, 0
+        End If
+    Else
+        Proc_6_245_801FA0 socketIndex, payload, 0
+    End If
+
+    HandlingRepresentedChatRoute = payload
+    Exit Function
+
+ChatDone:
+    HandlingRepresentedChatRoute = Empty
 End Function
 
 ' Original declaration: Private  Proc_6_29_70D800(arg_C, arg_10, arg_14, arg_18, arg_1C, arg_20, arg_24, arg_28, arg_2C, arg_30, arg_34) '70D800
@@ -10946,6 +11037,12 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_206_7DA450 socketIndex, "Er", packetPayload
         Case "@G"
             Proc_6_237_7F9ED0 socketIndex, "@G", packetPayload
+        Case "@t"
+            Proc_6_26_7034C0 socketIndex, "@t", packetPayload
+        Case "@w"
+            Proc_6_27_706920 socketIndex, "@w", packetPayload
+        Case "@x"
+            Proc_6_28_709DA0 socketIndex, "@x", packetPayload
         Case "Cd"
             Proc_6_101_749540 socketIndex, "EA", packetPayload
         Case "@Z"
@@ -12433,6 +12530,37 @@ Private Function HandlingUserName(ByVal userId As String) As String
 
 LookupFailed:
     HandlingUserName = vbNullString
+End Function
+
+Private Function HandlingUserSessionId(ByVal userId As String) As String
+    On Error GoTo LookupFailed
+    If Len(userId) = 0 Or userId = "0" Then GoTo LookupFailed
+
+    HandlingUserSessionId = CStr(Proc_5_2_6D4690("SELECT id_session FROM users WHERE id='" & _
+        Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 1", 0, 0))
+    Exit Function
+
+LookupFailed:
+    HandlingUserSessionId = vbNullString
+End Function
+
+Private Function HandlingSocketIndexForUserName(ByVal userName As String) As Integer
+    Dim rowText As String
+    Dim fields() As String
+
+    On Error GoTo LookupFailed
+    If Len(userName) = 0 Then GoTo LookupFailed
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT id_socket FROM users WHERE name='" & _
+        Proc_10_11_80A9C0(userName, 0, 0) & "' AND id_socket IS NOT NULL LIMIT 1", 0, 0))
+    If Len(rowText) = 0 Then GoTo LookupFailed
+
+    fields = Split(rowText, Chr$(9))
+    HandlingSocketIndexForUserName = CInt(Val(HandlingField(fields, 0)))
+    Exit Function
+
+LookupFailed:
+    HandlingSocketIndexForUserName = 0
 End Function
 
 Private Function MessengerFriendSummaryPayload(ByVal userId As String, ByVal relationshipState As Long) As String
