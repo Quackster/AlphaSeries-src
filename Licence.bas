@@ -15,6 +15,8 @@ Public global_00829204 As String
 Public global_00829208 As String
 Public global_0082920C As Variant
 Public global_00829210 As Variant
+Public global_00829224 As Variant
+Public global_00829230 As String
 Public global_008291D4 As Variant
 Public global_008291D8 As Long
 Public global_0082919C As Long

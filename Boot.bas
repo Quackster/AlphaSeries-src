@@ -143,7 +143,24 @@ End Function
 
 ' Original declaration: Private Sub Proc_1_11_6C8D10
 Public Function Proc_1_11_6C8D10(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim privateCategoryId As Long
+    Dim publicCategoryId As Long
+    Dim parentCategoryId As Long
+
+    On Error GoTo BuildFailed
+
+    privateCategoryId = CLng(Val(CStr(Proc_10_0_809570("com.client.navigator.categories.default.private.id", 0, 0))))
+    publicCategoryId = CLng(Val(CStr(Proc_10_0_809570("com.client.navigator.categories.default.public.id", 0, 0))))
+
+    ReDim global_00829224(0 To 2)
+    global_00829224(0) = privateCategoryId
+    global_00829224(2) = publicCategoryId
+
+    parentCategoryId = privateCategoryId
+    If parentCategoryId = 0 Then parentCategoryId = 1
+    global_00829230 = CStr(Proc_5_2_6D4690("SELECT id,name,has_trading,level_minrequired,hclevel_minrequired FROM rooms_categories WHERE id_parent='" & CStr(parentCategoryId) & "' ORDER BY id ASC", 0, 0))
+
+BuildFailed:
     Proc_1_11_6C8D10 = Empty
 End Function
 
