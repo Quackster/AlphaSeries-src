@@ -6591,7 +6591,44 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_191_7D18B0
 Public Function Proc_6_191_7D18B0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim callerUserId As String
+    Dim requestedUserId As Long
+    Dim targetSocketIndex As Integer
+    Dim payload As String
+    Dim offset As Long
+
+    On Error GoTo TagsFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex <= 0 Then GoTo TagsFailed
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "DG" Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    requestedUserId = ReadWireLong(requestPayload, offset)
+    If requestedUserId <= 0 Then GoTo TagsFailed
+
+    callerUserId = HandlingUserIdFromSocket(socketIndex)
+    If Len(callerUserId) = 0 Or callerUserId = "0" Then GoTo TagsFailed
+
+    targetSocketIndex = CInt(Val(CStr(Proc_5_2_6D4690("SELECT id_socket FROM users WHERE id='" & CStr(requestedUserId) & "' LIMIT 1", 0, 0))))
+    If targetSocketIndex <= 0 Then
+        If HandlingCurrentRoomId(socketIndex, callerUserId) <= 0 Then GoTo TagsFailed
+    End If
+
+    payload = "E^" & CStr(Proc_3_0_6D2AF0(requestedUserId, Empty, vbNullString)) & CStr(Proc_6_196_7D3ED0(requestedUserId, 0, 0))
+    Proc_6_244_801E80 socketIndex, payload, 0
+
+    Proc_6_191_7D18B0 = payload
+    Exit Function
+
+TagsFailed:
     Proc_6_191_7D18B0 = Empty
 End Function
 
@@ -6621,8 +6658,44 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_196_7D3ED0
 Public Function Proc_6_196_7D3ED0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_196_7D3ED0 = Empty
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim rowText As String
+    Dim rows() As String
+    Dim rowIndex As Long
+    Dim tagPayload As String
+    Dim tagCount As Long
+
+    On Error GoTo TagsBuildFailed
+
+    If UBound(args) >= 0 Then
+        If IsNumeric(CStr(args(0))) Then
+            userId = CStr(CLng(Val(CStr(args(0)))))
+        End If
+    End If
+
+    If Len(userId) = 0 Or userId = "0" Then
+        socketIndex = HandlingSocketIndex(args)
+        If socketIndex > 0 Then userId = HandlingUserIdFromSocket(socketIndex)
+    End If
+    If Len(userId) = 0 Or userId = "0" Then GoTo TagsBuildFailed
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT name FROM users_tags WHERE id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 30", 0, 0))
+    If Len(rowText) > 0 Then
+        rows = Split(rowText, Chr$(13))
+        For rowIndex = LBound(rows) To UBound(rows)
+            If Len(CStr(rows(rowIndex))) > 0 Then
+                tagPayload = tagPayload & CStr(rows(rowIndex)) & Chr$(2)
+                tagCount = tagCount + 1
+            End If
+        Next rowIndex
+    End If
+
+    Proc_6_196_7D3ED0 = CStr(Proc_3_0_6D2AF0(tagCount, Empty, vbNullString)) & tagPayload
+    Exit Function
+
+TagsBuildFailed:
+    Proc_6_196_7D3ED0 = CStr(Proc_3_0_6D2AF0(0, Empty, vbNullString))
 End Function
 
 ' Original declaration: Private Sub Proc_6_197_7D43C0
@@ -7515,6 +7588,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_188_7CF3C0 socketIndex, "Fx", packetPayload
         Case "Cg"
             Proc_6_190_7D11D0 socketIndex, "Cg", packetPayload
+        Case "DG"
+            Proc_6_191_7D18B0 socketIndex, "DG", packetPayload
         Case "n" & Chr$(127)
             Proc_6_177_7C6580 socketIndex, "n" & Chr$(127), packetPayload
         Case "ny"
