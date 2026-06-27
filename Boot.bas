@@ -62,7 +62,29 @@ End Function
 
 ' Original declaration: Private Sub Proc_1_8_6C6850
 Public Function Proc_1_8_6C6850(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim cacheKey As String
+    Dim cacheValue As String
+
+    On Error GoTo BuildFailed
+
+    rows = Split(CStr(Proc_5_2_6D4690("SELECT variable,value FROM locales WHERE category='2' AND variable LIKE 'roomevent_type_" & Chr$(37) & "'", 0, 0)), Chr$(13))
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(rows(rowIndex)) > 0 Then
+            fields = Split(rows(rowIndex), Chr$(9))
+            If UBound(fields) >= 1 Then
+                cacheKey = Replace(CStr(fields(0)), "roomevent_type_", vbNullString, 1, 1, vbBinaryCompare)
+                cacheValue = CStr(fields(1))
+                If Len(cacheKey) > 0 Then
+                    global_008291AC = global_008291AC & Chr$(0) & CStr(Val(cacheKey)) & Chr$(1) & cacheValue & Chr$(2)
+                End If
+            End If
+        End If
+    Next rowIndex
+
+BuildFailed:
     Proc_1_8_6C6850 = Empty
 End Function
 
