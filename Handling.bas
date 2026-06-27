@@ -153,7 +153,74 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_3_6DA490
 Public Function Proc_6_3_6DA490(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim callerUserId As String
+    Dim targetUserId As String
+    Dim targetSocketIndex As Integer
+    Dim currentRoomId As Long
+    Dim banMessage As String
+    Dim banHours As Long
+    Dim banSeconds As Long
+    Dim targetIpAddress As String
+    Dim offset As Long
+
+    On Error GoTo BanFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "GP" Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    targetUserId = CStr(ReadWireLong(requestPayload, offset))
+    If Len(targetUserId) = 0 Or targetUserId = "0" Then targetUserId = CStr(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    If Len(targetUserId) = 0 Or targetUserId = "0" Then GoTo BanFailed
+
+    banMessage = CStr(Proc_10_10_80A7F0(ReadWireString(requestPayload, offset), 0, 0))
+    If Len(banMessage) = 0 Then banMessage = CStr(Proc_10_10_80A7F0(Proc_10_7_80A190(requestPayload, 0, 0), 0, 0))
+    If Len(banMessage) = 0 Then GoTo BanFailed
+
+    banHours = ReadWireLong(requestPayload, offset)
+    If banHours <= 0 Then banHours = CLng(Val(CStr(Proc_10_6_809F10(Mid$(requestPayload, offset), 0, 0))))
+    If banHours <= 0 Then GoTo BanFailed
+    banSeconds = banHours * 60 * 60
+
+    callerUserId = HandlingUserIdFromSocket(socketIndex)
+    If Len(callerUserId) = 0 Or callerUserId = "0" Then GoTo BanFailed
+    If Not HandlingUserHasPermission(callerUserId, "fuse_mod") Then GoTo BanFailed
+    If Not HandlingUserHasPermission(callerUserId, "fuse_alert") Then GoTo BanFailed
+    If ContainsUnsafeStaffAlert(banMessage) Then GoTo BanFailed
+
+    currentRoomId = HandlingCurrentRoomId(socketIndex, callerUserId)
+    Proc_5_1_6D4110 "INSERT INTO logs_moderation(id_type,id_user,id_target,id_target_2,timestamp,message,id_session) VALUES('6','" & _
+        Proc_10_11_80A9C0(callerUserId, 0, 0) & "','" & Proc_10_11_80A9C0(targetUserId, 0, 0) & "','" & CStr(currentRoomId) & "',UNIX_TIMESTAMP(),'" & _
+        Proc_10_11_80A9C0(banMessage, 0, 0) & "','" & CStr(socketIndex) & "')", 0, 0
+
+    targetIpAddress = CStr(Proc_5_2_6D4690("SELECT ip_last FROM users WHERE id='" & Proc_10_11_80A9C0(targetUserId, 0, 0) & "' LIMIT 1", 0, 0))
+    If Len(targetIpAddress) > 0 Then
+        Proc_5_0_6D3CD0 "INSERT INTO users_bans(id_user,id_partner,message,timestamp_expire,timestamp_submit,ipaddress) VALUES('" & _
+            Proc_10_11_80A9C0(targetUserId, 0, 0) & "','" & Proc_10_11_80A9C0(callerUserId, 0, 0) & "','" & _
+            Proc_10_11_80A9C0(banMessage, 0, 0) & "',UNIX_TIMESTAMP()+" & CStr(banSeconds) & ",UNIX_TIMESTAMP(),'" & _
+            Proc_10_11_80A9C0(targetIpAddress, 0, 0) & "')", 0, 0
+    Else
+        Proc_5_0_6D3CD0 "INSERT INTO users_bans(id_user,id_partner,message,timestamp_expire,timestamp_submit) VALUES('" & _
+            Proc_10_11_80A9C0(targetUserId, 0, 0) & "','" & Proc_10_11_80A9C0(callerUserId, 0, 0) & "','" & _
+            Proc_10_11_80A9C0(banMessage, 0, 0) & "',UNIX_TIMESTAMP()+" & CStr(banSeconds) & ",UNIX_TIMESTAMP())", 0, 0
+    End If
+
+    Proc_5_0_6D3CD0 "UPDATE users SET login_session=NULL WHERE id='" & Proc_10_11_80A9C0(targetUserId, 0, 0) & "'", 0, 0
+
+    targetSocketIndex = HandlingSocketFromUserId(targetUserId)
+    If targetSocketIndex > 0 Then
+        Proc_6_244_801E80 targetSocketIndex, "@c" & banMessage & Chr$(2), 0
+        Proc_6_243_7FFEB0 targetSocketIndex, 0, 0
+    End If
+
+BanFailed:
     Proc_6_3_6DA490 = Empty
 End Function
 
@@ -3397,6 +3464,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_1_6D8B70 socketIndex, "GM", packetPayload
         Case "GO"
             Proc_6_2_6D9880 socketIndex, "GO", packetPayload
+        Case "GP"
+            Proc_6_3_6DA490 socketIndex, "GP", packetPayload
         Case "Fw"
             Proc_6_115_751220 socketIndex, "Fw", packetPayload
         Case "Fn"
