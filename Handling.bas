@@ -3501,6 +3501,7 @@ Public Function Proc_6_78_7279A0(ParamArray args() As Variant) As Variant
     Proc_6_83_732640 socketIndex, modelId
     Proc_6_85_73A8E0 socketIndex, roomId
     Proc_6_235_7F77E0 socketIndex, 0, 0
+    Proc_6_80_72EB60 socketIndex, roomId
     Proc_6_244_801E80 socketIndex, "CP" & Chr$(2) & Chr$(2), 0
 
     pollRow = CStr(Proc_5_2_6D4690("SELECT id,description_title FROM poll WHERE id_room='" & CStr(roomId) & "' AND timestamp_hide>UNIX_TIMESTAMP() LIMIT 1", 0, 0))
@@ -3606,6 +3607,7 @@ Public Function Proc_6_79_72A430(ParamArray args() As Variant) As Variant
     Proc_6_84_733600 socketIndex, roomId
     Proc_6_85_73A8E0 socketIndex, roomId
     Proc_6_235_7F77E0 socketIndex, 0, 0
+    Proc_6_80_72EB60 socketIndex, roomId
     Proc_6_244_801E80 socketIndex, "CP" & Chr$(2) & Chr$(2), 0
 
     pollRow = CStr(Proc_5_2_6D4690("SELECT id,description_title FROM poll WHERE id_room='" & CStr(roomId) & "' AND timestamp_hide>UNIX_TIMESTAMP() LIMIT 1", 0, 0))
@@ -3627,7 +3629,56 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_80_72EB60
 Public Function Proc_6_80_72EB60(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim roomId As Long
+    Dim roomSlot As Long
+    Dim rowText As String
+    Dim fields() As String
+    Dim roomUserIndex As Long
+    Dim positionX As Long
+    Dim positionY As Long
+    Dim positionZ As String
+    Dim directionValue As Long
+    Dim entryPayload As String
+
+    On Error GoTo BroadcastDone
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex <= 0 Then GoTo BroadcastDone
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo BroadcastDone
+
+    If UBound(args) >= 1 Then roomId = CLng(Val(CStr(args(1))))
+    If roomId <= 0 Then roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId <= 0 Then GoTo BroadcastDone
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT users.id,users.name,users.figure,users.motto,users.gender,models.position_x,models.position_y,rooms.id_slot FROM users,rooms,models WHERE users.id='" & _
+        Proc_10_11_80A9C0(userId, 0, 0) & "' AND rooms.id='" & CStr(roomId) & "' AND models.id=rooms.id_model LIMIT 1", 0, 0))
+    If Len(rowText) = 0 Then GoTo BroadcastDone
+
+    fields = Split(rowText, Chr$(9))
+    roomUserIndex = RepresentedRoomUserIndex(socketIndex, userId)
+    positionX = CLng(Val(HandlingField(fields, 5)))
+    positionY = CLng(Val(HandlingField(fields, 6)))
+    roomSlot = CLng(Val(HandlingField(fields, 7)))
+    positionZ = "0.0"
+    directionValue = 0
+
+    If roomSlot > 0 Then
+        If HandlingRepresentedMovementPosition(roomSlot, roomUserIndex, positionX, positionY) Then
+            directionValue = 0
+        End If
+    End If
+
+    entryPayload = CStr(Proc_6_41_712730(CLng(Val(HandlingField(fields, 0))), HandlingField(fields, 1), HandlingField(fields, 2), _
+        HandlingField(fields, 3), HandlingField(fields, 4), roomUserIndex, positionX, positionY, positionZ, directionValue, 0))
+    If Len(entryPayload) > 0 Then
+        Proc_6_247_8027E0 socketIndex, CStr(Proc_3_0_6D2AF0(1, Empty, "@\")) & entryPayload, 0
+    End If
+
+BroadcastDone:
     Proc_6_80_72EB60 = Empty
 End Function
 
