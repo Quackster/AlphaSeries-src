@@ -259,13 +259,31 @@ End Function
 
 ' Original declaration: Private  Proc_10_12_80ADB0(arg_C) '80ADB0
 Public Function Proc_10_12_80ADB0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    On Error GoTo SendFailed
+    If UBound(args) < 1 Then
+        Proc_10_12_80ADB0 = Empty
+        Exit Function
+    End If
+
+    Proc_10_12_80ADB0 = Proc_7_0_8034A0("Ba" & CStr(args(0)) & Chr$(2) & CStr(args(1)) & Chr$(2))
+    Exit Function
+
+SendFailed:
     Proc_10_12_80ADB0 = Empty
 End Function
 
 ' Original declaration: Private  Proc_10_13_80AEC0(arg_10) '80AEC0
 Public Function Proc_10_13_80AEC0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    On Error GoTo SendFailed
+    If UBound(args) < 1 Then
+        Proc_10_13_80AEC0 = Empty
+        Exit Function
+    End If
+
+    Proc_10_13_80AEC0 = Proc_7_0_8034A0("Ba" & CStr(args(0)) & Chr$(2) & CStr(args(1)) & Chr$(2))
+    Exit Function
+
+SendFailed:
     Proc_10_13_80AEC0 = Empty
 End Function
 
