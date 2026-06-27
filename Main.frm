@@ -390,7 +390,13 @@ End Sub
 
 ' Original declaration: Private Sub Form_QueryUnload(Cancel As Integer, UnloadMode As Integer) '68D210
 Private Sub Form_QueryUnload(Cancel As Integer, UnloadMode As Integer)
-    ' TODO: Reconstruct behavior from decompiled reference.
+    On Error Resume Next
+
+    Hide
+    gameServer.Close
+    Proc_5_0_6D3CD0 "UPDATE users SET id_socket=null,lastonline_time=UNIX_TIMESTAMP() WHERE id_socket IS NOT NULL", 1, 0
+    Proc_5_0_6D3CD0 "UPDATE rooms SET id_slot=null,visitors_now='0' WHERE id_slot IS NOT NULL OR visitors_now!='0'", 0, 0
+    End
 End Sub
 
 ' Original declaration: Private Sub Form_Initialize() '68B530
