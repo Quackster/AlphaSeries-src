@@ -6,6 +6,7 @@ Option Explicit
 ' Decompiled procedure bodies are intentionally not copied until they are understood and made valid VB6.
 
 Public global_0082928C As String
+Public global_008292A8 As Variant
 
 ' Original declaration: Private Sub Proc_10_0_809570
 Public Function Proc_10_0_809570(ParamArray args() As Variant) As Variant
@@ -27,8 +28,33 @@ End Function
 
 ' Original declaration: Private  Proc_10_1_809790(arg_C, arg_10, arg_14) '809790
 Public Function Proc_10_1_809790(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_10_1_809790 = Empty
+    Dim rankIndex As Long
+    Dim basePermissions As String
+    Dim permissionName As String
+    Dim permissionList As String
+
+    On Error GoTo CheckFailed
+    If UBound(args) < 2 Then
+        Proc_10_1_809790 = False
+        Exit Function
+    End If
+
+    rankIndex = CLng(Val(CStr(args(0))))
+    basePermissions = CStr(args(1))
+    permissionName = CStr(args(2))
+
+    permissionList = Chr$(2) & basePermissions & Chr$(2)
+    If IsArray(global_008292A8) Then
+        If rankIndex >= LBound(global_008292A8) And rankIndex <= UBound(global_008292A8) Then
+            permissionList = permissionList & CStr(global_008292A8(rankIndex))
+        End If
+    End If
+
+    Proc_10_1_809790 = (InStr(1, permissionList, Chr$(2) & permissionName & Chr$(2), vbBinaryCompare) > 0)
+    Exit Function
+
+CheckFailed:
+    Proc_10_1_809790 = False
 End Function
 
 ' Original declaration: Private Sub Proc_10_2_8099D0
