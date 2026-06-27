@@ -5345,7 +5345,49 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_228_7F2AF0
 Public Function Proc_6_228_7F2AF0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim songDiskProductId As Long
+    Dim rowText As String
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim diskCount As Long
+    Dim diskPayload As String
+    Dim rowValue As String
+    Dim diskId As Long
+    Dim destinationId As Long
+
+    On Error GoTo DiskListFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo DiskListFailed
+
+    songDiskProductId = CLng(Val(CStr(Proc_10_0_809570("com.server.socket.game.default.songdisk", 0, 0))))
+    If songDiskProductId <= 0 Then GoTo DiskListFailed
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT id,id_destination FROM furnitures WHERE id_owner='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_product='" & CStr(songDiskProductId) & "' LIMIT 250", 0, 0))
+    If Len(rowText) > 0 Then
+        rows = Split(rowText, Chr$(13))
+        For rowIndex = LBound(rows) To UBound(rows)
+            rowValue = Trim$(CStr(rows(rowIndex)))
+            If Len(rowValue) > 0 Then
+                fields = Split(rowValue, Chr$(9))
+                diskId = CLng(Val(HandlingField(fields, 0)))
+                destinationId = CLng(Val(HandlingField(fields, 1)))
+                If diskId > 0 Then
+                    diskPayload = diskPayload & CStr(Proc_3_0_6D2AF0(diskId, Empty, vbNullString))
+                    diskPayload = diskPayload & CStr(Proc_3_0_6D2AF0(destinationId, Empty, vbNullString))
+                    diskCount = diskCount + 1
+                End If
+            End If
+        Next rowIndex
+    End If
+
+    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(diskCount, Empty, "EM")) & diskPayload, 0
+
+DiskListFailed:
     Proc_6_228_7F2AF0 = Empty
 End Function
 
