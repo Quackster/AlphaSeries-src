@@ -2079,7 +2079,60 @@ End Function
 
 ' Original declaration: Private  Proc_6_204_7D82E0(arg_C, arg_10) '7D82E0
 Public Function Proc_6_204_7D82E0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim achievementIndex As Long
+    Dim achievementId As Long
+    Dim badgePrefix As String
+    Dim badgeLevel As Long
+    Dim badgeId As String
+    Dim badgeRowId As Long
+    Dim rewardIncrease As Long
+    Dim scoreIncrease As Long
+    Dim rewardType As Long
+    Dim payload As String
+
+    On Error GoTo RewardFailed
+    If UBound(args) < 1 Then GoTo RewardFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    userId = HandlingUserIdFromSocket(socketIndex)
+    achievementIndex = CLng(Val(CStr(args(1))))
+    If UBound(args) >= 2 Then
+        badgeLevel = CLng(Val(CStr(args(2))))
+    Else
+        badgeLevel = 1
+    End If
+    If badgeLevel <= 0 Then badgeLevel = 1
+
+    If Len(userId) = 0 Then GoTo RewardFailed
+    If Not IsArray(global_008291E8) Then GoTo RewardFailed
+    If achievementIndex < LBound(global_008291E8, 1) Or achievementIndex > UBound(global_008291E8, 1) Then GoTo RewardFailed
+
+    achievementId = CLng(Val(CStr(global_008291E8(achievementIndex, 0))))
+    badgePrefix = CStr(global_008291E8(achievementIndex, 1))
+    rewardIncrease = CLng(Val(CStr(global_008291E8(achievementIndex, 3))))
+    scoreIncrease = CLng(Val(CStr(global_008291E8(achievementIndex, 5))))
+    rewardType = CLng(Val(CStr(global_008291E8(achievementIndex, 6))))
+    If achievementId = 0 Or Len(badgePrefix) = 0 Then GoTo RewardFailed
+
+    badgeId = badgePrefix & CStr(badgeLevel)
+    Proc_5_0_6D3CD0 "DELETE FROM users_badges WHERE id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_badge LIKE '" & Proc_10_11_80A9C0(badgePrefix, 0, 0) & "%' LIMIT 1", 0, 0
+    Proc_5_0_6D3CD0 "INSERT INTO users_badges(id_user,id_badge) VALUES('" & Proc_10_11_80A9C0(userId, 0, 0) & "','" & Proc_10_11_80A9C0(badgeId, 0, 0) & "')", 0, 0
+
+    badgeRowId = CLng(Val(CStr(Proc_5_2_6D4690("SELECT id FROM users_badges WHERE id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_badge='" & Proc_10_11_80A9C0(badgeId, 0, 0) & "' ORDER BY id DESC LIMIT 1", 0, 0))))
+    payload = CStr(Proc_3_0_6D2AF0(achievementIndex, Empty, "Fu"))
+    payload = CStr(Proc_3_0_6D2AF0(achievementId, Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(badgeRowId, Empty, payload)) & badgeId & Chr$(2)
+    payload = CStr(Proc_3_0_6D2AF0(rewardIncrease, Empty, CStr(Proc_3_0_6D2AF0(scoreIncrease, Empty, payload)))) & "HHH" & Chr$(2) & CStr(global_008291E8(achievementIndex, 4)) & Chr$(2)
+    Proc_6_244_801E80 socketIndex, payload, 0
+
+    If rewardIncrease <> 0 Or scoreIncrease <> 0 Then
+        Proc_5_0_6D3CD0 "UPDATE users SET activitypoints_" & CStr(rewardType) & "=activitypoints_" & CStr(rewardType) & "+" & CStr(rewardIncrease) & ",achievement_score=achievement_score+" & CStr(scoreIncrease) & " WHERE id='" & Proc_10_11_80A9C0(userId, 0, 0) & "'", 0, 0
+        Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(rewardType, Empty, CStr(Proc_3_0_6D2AF0(rewardIncrease, Empty, CStr(Proc_3_0_6D2AF0(scoreIncrease, Empty, "Fv")))))), 0
+    End If
+
+RewardFailed:
     Proc_6_204_7D82E0 = Empty
 End Function
 
