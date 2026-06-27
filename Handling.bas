@@ -6537,7 +6537,55 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_190_7D11D0
 Public Function Proc_6_190_7D11D0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim callerUserId As String
+    Dim roomId As Long
+    Dim requestedRoomUserIndex As Long
+    Dim offset As Long
+    Dim rowText As String
+    Dim fields() As String
+    Dim payload As String
+
+    On Error GoTo ProfileFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex <= 0 Then GoTo ProfileFailed
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "Cg" Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    requestedRoomUserIndex = ReadWireLong(requestPayload, offset)
+    If requestedRoomUserIndex <= 0 Then GoTo ProfileFailed
+
+    callerUserId = HandlingUserIdFromSocket(socketIndex)
+    If Len(callerUserId) = 0 Or callerUserId = "0" Then GoTo ProfileFailed
+
+    roomId = HandlingCurrentRoomId(socketIndex, callerUserId)
+    If roomId <= 0 Then GoTo ProfileFailed
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT logs_visitedrooms.id,users.name,users.motto,users.achievement_score,users.figure FROM logs_visitedrooms,users WHERE logs_visitedrooms.id='" & _
+        CStr(requestedRoomUserIndex) & "' AND logs_visitedrooms.id_room='" & CStr(roomId) & "' AND logs_visitedrooms.timestamp_left IS NULL AND users.id=logs_visitedrooms.id_user LIMIT 1", 0, 0))
+    If Len(rowText) = 0 Then
+        rowText = CStr(Proc_5_2_6D4690("SELECT logs_visitedrooms.id,users.name,users.motto,users.achievement_score,users.figure FROM logs_visitedrooms,users WHERE logs_visitedrooms.id_user='" & _
+            CStr(requestedRoomUserIndex) & "' AND logs_visitedrooms.id_room='" & CStr(roomId) & "' AND logs_visitedrooms.timestamp_left IS NULL AND users.id=logs_visitedrooms.id_user LIMIT 1", 0, 0))
+    End If
+    If Len(rowText) = 0 Then GoTo ProfileFailed
+
+    fields = Split(rowText, Chr$(9))
+    If UBound(fields) < 4 Then GoTo ProfileFailed
+
+    payload = RepresentedRoomUserProfilePayload(CLng(Val(CStr(fields(0)))), CStr(fields(1)), CStr(fields(2)), CLng(Val(CStr(fields(3)))), CStr(fields(4)))
+    If Len(payload) > 0 Then Proc_6_244_801E80 socketIndex, payload, 0
+
+    Proc_6_190_7D11D0 = payload
+    Exit Function
+
+ProfileFailed:
     Proc_6_190_7D11D0 = Empty
 End Function
 
@@ -7465,6 +7513,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_189_7D0630 socketIndex, "Fy", packetPayload
         Case "Fx"
             Proc_6_188_7CF3C0 socketIndex, "Fx", packetPayload
+        Case "Cg"
+            Proc_6_190_7D11D0 socketIndex, "Cg", packetPayload
         Case "n" & Chr$(127)
             Proc_6_177_7C6580 socketIndex, "n" & Chr$(127), packetPayload
         Case "ny"
@@ -8077,6 +8127,21 @@ Private Function RepresentedBotEntitiesForRoom(ByVal roomSlot As Long, ByVal onl
     Next recordIndex
 
 LookupDone:
+End Function
+
+Private Function RepresentedRoomUserProfilePayload(ByVal roomUserIndex As Long, ByVal userName As String, ByVal mottoText As String, ByVal achievementScore As Long, ByVal figureText As String) As String
+    On Error GoTo BuildFailed
+    If roomUserIndex <= 0 Then GoTo BuildFailed
+
+    RepresentedRoomUserProfilePayload = CStr(Proc_3_0_6D2AF0(roomUserIndex, Empty, "Dw"))
+    RepresentedRoomUserProfilePayload = RepresentedRoomUserProfilePayload & userName & Chr$(2)
+    RepresentedRoomUserProfilePayload = RepresentedRoomUserProfilePayload & mottoText & Chr$(2)
+    RepresentedRoomUserProfilePayload = CStr(Proc_3_0_6D2AF0(achievementScore, Empty, RepresentedRoomUserProfilePayload))
+    RepresentedRoomUserProfilePayload = RepresentedRoomUserProfilePayload & figureText & Chr$(2)
+    Exit Function
+
+BuildFailed:
+    RepresentedRoomUserProfilePayload = vbNullString
 End Function
 
 Private Sub StoreRepresentedBotPosition(ByVal botEntityId As Long, ByVal positionX As Long, ByVal positionY As Long, ByVal positionZ As String, ByVal positionR As Long)
