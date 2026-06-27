@@ -7,7 +7,45 @@ Option Explicit
 
 ' Original declaration: Private Sub Proc_6_0_6D7FF0
 Public Function Proc_6_0_6D7FF0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim callerUserId As String
+    Dim targetUserId As String
+    Dim userRow As String
+    Dim userFields() As String
+    Dim offset As Long
+    Dim payload As String
+
+    On Error GoTo SummaryFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "GF" Then requestPayload = Mid$(requestPayload, 3)
+
+    targetUserId = CStr(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    If Len(targetUserId) = 0 Or targetUserId = "0" Then
+        offset = 1
+        targetUserId = CStr(ReadWireLong(requestPayload, offset))
+    End If
+    If Len(targetUserId) = 0 Or targetUserId = "0" Then GoTo SummaryFailed
+
+    callerUserId = HandlingUserIdFromSocket(socketIndex)
+    If Len(callerUserId) = 0 Or callerUserId = "0" Then GoTo SummaryFailed
+    If Not HandlingUserHasPermission(callerUserId, "fuse_mod") Then GoTo SummaryFailed
+
+    userRow = CStr(Proc_5_2_6D4690("SELECT users.id,users.name,ROUND((UNIX_TIMESTAMP()-users.create_time)/60,0),ROUND((UNIX_TIMESTAMP()-users.lastonline_time)/60,0),users.id_socket FROM users WHERE users.id='" & _
+        Proc_10_11_80A9C0(targetUserId, 0, 0) & "' LIMIT 1", 0, 0))
+    If Len(userRow) = 0 Then GoTo SummaryFailed
+
+    userFields = Split(userRow, Chr$(9))
+    payload = StaffUserSummaryPayload(userFields)
+    If Len(payload) > 0 Then Proc_6_244_801E80 socketIndex, payload, 0
+
+SummaryFailed:
     Proc_6_0_6D7FF0 = Empty
 End Function
 
@@ -3263,6 +3301,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_5_5_6D64D0 socketIndex, "GH", packetPayload
         Case "GK"
             Proc_5_6_6D7090 socketIndex, "GK", packetPayload
+        Case "GF"
+            Proc_6_0_6D7FF0 socketIndex, "GF", packetPayload
         Case "Fw"
             Proc_6_115_751220 socketIndex, "Fw", packetPayload
         Case "Fn"
@@ -3638,6 +3678,45 @@ Private Function CallForHelpRowPayload(ByRef fields() As String) As String
 
 BuildFailed:
     CallForHelpRowPayload = vbNullString
+End Function
+
+Private Function StaffUserSummaryPayload(ByRef fields() As String) As String
+    Dim userId As Long
+    Dim userName As String
+    Dim createdMinutes As Long
+    Dim lastOnlineMinutes As Long
+    Dim socketIndex As Long
+    Dim callForHelpCount As Long
+    Dim pickedCallForHelpCount As Long
+    Dim cautionCount As Long
+    Dim banCount As Long
+    Dim payload As String
+
+    On Error GoTo BuildFailed
+
+    userId = CLng(Val(HandlingField(fields, 0)))
+    userName = HandlingField(fields, 1)
+    createdMinutes = CLng(Val(HandlingField(fields, 2)))
+    lastOnlineMinutes = CLng(Val(HandlingField(fields, 3)))
+    socketIndex = CLng(Val(HandlingField(fields, 4)))
+
+    callForHelpCount = CLng(Val(CStr(Proc_5_2_6D4690("SELECT COUNT(id) FROM staff_cfh WHERE id_user='" & CStr(userId) & "'", 0, 0))))
+    pickedCallForHelpCount = CLng(Val(CStr(Proc_5_2_6D4690("SELECT COUNT(id) FROM staff_cfh WHERE id_user='" & CStr(userId) & "' AND id_closed='2'", 0, 0))))
+    cautionCount = CLng(Val(CStr(Proc_5_2_6D4690("SELECT COUNT(id) FROM users_cautions WHERE id_user='" & CStr(userId) & "'", 0, 0))))
+    banCount = CLng(Val(CStr(Proc_5_2_6D4690("SELECT COUNT(id) FROM users_bans WHERE id_user='" & CStr(userId) & "'", 0, 0))))
+
+    payload = CStr(Proc_3_0_6D2AF0(userId, Empty, "HU")) & userName & Chr$(2)
+    payload = CStr(Proc_3_0_6D2AF0(createdMinutes, Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(lastOnlineMinutes, Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(IIf(socketIndex > 0, 1, 0), Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(callForHelpCount, Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(pickedCallForHelpCount, Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(cautionCount, Empty, payload))
+    StaffUserSummaryPayload = CStr(Proc_3_0_6D2AF0(banCount, Empty, payload))
+    Exit Function
+
+BuildFailed:
+    StaffUserSummaryPayload = vbNullString
 End Function
 
 Private Function HandlingField(ByRef fields() As String, ByVal fieldIndex As Long) As String
