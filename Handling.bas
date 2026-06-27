@@ -181,8 +181,48 @@ End Function
 
 ' Original declaration: Private  Proc_6_29_70D800(arg_C, arg_10, arg_14, arg_18, arg_1C, arg_20, arg_24, arg_28, arg_2C, arg_30, arg_34) '70D800
 Public Function Proc_6_29_70D800(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_29_70D800 = Empty
+    Dim baseValue As Long
+    Dim firstValue As Long
+    Dim secondValue As Long
+    Dim thirdValue As Long
+    Dim fourthValue As String
+    Dim fifthValue As Long
+    Dim sixthValue As String
+    Dim seventhValue As String
+    Dim eighthValue As Long
+    Dim ninthValue As String
+    Dim tenthValue As Long
+    Dim eleventhValue As String
+    Dim payload As String
+
+    On Error GoTo BuildFailed
+    If UBound(args) < 11 Then GoTo BuildFailed
+
+    baseValue = CLng(Val(CStr(args(0))))
+    firstValue = CLng(Val(CStr(args(1))))
+    secondValue = CLng(Val(CStr(args(2))))
+    thirdValue = CLng(Val(CStr(args(3))))
+    fourthValue = CStr(args(4))
+    fifthValue = CLng(Val(CStr(args(5))))
+    sixthValue = CStr(args(6))
+    seventhValue = CStr(args(7))
+    eighthValue = CLng(Val(CStr(args(8))))
+    ninthValue = CStr(args(9))
+    tenthValue = CLng(Val(CStr(args(10))))
+    eleventhValue = CStr(args(11))
+
+    payload = CStr(Proc_3_0_6D2AF0(baseValue, Empty, "0"))
+    payload = CStr(Proc_3_0_6D2AF0(firstValue, Empty, payload)) & "H"
+    payload = "0" & CStr(Proc_3_0_6D2AF0(secondValue, Empty, payload)) & "H"
+    payload = CStr(Proc_3_0_6D2AF0(baseValue, Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(thirdValue, Empty, payload)) & fourthValue & Chr$(2)
+    payload = CStr(Proc_3_0_6D2AF0(fifthValue, Empty, payload)) & sixthValue & Chr$(2)
+    payload = CStr(Proc_3_0_6D2AF0(eighthValue, Empty, payload)) & ninthValue & Chr$(2) & seventhValue & Chr$(2)
+    Proc_6_29_70D800 = CStr(Proc_3_0_6D2AF0(tenthValue, Empty, payload)) & eleventhValue & Chr$(2)
+    Exit Function
+
+BuildFailed:
+    Proc_6_29_70D800 = vbNullString
 End Function
 
 ' Original declaration: Private Sub Proc_6_30_70DC90
