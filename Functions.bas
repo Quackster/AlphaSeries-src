@@ -5,10 +5,24 @@ Option Explicit
 ' Source reference: /opt/git/AlphaSeries_cracked/DECOMPILED/Functions.bas
 ' Decompiled procedure bodies are intentionally not copied until they are understood and made valid VB6.
 
+Public global_0082928C As String
+
 ' Original declaration: Private Sub Proc_10_0_809570
 Public Function Proc_10_0_809570(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_10_0_809570 = Empty
+    Dim keyName As String
+
+    On Error GoTo LookupFailed
+    If UBound(args) < 0 Then
+        Proc_10_0_809570 = vbNullString
+        Exit Function
+    End If
+
+    keyName = CStr(args(0))
+    Proc_10_0_809570 = ReadSettingsValue(global_0082928C, keyName)
+    Exit Function
+
+LookupFailed:
+    Proc_10_0_809570 = vbNullString
 End Function
 
 ' Original declaration: Private  Proc_10_1_809790(arg_C, arg_10, arg_14) '809790
@@ -344,4 +358,44 @@ Private Function RandomLongFromArgs(ByRef args() As Variant) As Long
 
 RandomFailed:
     RandomLongFromArgs = 0
+End Function
+
+Private Function ReadSettingsValue(ByVal settingsText As String, ByVal keyName As String) As String
+    Dim marker As String
+    Dim valueStart As Long
+    Dim valueEnd As Long
+    Dim normalizedText As String
+    Dim settingLines() As String
+    Dim index As Long
+    Dim currentLine As String
+    Dim equalsAt As Long
+
+    If Len(keyName) = 0 Or Len(settingsText) = 0 Then Exit Function
+
+    marker = "[" & keyName & "="
+    valueStart = InStr(1, settingsText, marker, vbTextCompare)
+    If valueStart > 0 Then
+        valueStart = valueStart + Len(marker)
+        valueEnd = InStr(valueStart, settingsText, "]", vbBinaryCompare)
+        If valueEnd = 0 Then valueEnd = Len(settingsText) + 1
+        ReadSettingsValue = Mid$(settingsText, valueStart, valueEnd - valueStart)
+        Exit Function
+    End If
+
+    normalizedText = Replace(settingsText, vbCrLf, vbLf)
+    normalizedText = Replace(normalizedText, vbCr, vbLf)
+    normalizedText = Replace(normalizedText, "]", vbLf)
+    settingLines = Split(normalizedText, vbLf)
+
+    For index = LBound(settingLines) To UBound(settingLines)
+        currentLine = Trim$(settingLines(index))
+        If Left$(currentLine, 1) = "[" Then currentLine = Mid$(currentLine, 2)
+        equalsAt = InStr(1, currentLine, "=", vbBinaryCompare)
+        If equalsAt > 0 Then
+            If StrComp(Trim$(Left$(currentLine, equalsAt - 1)), keyName, vbTextCompare) = 0 Then
+                ReadSettingsValue = Mid$(currentLine, equalsAt + 1)
+                Exit Function
+            End If
+        End If
+    Next index
 End Function
