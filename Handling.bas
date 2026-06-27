@@ -1062,7 +1062,42 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_64_721650
 Public Function Proc_6_64_721650(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim callerUserId As String
+    Dim targetName As String
+    Dim targetUserId As String
+    Dim roomId As Long
+    Dim offset As Long
+
+    On Error GoTo RevokeFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "D" & Chr$(127) Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    targetName = CStr(Proc_10_11_80A9C0(ReadWireString(requestPayload, offset), 0, 0))
+    If Len(targetName) = 0 Then GoTo RevokeFailed
+
+    callerUserId = HandlingUserIdFromSocket(socketIndex)
+    If Len(callerUserId) = 0 Or callerUserId = "0" Then GoTo RevokeFailed
+
+    roomId = HandlingCurrentRoomId(socketIndex, callerUserId)
+    If roomId <= 0 Then GoTo RevokeFailed
+    If Not HandlingUserHasRoomRight(callerUserId, roomId) Then GoTo RevokeFailed
+
+    targetUserId = CStr(Val(CStr(Proc_5_2_6D4690("SELECT id FROM users WHERE name='" & targetName & "' LIMIT 1", 0, 0))))
+    If Len(targetUserId) = 0 Or targetUserId = "0" Then GoTo RevokeFailed
+
+    Proc_5_0_6D3CD0 "DELETE FROM rooms_rights WHERE id_user='" & Proc_10_11_80A9C0(targetUserId, 0, 0) & "' AND id_room='" & CStr(roomId) & "'", 0, 0
+    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(0, Empty, "Fc")), 0
+
+RevokeFailed:
     Proc_6_64_721650 = Empty
 End Function
 
@@ -3071,6 +3106,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_62_7209F0 socketIndex, "E@", packetPayload
         Case "DE"
             Proc_6_63_721050 socketIndex, "DE", packetPayload
+        Case "D" & Chr$(127)
+            Proc_6_64_721650 socketIndex, "D" & Chr$(127), packetPayload
         Case "A`"
             Proc_6_65_721A10 socketIndex, "A`", packetPayload
         Case "FA"
