@@ -6351,7 +6351,72 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_155_795C90
 Public Function Proc_6_155_795C90(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim userId As String
+    Dim roomId As Long
+    Dim furnitureId As Long
+    Dim rowText As String
+    Dim fields() As String
+    Dim productId As Long
+    Dim ownerId As String
+    Dim sessionId As String
+    Dim offset As Long
+
+    On Error GoTo PickupDone
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "AC" Then requestPayload = Mid$(requestPayload, 3)
+
+    furnitureId = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    If furnitureId <= 0 Then
+        offset = 1
+        furnitureId = ReadWireLong(requestPayload, offset)
+    End If
+    If socketIndex <= 0 Or furnitureId <= 0 Then GoTo PickupDone
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If Len(userId) = 0 Or userId = "0" Or roomId <= 0 Then GoTo PickupDone
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT id_product,id_owner FROM furnitures WHERE id='" & CStr(furnitureId) & _
+        "' AND id_room='" & CStr(roomId) & "' LIMIT 1", 0, 0))
+    If Len(rowText) = 0 Then GoTo PickupDone
+
+    fields = Split(rowText, Chr$(9))
+    productId = CLng(Val(HandlingField(fields, 0)))
+    ownerId = CStr(CLng(Val(HandlingField(fields, 1))))
+    If productId <= 0 Then GoTo PickupDone
+
+    If ownerId <> userId Then
+        If Not HandlingUserOwnsRoom(userId, roomId) And Not HandlingUserHasPermission(userId, "fuse_pick_up_any_furni") Then GoTo PickupDone
+    End If
+    If Not HandlingUserHasRoomRight(userId, roomId) And ownerId <> userId And Not HandlingUserHasPermission(userId, "fuse_pick_up_any_furni") Then GoTo PickupDone
+
+    If ownerId <> userId Then
+        sessionId = CStr(Proc_5_2_6D4690("SELECT id_session FROM users WHERE id='" & Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 1", 0, 0))
+        Proc_5_1_6D4110 "INSERT INTO logs_moderation(id_type,id_user,id_target,id_target_2,timestamp,message,id_session) VALUES('8','" & _
+            Proc_10_11_80A9C0(userId, 0, 0) & "','" & CStr(roomId) & "','" & CStr(furnitureId) & "',UNIX_TIMESTAMP(),'','" & _
+            Proc_10_11_80A9C0(sessionId, 0, 0) & "')", 0, 0
+    End If
+
+    Proc_6_146_76D300 socketIndex, furnitureId, productId
+    Proc_5_0_6D3CD0 "UPDATE furnitures SET id_room=NULL,position_x=NULL,position_y=NULL,position_z=NULL,position_r='0',position_wall=NULL,id_owner='" & _
+        Proc_10_11_80A9C0(userId, 0, 0) & "',task_owner='" & Proc_10_11_80A9C0(userId, 0, 0) & _
+        "',task_time=UNIX_TIMESTAMP() WHERE id='" & CStr(furnitureId) & "' AND id_room='" & CStr(roomId) & "' LIMIT 1", 0, 0
+
+    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(furnitureId, Empty, "Ac")), 0
+    Proc_6_247_8027E0 socketIndex, "A^" & CStr(furnitureId) & Chr$(2), 0
+    Proc_6_106_74B750 App.Path & "\CACHE\ROOMS\" & CStr(roomId) & ".cache", 0, 0
+    Proc_6_106_74B750 App.Path & "\CACHE\PATHFINDER\" & CStr(roomId) & ".cache", 0, 0
+    Proc_6_140_769400 socketIndex, "FT", vbNullString
+
+PickupDone:
     Proc_6_155_795C90 = Empty
 End Function
 
@@ -10447,6 +10512,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_228_7F2AF0 socketIndex, packetPayload, 0
         Case "AZ"
             Proc_6_144_76BE70 socketIndex, "AZ", packetPayload
+        Case "AC"
+            Proc_6_155_795C90 socketIndex, "AC", packetPayload
         Case "A["
             Proc_6_141_76A670 socketIndex, "A[", packetPayload
         Case "rv"
