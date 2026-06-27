@@ -10,6 +10,7 @@ Public global_008292C0 As Variant
 Public global_008292C8 As Long
 Public global_008292CC As Variant
 Public global_008292D0 As Variant
+Public global_008292D4 As String
 Public global_008292D8 As Variant
 Public global_008291E4 As String
 Public global_008291E8 As Variant
@@ -68,6 +69,7 @@ Public global_0082934C As Variant
 Public global_0082930C As String
 Public global_00829350 As String
 Public global_00829354 As String
+Public global_00829358 As String
 
 ' Original declaration: Private  Proc_9_0_806F70(arg_C) '806F70
 Public Function Proc_9_0_806F70(ParamArray args() As Variant) As Variant

@@ -5862,8 +5862,70 @@ End Function
 
 ' Original declaration: Private  Proc_6_187_7CD700(arg_C) '7CD700
 Public Function Proc_6_187_7CD700(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_187_7CD700 = Empty
+    Dim roomSlot As Long
+    Dim botFields As Variant
+    Dim botEntityId As Long
+    Dim botId As Long
+    Dim botName As String
+    Dim botMotto As String
+    Dim botSpeech As String
+    Dim botResponses As String
+    Dim positionX As Long
+    Dim positionY As Long
+    Dim positionZ As String
+    Dim positionR As Long
+    Dim botFigure As String
+    Dim handleId As Long
+    Dim handleActionId As Long
+    Dim cacheAction As String
+    Dim speechSubmit As String
+    Dim allowWalk As Long
+    Dim maxFieldsAway As Long
+    Dim recordText As String
+
+    On Error GoTo AllocateFailed
+    If UBound(args) < 1 Then GoTo AllocateFailed
+
+    roomSlot = CLng(Val(CStr(args(0))))
+    botFields = args(1)
+    If roomSlot <= 0 Then GoTo AllocateFailed
+
+    botEntityId = ReserveRepresentedBotSlot()
+    If botEntityId <= 0 Then GoTo AllocateFailed
+
+    botId = CLng(Val(RepresentedBotField(botFields, 0)))
+    botName = RepresentedBotField(botFields, 1)
+    botMotto = RepresentedBotField(botFields, 2)
+    botSpeech = RepresentedBotField(botFields, 3)
+    botResponses = RepresentedBotField(botFields, 4)
+    positionX = CLng(Val(RepresentedBotField(botFields, 5)))
+    positionY = CLng(Val(RepresentedBotField(botFields, 6)))
+    positionZ = RepresentedBotField(botFields, 7)
+    positionR = CLng(Val(RepresentedBotField(botFields, 8)))
+    botFigure = RepresentedBotField(botFields, 9)
+    handleId = CLng(Val(RepresentedBotField(botFields, 11)))
+    handleActionId = CLng(Val(RepresentedBotField(botFields, 12)))
+    cacheAction = RepresentedBotField(botFields, 13)
+    speechSubmit = RepresentedBotField(botFields, 14)
+    allowWalk = CLng(Val(RepresentedBotField(botFields, 15)))
+    maxFieldsAway = CLng(Val(RepresentedBotField(botFields, 16)))
+
+    recordText = CStr(roomSlot) & Chr$(2) & CStr(botId) & Chr$(2)
+    recordText = recordText & botName & Chr$(2) & botMotto & Chr$(2)
+    recordText = recordText & botSpeech & Chr$(2) & botResponses & Chr$(2)
+    recordText = recordText & CStr(positionX) & Chr$(2) & CStr(positionY) & Chr$(2)
+    recordText = recordText & positionZ & Chr$(2) & CStr(positionR) & Chr$(2)
+    recordText = recordText & botFigure & Chr$(2) & CStr(handleId) & Chr$(2)
+    recordText = recordText & CStr(handleActionId) & Chr$(2) & cacheAction & Chr$(2)
+    recordText = recordText & speechSubmit & Chr$(2) & CStr(allowWalk) & Chr$(2)
+    recordText = recordText & CStr(maxFieldsAway)
+
+    StoreRepresentedBotRecord botEntityId, recordText
+    Proc_6_187_7CD700 = botEntityId
+    Exit Function
+
+AllocateFailed:
+    Proc_6_187_7CD700 = 0
 End Function
 
 ' Original declaration: Private Sub Proc_6_188_7CF3C0
@@ -7227,6 +7289,59 @@ Private Sub LoadRepresentedRoomBots(ByVal roomSlot As Long, ByVal roomId As Long
     Next rowIndex
 
 LoadDone:
+End Sub
+
+Private Function ReserveRepresentedBotSlot() As Long
+    Dim slotIndex As Long
+    Dim marker As String
+
+    On Error GoTo ReserveFailed
+    For slotIndex = 1 To 5000
+        marker = "[" & CStr(slotIndex) & "]"
+        If InStr(1, global_008292D4, marker, vbBinaryCompare) = 0 Then
+            global_008292D4 = global_008292D4 & marker
+            ReserveRepresentedBotSlot = slotIndex
+            Exit Function
+        End If
+    Next slotIndex
+
+ReserveFailed:
+    ReserveRepresentedBotSlot = 0
+End Function
+
+Private Function RepresentedBotField(ByVal botFields As Variant, ByVal fieldIndex As Long) As String
+    On Error GoTo MissingField
+    If Not IsArray(botFields) Then GoTo MissingField
+    If fieldIndex < LBound(botFields) Or fieldIndex > UBound(botFields) Then GoTo MissingField
+    RepresentedBotField = CStr(botFields(fieldIndex))
+    Exit Function
+
+MissingField:
+    RepresentedBotField = vbNullString
+End Function
+
+Private Sub StoreRepresentedBotRecord(ByVal botEntityId As Long, ByVal recordText As String)
+    Dim startMarker As String
+    Dim endMarker As String
+    Dim startAt As Long
+    Dim endAt As Long
+
+    On Error GoTo StoreDone
+    If botEntityId <= 0 Then GoTo StoreDone
+
+    startMarker = "[" & CStr(botEntityId) & ":"
+    endMarker = "]"
+    startAt = InStr(1, global_00829358, startMarker, vbBinaryCompare)
+    If startAt > 0 Then
+        endAt = InStr(startAt + Len(startMarker), global_00829358, endMarker, vbBinaryCompare)
+        If endAt > 0 Then
+            global_00829358 = Left$(global_00829358, startAt - 1) & Mid$(global_00829358, endAt + Len(endMarker))
+        End If
+    End If
+
+    global_00829358 = global_00829358 & startMarker & recordText & endMarker
+
+StoreDone:
 End Sub
 
 Private Function AvatarNameValidationCode(ByVal candidateName As String, ByVal currentName As String) As Long
