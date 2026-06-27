@@ -3073,7 +3073,63 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_73_725540
 Public Function Proc_6_73_725540(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim userId As String
+    Dim roomId As Long
+    Dim furnitureId As Long
+    Dim productId As Long
+    Dim creditValue As Long
+    Dim productSprite As String
+    Dim productParts() As String
+    Dim rowText As String
+    Dim offset As Long
+
+    On Error GoTo RedeemFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "AT" Then requestPayload = Mid$(requestPayload, 3)
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo RedeemFailed
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId <= 0 Then GoTo RedeemFailed
+    If Not HandlingUserHasRoomRight(userId, roomId) And Not HandlingUserHasPermission(userId, "fuse_pick_up_any_furni") Then GoTo RedeemFailed
+
+    furnitureId = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    If furnitureId <= 0 Then
+        offset = 1
+        furnitureId = ReadWireLong(requestPayload, offset)
+    End If
+    If furnitureId <= 0 Then GoTo RedeemFailed
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT id_product FROM furnitures WHERE id_room='" & CStr(roomId) & "' AND id='" & CStr(furnitureId) & "' LIMIT 1", 0, 0))
+    productId = CLng(Val(rowText))
+    If productId <= 0 Then GoTo RedeemFailed
+
+    productSprite = CStr(Proc_8_12_806C30(productId, 17, 0))
+    If Len(productSprite) = 0 Then productSprite = CStr(Proc_8_12_806C30(productId, 18, 0))
+    If Left$(productSprite, 3) <> "CF_" And Left$(productSprite, 4) <> "CFC_" Then GoTo RedeemFailed
+
+    productParts = Split(productSprite, "_")
+    If UBound(productParts) < 1 Then GoTo RedeemFailed
+    creditValue = CLng(Val(productParts(1)))
+    If creditValue <= 0 Then GoTo RedeemFailed
+
+    Proc_5_0_6D3CD0 "UPDATE users SET credits=credits+" & CStr(creditValue) & " WHERE id='" & Proc_10_11_80A9C0(userId, 0, 0) & "'", 0, 0
+    Proc_6_244_801E80 socketIndex, "@F" & CStr(CLng(Val(CStr(Proc_5_2_6D4690("SELECT credits FROM users WHERE id='" & Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 1", 0, 0))))) & ".0" & Chr$(2), 0
+    Proc_6_247_8027E0 socketIndex, "A^" & CStr(furnitureId) & Chr$(2) & "H" & Chr$(2), 0
+    Proc_5_0_6D3CD0 "DELETE FROM furnitures WHERE id='" & CStr(furnitureId) & "' LIMIT 1", 0, 0
+    Proc_6_106_74B750 App.Path & "\CACHE\ROOMS\" & CStr(roomId) & ".cache", 0, 0
+    Proc_6_106_74B750 App.Path & "\CACHE\PATHFINDER\" & CStr(roomId) & ".cache", 0, 0
+
+RedeemFailed:
     Proc_6_73_725540 = Empty
 End Function
 
