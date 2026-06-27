@@ -6634,7 +6634,72 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_192_7D1B80
 Public Function Proc_6_192_7D1B80(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim callerUserId As String
+    Dim callerRoomUserIndex As Long
+    Dim callerRoomId As Long
+    Dim requestedRoomUserIndex As Long
+    Dim targetRow As String
+    Dim targetFields() As String
+    Dim targetRoomUserIndex As Long
+    Dim targetUserId As String
+    Dim targetBadgePayload As String
+    Dim callerStatusPayload As String
+    Dim targetStatusPayload As String
+    Dim offset As Long
+
+    On Error GoTo LookToFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex <= 0 Then GoTo LookToFailed
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "B_" Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    requestedRoomUserIndex = ReadWireLong(requestPayload, offset)
+    If requestedRoomUserIndex <= 0 Then GoTo LookToFailed
+
+    callerUserId = HandlingUserIdFromSocket(socketIndex)
+    If Len(callerUserId) = 0 Or callerUserId = "0" Then GoTo LookToFailed
+
+    callerRoomId = HandlingCurrentRoomId(socketIndex, callerUserId)
+    If callerRoomId <= 0 Then GoTo LookToFailed
+
+    callerRoomUserIndex = RepresentedRoomUserIndex(socketIndex, callerUserId)
+    targetRow = CStr(Proc_5_2_6D4690("SELECT logs_visitedrooms.id,logs_visitedrooms.id_user,users.id_socket FROM logs_visitedrooms,users WHERE logs_visitedrooms.id='" & _
+        CStr(requestedRoomUserIndex) & "' AND logs_visitedrooms.id_room='" & CStr(callerRoomId) & "' AND logs_visitedrooms.timestamp_left IS NULL AND users.id=logs_visitedrooms.id_user LIMIT 1", 0, 0))
+    If Len(targetRow) = 0 Then
+        targetRow = CStr(Proc_5_2_6D4690("SELECT logs_visitedrooms.id,logs_visitedrooms.id_user,users.id_socket FROM logs_visitedrooms,users WHERE logs_visitedrooms.id_user='" & _
+            CStr(requestedRoomUserIndex) & "' AND logs_visitedrooms.id_room='" & CStr(callerRoomId) & "' AND logs_visitedrooms.timestamp_left IS NULL AND users.id=logs_visitedrooms.id_user LIMIT 1", 0, 0))
+    End If
+    If Len(targetRow) = 0 Then GoTo LookToFailed
+
+    targetFields = Split(targetRow, Chr$(9))
+    If UBound(targetFields) < 1 Then GoTo LookToFailed
+
+    targetRoomUserIndex = CLng(Val(CStr(targetFields(0))))
+    targetUserId = CStr(CLng(Val(CStr(targetFields(1)))))
+    If targetRoomUserIndex <= 0 Or Len(targetUserId) = 0 Or targetUserId = "0" Then GoTo LookToFailed
+
+    targetBadgePayload = "Cd" & CStr(Proc_3_0_6D2AF0(CLng(Val(targetUserId)), Empty, vbNullString)) & CStr(Proc_6_195_7D38D0(targetUserId, 0, 0))
+    Proc_6_244_801E80 socketIndex, targetBadgePayload, 0
+
+    If callerRoomUserIndex > 0 And callerRoomUserIndex <> targetRoomUserIndex Then
+        callerStatusPayload = RepresentedRoomUserStatusPayload(callerRoomUserIndex, 0)
+        targetStatusPayload = RepresentedRoomUserStatusPayload(targetRoomUserIndex, 0)
+        If Len(callerStatusPayload) > 0 Then Proc_6_247_8027E0 socketIndex, callerStatusPayload, 0
+        If Len(targetStatusPayload) > 0 Then Proc_6_247_8027E0 socketIndex, targetStatusPayload, 0
+    End If
+
+    Proc_6_192_7D1B80 = targetBadgePayload
+    Exit Function
+
+LookToFailed:
     Proc_6_192_7D1B80 = Empty
 End Function
 
@@ -7721,6 +7786,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_190_7D11D0 socketIndex, "Cg", packetPayload
         Case "DG"
             Proc_6_191_7D18B0 socketIndex, "DG", packetPayload
+        Case "B_"
+            Proc_6_192_7D1B80 socketIndex, "B_", packetPayload
         Case "B]"
             Proc_6_193_7D2BB0 socketIndex, "B]", packetPayload
         Case "B^"
@@ -8352,6 +8419,19 @@ Private Function RepresentedRoomUserProfilePayload(ByVal roomUserIndex As Long, 
 
 BuildFailed:
     RepresentedRoomUserProfilePayload = vbNullString
+End Function
+
+Private Function RepresentedRoomUserStatusPayload(ByVal roomUserIndex As Long, ByVal statusCode As Long) As String
+    On Error GoTo BuildFailed
+    If roomUserIndex <= 0 Then GoTo BuildFailed
+    If statusCode < 0 Then statusCode = 0
+
+    RepresentedRoomUserStatusPayload = "0" & CStr(Proc_3_0_6D2AF0(statusCode, Empty, _
+        CStr(Proc_3_0_6D2AF0(roomUserIndex, Empty, "Ge"))))
+    Exit Function
+
+BuildFailed:
+    RepresentedRoomUserStatusPayload = vbNullString
 End Function
 
 Private Sub StoreRepresentedBotPosition(ByVal botEntityId As Long, ByVal positionX As Long, ByVal positionY As Long, ByVal positionZ As String, ByVal positionR As Long)
