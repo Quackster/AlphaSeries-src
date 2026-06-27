@@ -979,7 +979,19 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_162_7B3310
 Public Function Proc_6_162_7B3310(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim dateFormat As String
+    Dim payload As String
+
+    On Error GoTo HandshakeFailed
+    socketIndex = HandlingSocketIndex(args)
+    dateFormat = CStr(Proc_10_0_809570("com.system.format.date", "DAQBHHIIKHJHPAHQA", 0))
+    If Len(dateFormat) = 0 Then dateFormat = "DAQBHHIIKHJHPAHQA"
+
+    payload = "0" & dateFormat & Chr$(2) & "SAHPB" & "http://www.alpha-series.com/" & Chr$(2) & "QBH"
+    Proc_6_244_801E80 socketIndex, payload, 0
+
+HandshakeFailed:
     Proc_6_162_7B3310 = Empty
 End Function
 
@@ -1640,7 +1652,21 @@ End Function
 
 ' Original declaration: Private  Proc_6_244_801E80(arg_C) '801E80
 Public Function Proc_6_244_801E80(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim payload As String
+
+    On Error GoTo SendFailed
+    If UBound(args) < 1 Then GoTo SendFailed
+
+    socketIndex = CInt(Val(CStr(args(0))))
+    If socketIndex = 0 Then GoTo SendFailed
+    If Proc_11_2_821390(socketIndex, 0, 0) <> 1 Then GoTo SendFailed
+    If IsSocketMarkedBusy(socketIndex) Then GoTo SendFailed
+
+    payload = CStr(args(1)) & Chr$(1)
+    Proc_12_1_821AA0 socketIndex, payload, 0
+
+SendFailed:
     Proc_6_244_801E80 = Empty
 End Function
 
@@ -1672,4 +1698,41 @@ End Function
 Public Function Proc_6_249_802F10(ParamArray args() As Variant) As Variant
     ' TODO: Reconstruct behavior from decompiled reference.
     Proc_6_249_802F10 = Empty
+End Function
+
+Private Function HandlingSocketIndex(ByRef args() As Variant) As Integer
+    On Error GoTo DefaultIndex
+    If UBound(args) >= 0 Then
+        HandlingSocketIndex = CInt(Val(CStr(args(0))))
+        Exit Function
+    End If
+
+DefaultIndex:
+    HandlingSocketIndex = 0
+End Function
+
+Private Function IsSocketMarkedBusy(ByVal socketIndex As Integer) As Boolean
+    Dim recordText As String
+    Dim marker As String
+    Dim startAt As Long
+    Dim endAt As Long
+    Dim fields As Variant
+
+    On Error GoTo NotBusy
+    If IsEmpty(global_0082934C) Then GoTo NotBusy
+
+    marker = "[" & CStr(socketIndex) & "]"
+    startAt = InStr(1, CStr(global_0082934C), marker, vbBinaryCompare)
+    If startAt = 0 Then GoTo NotBusy
+
+    endAt = InStr(startAt + Len(marker), CStr(global_0082934C), "[", vbBinaryCompare)
+    If endAt = 0 Then endAt = Len(CStr(global_0082934C)) + 1
+
+    recordText = Mid$(CStr(global_0082934C), startAt + Len(marker), endAt - startAt - Len(marker))
+    fields = Split(recordText, Chr$(2))
+    If UBound(fields) >= 5 Then IsSocketMarkedBusy = (Val(CStr(fields(5))) <> 0)
+    Exit Function
+
+NotBusy:
+    IsSocketMarkedBusy = False
 End Function
