@@ -3250,7 +3250,45 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_94_746990
 Public Function Proc_6_94_746990(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim sourceRoomUserIndex As Long
+    Dim targetSocketIndex As Integer
+    Dim targetUserId As String
+    Dim targetRoomUserIndex As Long
+    Dim sourcePayload As String
+    Dim targetPayload As String
+
+    On Error GoTo InteractionFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex <= 0 Then GoTo InteractionFailed
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo InteractionFailed
+
+    sourceRoomUserIndex = RepresentedRoomUserIndex(socketIndex, userId)
+    If sourceRoomUserIndex <= 0 Then GoTo InteractionFailed
+
+    ' The original used hidden session slot +15Ch for the paired user/socket. Use an
+    ' explicit second argument when the caller has recovered it; otherwise there is
+    ' no represented pair to notify.
+    If UBound(args) >= 1 Then targetSocketIndex = CInt(Val(CStr(args(1))))
+    If targetSocketIndex <= 0 Then GoTo InteractionFailed
+
+    targetUserId = HandlingUserIdFromSocket(targetSocketIndex)
+    If Len(targetUserId) = 0 Or targetUserId = "0" Then GoTo InteractionFailed
+
+    targetRoomUserIndex = RepresentedRoomUserIndex(targetSocketIndex, targetUserId)
+    If targetRoomUserIndex <= 0 Then GoTo InteractionFailed
+
+    sourcePayload = "0" & CStr(Proc_3_0_6D2AF0(sourceRoomUserIndex, Empty, "An"))
+    targetPayload = "0" & CStr(Proc_3_0_6D2AF0(sourceRoomUserIndex, Empty, "An"))
+
+    Proc_6_244_801E80 socketIndex, sourcePayload, 0
+    Proc_6_244_801E80 targetSocketIndex, targetPayload, 0
+
+InteractionFailed:
     Proc_6_94_746990 = Empty
 End Function
 
