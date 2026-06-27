@@ -348,7 +348,39 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_9_6DDD70
 Public Function Proc_6_9_6DDD70(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim callerUserId As String
+    Dim roomId As Long
+    Dim firstFlag As Long
+    Dim lockFlag As Long
+    Dim offset As Long
+
+    On Error GoTo RoomLockFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "GL" Then requestPayload = Mid$(requestPayload, 3)
+
+    callerUserId = HandlingUserIdFromSocket(socketIndex)
+    If Len(callerUserId) = 0 Or callerUserId = "0" Then GoTo RoomLockFailed
+    If Not HandlingUserHasPermission(callerUserId, "fuse_mod") Then GoTo RoomLockFailed
+
+    roomId = HandlingCurrentRoomId(socketIndex, callerUserId)
+    If roomId <= 0 Then GoTo RoomLockFailed
+
+    offset = 1
+    firstFlag = ReadWireLong(requestPayload, offset)
+    lockFlag = ReadWireLong(requestPayload, offset)
+    If lockFlag <> 1 Then GoTo RoomLockFailed
+
+    Proc_5_0_6D3CD0 "UPDATE rooms SET status_door='1', name='Inappropriate to hotel management' WHERE id='" & CStr(roomId) & "'", 0, 0
+
+RoomLockFailed:
     Proc_6_9_6DDD70 = Empty
 End Function
 
@@ -3564,6 +3596,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_8_6DD790 socketIndex, "GC", packetPayload
         Case "GD"
             Proc_6_7_6DD0E0 socketIndex, "GD", packetPayload
+        Case "GL"
+            Proc_6_9_6DDD70 socketIndex, "GL", packetPayload
         Case "Fw"
             Proc_6_115_751220 socketIndex, "Fw", packetPayload
         Case "Fn"
