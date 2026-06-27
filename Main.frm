@@ -284,7 +284,52 @@ End Sub
 
 ' Original declaration contained invalid VB6 identifier text: Private Sub gameServer_C_q]<lkamWk&_uo_lLfj`j=nEge]( '68F5C0
 Private Sub gameServer_C_q()
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim incomingData As String
+    Dim packets As Variant
+    Dim packet As Variant
+    Dim fields As Variant
+    Dim commandName As String
+    Dim socketIndex As Long
+
+    On Error GoTo ReadFailed
+
+    gameServer.GetData incomingData, vbString
+    packets = Split(incomingData, Chr$(1))
+
+    For Each packet In packets
+        If Len(CStr(packet)) > 0 Then
+            fields = Split(CStr(packet), Chr$(2))
+            commandName = UCase$(CStr(fields(0)))
+
+            Select Case commandName
+                Case "SHUTDOWN"
+                    If UBound(fields) >= 1 Then
+                        socketIndex = CLng(Val(CStr(fields(1))))
+                        Proc_6_243_7FFEB0 socketIndex, Me, 0
+                    End If
+
+                Case "LISTEN"
+                    If UBound(fields) >= 1 Then
+                        socketIndex = CLng(Val(CStr(fields(1))))
+                        Proc_11_3_821440 socketIndex, 0, 0
+                    End If
+
+                Case "DATA"
+                    If UBound(fields) >= 2 Then
+                        socketIndex = CLng(Val(CStr(fields(1))))
+                        AppendGameServerPacketData socketIndex, fields
+                    End If
+
+                Case Else
+                    If UBound(fields) >= 0 Then
+                        socketIndex = CLng(Val(CStr(fields(0))))
+                        Proc_6_243_7FFEB0 socketIndex, Me, 0
+                    End If
+            End Select
+        End If
+    Next packet
+
+ReadFailed:
 End Sub
 
 ' Original declaration: Private Sub gameServer_UnknownEvent_C '68F4C0
@@ -448,6 +493,24 @@ Private Function ShiftIdentityText(ByVal sourceText As String, ByVal shiftAmount
 ShiftFailed:
     ShiftIdentityText = vbNullString
 End Function
+
+Private Sub AppendGameServerPacketData(ByVal socketIndex As Long, ByVal fields As Variant)
+    Dim fieldIndex As Long
+    Dim payload As String
+
+    On Error GoTo AppendFailed
+
+    For fieldIndex = 2 To UBound(fields)
+        If Len(payload) > 0 Then payload = payload & Chr$(2)
+        payload = payload & CStr(fields(fieldIndex))
+    Next fieldIndex
+
+    If Len(payload) > 0 Then
+        global_00829350 = global_00829350 & "[" & CStr(socketIndex) & ":" & payload & "]"
+    End If
+
+AppendFailed:
+End Sub
 
 ' Original declaration: Private  Proc_0_22_68C1A0(arg_C) '68C1A0
 Private Function Proc_0_22_68C1A0(Optional ByVal arg_C As Variant) As Variant
