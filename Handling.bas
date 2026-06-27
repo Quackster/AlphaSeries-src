@@ -5947,8 +5947,101 @@ End Function
 
 ' Original declaration: Private  Proc_6_184_7CBDA0(arg_C) '7CBDA0
 Public Function Proc_6_184_7CBDA0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim petLevel As Long
+    Dim commandIndex As Long
+    Dim commandFields() As String
+    Dim commandId As Long
+    Dim requiredLevel As Long
+    Dim allCount As Long
+    Dim availableCount As Long
+    Dim allPayload As String
+    Dim availablePayload As String
+    Dim payload As String
+
+    On Error GoTo CommandListFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 1 Then
+        petLevel = CLng(Val(CStr(args(1))))
+    ElseIf UBound(args) >= 0 Then
+        petLevel = CLng(Val(CStr(args(0))))
+    End If
+    If petLevel < 0 Then petLevel = 0
+
+    If IsArray(global_008292CC) Then
+        For commandIndex = LBound(global_008292CC) To UBound(global_008292CC)
+            If Len(CStr(global_008292CC(commandIndex))) > 0 Then
+                commandFields = Split(CStr(global_008292CC(commandIndex)), Chr$(9))
+                If UBound(commandFields) >= 1 Then
+                    commandId = CLng(Val(CStr(commandFields(0))))
+                    requiredLevel = CLng(Val(CStr(commandFields(1))))
+                    If commandId > 0 Then
+                        allPayload = allPayload & "0" & CStr(Proc_3_0_6D2AF0(commandId, Empty, vbNullString))
+                        allCount = allCount + 1
+                        If requiredLevel <= petLevel Then
+                            availablePayload = availablePayload & "0" & CStr(Proc_3_0_6D2AF0(commandId, Empty, vbNullString))
+                            availableCount = availableCount + 1
+                        End If
+                    End If
+                End If
+            End If
+        Next commandIndex
+    End If
+
+    If allCount = 0 Then
+        allPayload = RepresentedPetCommandPayloadFromSql(petLevel, False, allCount)
+        availablePayload = RepresentedPetCommandPayloadFromSql(petLevel, True, availableCount)
+    End If
+
+    payload = CStr(Proc_3_0_6D2AF0(petLevel, Empty, "I]"))
+    payload = payload & CStr(Proc_3_0_6D2AF0(allCount, Empty, vbNullString)) & allPayload
+    payload = payload & CStr(Proc_3_0_6D2AF0(availableCount, Empty, vbNullString)) & availablePayload
+
+    If socketIndex > 0 Then Proc_6_244_801E80 socketIndex, payload, 0
+    Proc_6_184_7CBDA0 = payload
+    Exit Function
+
+CommandListFailed:
     Proc_6_184_7CBDA0 = Empty
+End Function
+
+' Original decompiler route target: Proc_7CC190(Me, "n|", packet)
+Public Function Proc_7CC190(ParamArray args() As Variant) As Variant
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim offset As Long
+    Dim requestedId As Long
+    Dim botId As Long
+    Dim petLevel As Long
+    Dim userId As String
+
+    On Error GoTo CommandRouteFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "n|" Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    requestedId = ReadWireLong(requestPayload, offset)
+    botId = RepresentedBotRecordLong(requestedId, 1)
+    If botId <= 0 Then botId = requestedId
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) > 0 And userId <> "0" And botId > 0 Then
+        petLevel = CLng(Val(CStr(Proc_5_2_6D4690("SELECT bots_petdata.id_level FROM bots,bots_petdata WHERE bots.id='" & _
+            CStr(botId) & "' AND bots.id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND bots_petdata.id_bot=bots.id LIMIT 1", 0, 0))))
+    End If
+
+    Proc_7CC190 = Proc_6_184_7CBDA0(socketIndex, petLevel, 0)
+    Exit Function
+
+CommandRouteFailed:
+    Proc_7CC190 = Empty
 End Function
 
 ' Original declaration: Private  Proc_6_185_7CC2D0(arg_C) '7CC2D0
@@ -7025,6 +7118,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_178_7C6E60 socketIndex, "nx", packetPayload
         Case "nz"
             Proc_6_179_7C7790 socketIndex, "nz", packetPayload
+        Case "n|"
+            Proc_7CC190 socketIndex, "n|", packetPayload
         Case "E["
             Proc_6_45_714B60 socketIndex, "E[", packetPayload
         Case "A_"
@@ -7634,6 +7729,42 @@ Private Function RepresentedPetInventoryRow(ByVal petId As Long, ByVal petName A
 
 RowFailed:
     RepresentedPetInventoryRow = vbNullString
+End Function
+
+Private Function RepresentedPetCommandPayloadFromSql(ByVal petLevel As Long, ByVal onlyAvailable As Boolean, ByRef commandCount As Long) As String
+    Dim rowText As String
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim commandId As Long
+    Dim requiredLevel As Long
+
+    On Error GoTo BuildFailed
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT id_command,petlevel_required FROM bots_petcommands ORDER BY id_command ASC", 0, 0))
+    If Len(rowText) = 0 Then GoTo BuildFailed
+
+    rows = Split(rowText, Chr$(13))
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(CStr(rows(rowIndex))) > 0 Then
+            fields = Split(CStr(rows(rowIndex)), Chr$(9))
+            If UBound(fields) >= 1 Then
+                commandId = CLng(Val(CStr(fields(0))))
+                requiredLevel = CLng(Val(CStr(fields(1))))
+                If commandId > 0 Then
+                    If Not onlyAvailable Or requiredLevel <= petLevel Then
+                        RepresentedPetCommandPayloadFromSql = RepresentedPetCommandPayloadFromSql & "0" & _
+                            CStr(Proc_3_0_6D2AF0(commandId, Empty, vbNullString))
+                        commandCount = commandCount + 1
+                    End If
+                End If
+            End If
+        End If
+    Next rowIndex
+    Exit Function
+
+BuildFailed:
+    RepresentedPetCommandPayloadFromSql = vbNullString
 End Function
 
 Private Function IsRepresentedBotAllocated(ByVal roomSlot As Long, ByVal botId As Long) As Boolean
