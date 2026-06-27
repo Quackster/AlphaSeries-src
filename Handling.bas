@@ -5060,7 +5060,61 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_144_76BE70
 Public Function Proc_6_144_76BE70(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim userId As String
+    Dim roomId As Long
+    Dim furnitureId As Long
+    Dim rowText As String
+    Dim fields() As String
+    Dim ownerId As String
+    Dim productId As Long
+    Dim offset As Long
+
+    On Error GoTo PickupFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+    If Left$(packetPayload, 2) = "AZ" Then
+        requestPayload = Mid$(packetPayload, 3)
+    Else
+        requestPayload = packetPayload
+    End If
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If Len(userId) = 0 Or userId = "0" Or roomId <= 0 Then GoTo PickupFailed
+
+    furnitureId = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    If furnitureId <= 0 Then
+        offset = 1
+        furnitureId = ReadWireLong(requestPayload, offset)
+    End If
+    If furnitureId <= 0 Then GoTo PickupFailed
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT id_product,id_owner FROM furnitures WHERE id='" & CStr(furnitureId) & "' AND id_room='" & CStr(roomId) & "' LIMIT 1", 0, 0))
+    If Len(rowText) = 0 Then GoTo PickupFailed
+
+    fields = Split(rowText, Chr$(9))
+    productId = CLng(Val(HandlingField(fields, 0)))
+    ownerId = CStr(CLng(Val(HandlingField(fields, 1))))
+    If productId <= 0 Or Len(ownerId) = 0 Or ownerId = "0" Then GoTo PickupFailed
+
+    If ownerId <> userId Then
+        If Not HandlingUserOwnsRoom(userId, roomId) And Not HandlingUserHasPermission(userId, "fuse_pick_up_any_furni") Then GoTo PickupFailed
+    End If
+    If Not HandlingUserHasRoomRight(userId, roomId) And ownerId <> userId And Not HandlingUserHasPermission(userId, "fuse_pick_up_any_furni") Then GoTo PickupFailed
+
+    Proc_5_0_6D3CD0 "UPDATE furnitures SET id_room=NULL,position_x=NULL,position_y=NULL,position_z=NULL,position_r='0',position_wall=NULL,id_owner='" & _
+        Proc_10_11_80A9C0(userId, 0, 0) & "',task_owner='" & Proc_10_11_80A9C0(userId, 0, 0) & "',task_time=UNIX_TIMESTAMP() WHERE id='" & CStr(furnitureId) & "' LIMIT 1", 0, 0
+    Proc_6_247_8027E0 socketIndex, "A^" & CStr(furnitureId) & Chr$(2), 0
+    Proc_6_106_74B750 App.Path & "\CACHE\ROOMS\" & CStr(roomId) & ".cache", 0, 0
+    Proc_6_106_74B750 App.Path & "\CACHE\PATHFINDER\" & CStr(roomId) & ".cache", 0, 0
+    Proc_6_140_769400 socketIndex, "FT", vbNullString
+
+PickupFailed:
     Proc_6_144_76BE70 = Empty
 End Function
 
@@ -8962,6 +9016,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
         Case "DC"
             Proc_6_227_7F2400 socketIndex, packetPayload, 0
             Proc_6_228_7F2AF0 socketIndex, packetPayload, 0
+        Case "AZ"
+            Proc_6_144_76BE70 socketIndex, "AZ", packetPayload
         Case "pa"
             Proc_6_244_801E80 socketIndex, "J|H", 0
         Case "pb"
