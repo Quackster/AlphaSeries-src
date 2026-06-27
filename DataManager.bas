@@ -5,6 +5,8 @@ Option Explicit
 ' Source reference: /opt/git/AlphaSeries_cracked/DECOMPILED/DataManager.bas
 ' Decompiled procedure bodies are intentionally not copied until they are understood and made valid VB6.
 
+Public global_008291AC As String
+
 ' Original declaration: Private Sub Proc_8_0_804330
 Public Function Proc_8_0_804330(ParamArray args() As Variant) As Variant
     ' TODO: Reconstruct behavior from decompiled reference.
@@ -13,14 +15,30 @@ End Function
 
 ' Original declaration: Private Sub Proc_8_1_804400
 Public Function Proc_8_1_804400(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_8_1_804400 = Empty
+    On Error GoTo GenerateFailed
+    If UBound(args) < 0 Then
+        Proc_8_1_804400 = "0"
+    Else
+        Proc_8_1_804400 = CStr(CLng(Val(CStr(args(0)))) * CLng(Proc_10_4_809CA0(1, 4)))
+    End If
+    Exit Function
+
+GenerateFailed:
+    Proc_8_1_804400 = "0"
 End Function
 
 ' Original declaration: Private Sub Proc_8_2_804490
 Public Function Proc_8_2_804490(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_8_2_804490 = Empty
+    On Error GoTo GenerateFailed
+    If UBound(args) < 0 Then
+        Proc_8_2_804490 = "0"
+    Else
+        Proc_8_2_804490 = CStr(CLng(Val(CStr(args(0)))) * CLng(Proc_10_4_809CA0(60, 90)))
+    End If
+    Exit Function
+
+GenerateFailed:
+    Proc_8_2_804490 = "0"
 End Function
 
 ' Original declaration: Private Sub Proc_8_3_804530
@@ -144,12 +162,94 @@ End Function
 
 ' Original declaration: Private Sub Proc_8_11_8069B0
 Public Function Proc_8_11_8069B0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_8_11_8069B0 = Empty
+    On Error GoTo LookupFailed
+    If UBound(args) < 0 Then
+        Proc_8_11_8069B0 = vbNullString
+    Else
+        Proc_8_11_8069B0 = GetNullDelimitedCacheField(global_008291AC, CStr(args(0)), GetOptionalColumnIndex(args, 1, 0))
+    End If
+    Exit Function
+
+LookupFailed:
+    Proc_8_11_8069B0 = vbNullString
 End Function
 
 ' Original declaration: Private  Proc_8_12_806C30(arg_C) '806C30
 Public Function Proc_8_12_806C30(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_8_12_806C30 = Empty
+    On Error GoTo LookupFailed
+    If UBound(args) < 1 Then
+        Proc_8_12_806C30 = vbNullString
+    Else
+        Proc_8_12_806C30 = GetProductCacheCell(CLng(Val(CStr(args(0)))), CLng(Val(CStr(args(1)))))
+    End If
+    Exit Function
+
+LookupFailed:
+    Proc_8_12_806C30 = vbNullString
+End Function
+
+Private Function GetOptionalColumnIndex(ByRef args() As Variant, ByVal argumentIndex As Long, ByVal defaultValue As Long) As Long
+    On Error GoTo UseDefault
+    If UBound(args) >= argumentIndex Then
+        If Len(CStr(args(argumentIndex))) > 0 Then
+            GetOptionalColumnIndex = CLng(Val(CStr(args(argumentIndex))))
+            Exit Function
+        End If
+    End If
+
+UseDefault:
+    GetOptionalColumnIndex = defaultValue
+End Function
+
+Private Function GetNullDelimitedCacheField(ByVal cacheText As String, ByVal keyName As String, ByVal columnIndex As Long) As String
+    Dim marker As String
+    Dim fields() As String
+
+    If Len(cacheText) = 0 Or Len(keyName) = 0 Then Exit Function
+
+    marker = Chr$(0) & keyName & Chr$(1)
+    fields = Split(CStr(Split(cacheText, marker)(1)), Chr$(2))
+    If columnIndex < LBound(fields) Or columnIndex > UBound(fields) Then Exit Function
+    GetNullDelimitedCacheField = fields(columnIndex)
+End Function
+
+Private Function GetProductCacheCell(ByVal productId As Long, ByVal columnIndex As Long) As String
+    Dim rowValue As String
+    Dim columns() As String
+
+    On Error GoTo LookupFailed
+    If IsArray(global_008292BC) Then
+        rowValue = CStr(global_008292BC(productId))
+    Else
+        rowValue = GetDelimitedProductRow(CStr(global_008292BC), productId)
+    End If
+
+    columns = Split(rowValue, Chr$(9))
+    If columnIndex < LBound(columns) Or columnIndex > UBound(columns) Then Exit Function
+    GetProductCacheCell = columns(columnIndex)
+    Exit Function
+
+LookupFailed:
+    GetProductCacheCell = vbNullString
+End Function
+
+Private Function GetDelimitedProductRow(ByVal tableText As String, ByVal productId As Long) As String
+    Dim rows() As String
+    Dim rowIndex As Long
+    Dim columns() As String
+
+    If Len(tableText) = 0 Then Exit Function
+
+    rows = Split(vbCr & tableText & vbCr, vbCr)
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(rows(rowIndex)) > 0 Then
+            columns = Split(rows(rowIndex), Chr$(9))
+            If UBound(columns) >= 0 Then
+                If CLng(Val(columns(0))) = productId Then
+                    GetDelimitedProductRow = rows(rowIndex)
+                    Exit Function
+                End If
+            End If
+        End If
+    Next rowIndex
 End Function
