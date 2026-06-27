@@ -146,7 +146,46 @@ End Function
 
 ' Original declaration: Private Sub Proc_1_3_6BEBA0
 Public Function Proc_1_3_6BEBA0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim appPath As String
+    Dim figureData As String
+    Dim slowLogHeader As String
+
+    On Error GoTo StartupFailed
+
+    appPath = App.Path
+    slowLogHeader = "-------------------------------------------------------------------------------------------------------------------------------------------------------" & vbCrLf
+    slowLogHeader = slowLogHeader & " Emulator is running since " & CStr(Now) & ", slow query are being logged if you are running the development mode." & vbCrLf
+    slowLogHeader = slowLogHeader & "-------------------------------------------------------------------------------------------------------------------------------------------------------" & vbCrLf & vbCrLf
+    Proc_8_9_806810 appPath & "\SLOW.log", slowLogHeader, -1
+
+    Proc_1_2_6BE280 0, 0, 0
+    Proc_1_5_6C4F80 0, 0, 0
+    Proc_1_7_6C5E10 0, 0, 0
+
+    figureData = CStr(Proc_5_2_6D4690("SELECT value FROM settings WHERE variable='com.cache.figuredata' LIMIT 1", 0, 0))
+    If Len(figureData) > 0 Then
+        Proc_6_240_7FC2B0 appPath & "\figuredata.cache", figureData, 0
+    End If
+
+    If Len(CStr(Proc_6_239_7FC170(appPath & "\figuredata.cache", 0, 0))) = 0 Then
+        Proc_2_0_6D1510 """Figuredata"" Datei konnte nicht gefunden werden!", "ERROR", CStr(255)
+        GoTo StartupFailed
+    End If
+
+    Proc_1_23_6D1480 "Figuredata im Cache gespeichert", "DEBUG"
+
+    Proc_5_0_6D3CD0 "UPDATE users SET id_socket=null,lastonline_time=UNIX_TIMESTAMP() WHERE id_socket IS NOT NULL", 0, 0
+    Proc_5_0_6D3CD0 "UPDATE rooms SET id_slot=null, visitors_now='0' WHERE visitors_now != 0", 0, 0
+    Proc_5_0_6D3CD0 "DELETE FROM logs_visitedrooms WHERE timestamp_left IS NULL", 0, 0
+    Proc_5_0_6D3CD0 "DELETE FROM rooms_events", 0, 0
+
+    Proc_1_9_6C6DF0 0, 0, 0
+    Proc_1_8_6C6850 0, 0, 0
+    Proc_1_11_6C8D10 0, 0, 0
+    Proc_1_12_6C8EF0 0, 0, 0
+    Proc_1_22_6D0F00 0, 0, 0
+
+StartupFailed:
     Proc_1_3_6BEBA0 = Empty
 End Function
 
