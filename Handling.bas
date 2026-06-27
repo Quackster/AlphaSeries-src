@@ -5202,7 +5202,161 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_132_75D4A0
 Public Function Proc_6_132_75D4A0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim offset As Long
+    Dim catalogProductId As Long
+    Dim expectedProductId As Long
+    Dim recipientName As String
+    Dim giftMessage As String
+    Dim wrapProductId As Long
+    Dim ribbonId As Long
+    Dim colorId As Long
+    Dim senderUserId As String
+    Dim recipientUserId As String
+    Dim catalogRow As String
+    Dim catalogFields() As String
+    Dim productId As Long
+    Dim creditPrice As Long
+    Dim activityPrice As Long
+    Dim activityType As Long
+    Dim allowGifts As Long
+    Dim minClubLevel As Long
+    Dim wrapPrice As Long
+    Dim userRow As String
+    Dim userFields() As String
+    Dim userCredits As Long
+    Dim userActivityPoints As Long
+    Dim userClubLevel As Long
+    Dim grantedFurnitureId As Long
+    Dim productSign As String
+    Dim dateFormat As String
+    Dim senderName As String
+    Dim giftSignExtra As String
+    Dim giftSecondary As Long
+    Dim recipientSocket As Long
+    Dim itemPayload As String
+    Dim productType As Long
+    Dim purchasePayload As String
+
+    On Error GoTo GiftPurchaseFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "GX" Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    catalogProductId = ReadWireLong(requestPayload, offset)
+    expectedProductId = ReadWireLong(requestPayload, offset)
+    recipientName = CStr(Proc_10_10_80A7F0(ReadWireString(requestPayload, offset), 1, 1))
+    giftMessage = Left$(CStr(Proc_10_10_80A7F0(ReadWireString(requestPayload, offset), 1, 1)), 142)
+    wrapProductId = ReadWireLong(requestPayload, offset)
+    ribbonId = ReadWireLong(requestPayload, offset)
+    colorId = ReadWireLong(requestPayload, offset)
+
+    If catalogProductId <= 0 Then catalogProductId = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    If Len(recipientName) = 0 Then recipientName = CStr(Proc_10_10_80A7F0(Proc_10_7_80A190(requestPayload, 0, 0), 1, 1))
+    If catalogProductId <= 0 Or Len(recipientName) = 0 Or Len(giftMessage) > 142 Then GoTo GiftPurchaseFailed
+
+    senderUserId = HandlingUserIdFromSocket(socketIndex)
+    If socketIndex <= 0 Or Len(senderUserId) = 0 Or senderUserId = "0" Then GoTo GiftPurchaseFailed
+
+    catalogRow = CStr(Proc_9_4_807B90(catalogProductId, 0, 0))
+    If Len(catalogRow) = 0 Then GoTo GiftPurchaseFailed
+    catalogFields = Split(catalogRow, Chr$(9))
+    productId = CLng(Val(HandlingField(catalogFields, 2)))
+    creditPrice = CLng(Val(HandlingField(catalogFields, 7)))
+    activityPrice = CLng(Val(HandlingField(catalogFields, 8)))
+    activityType = CLng(Val(HandlingField(catalogFields, 9)))
+    allowGifts = CLng(Val(HandlingField(catalogFields, 10)))
+    minClubLevel = CLng(Val(HandlingField(catalogFields, 11)))
+    If productId <= 0 Or allowGifts = 0 Then GoTo GiftPurchaseFailed
+    If expectedProductId > 0 And expectedProductId <> productId Then GoTo GiftPurchaseFailed
+    If activityType < 0 Or activityType > 4 Then activityType = 0
+
+    If CLng(Val(CStr(Proc_10_0_809570("com.client.catalog.gifts.wrap.enabled", 0, 0)))) <> 0 Then
+        wrapPrice = CLng(Val(CStr(Proc_10_0_809570("com.client.catalog.gifts.wrap.price", 0, 0))))
+        If wrapProductId <= 0 Then wrapProductId = CLng(Val(CStr(Proc_5_2_6D4690("SELECT id FROM products WHERE sprite LIKE 'present_wrap%' ORDER BY id ASC LIMIT 1", 0, 0))))
+        If wrapProductId > 0 Then
+            If InStr(1, global_0082925C, Chr$(13) & CStr(wrapProductId) & Chr$(13), vbBinaryCompare) = 0 Then GoTo GiftPurchaseFailed
+        End If
+    End If
+
+    creditPrice = creditPrice + wrapPrice
+    userRow = CStr(Proc_5_2_6D4690("SELECT credits,activitypoints_" & CStr(activityType) & ",level_hc FROM users WHERE id='" & _
+        Proc_10_11_80A9C0(senderUserId, 0, 0) & "' LIMIT 1", 0, 0))
+    If Len(userRow) = 0 Then GoTo GiftPurchaseFailed
+    userFields = Split(userRow, Chr$(9))
+    userCredits = CLng(Val(HandlingField(userFields, 0)))
+    userActivityPoints = CLng(Val(HandlingField(userFields, 1)))
+    userClubLevel = CLng(Val(HandlingField(userFields, 2)))
+
+    If minClubLevel > 0 And userClubLevel < minClubLevel Then
+        Proc_6_244_801E80 socketIndex, "AD" & CStr(Proc_3_0_6D2AF0(3, Empty, vbNullString)), 0
+        GoTo GiftPurchaseFailed
+    End If
+    If userCredits < creditPrice Then
+        Proc_6_244_801E80 socketIndex, "AD" & CStr(Proc_3_0_6D2AF0(1, Empty, vbNullString)), 0
+        GoTo GiftPurchaseFailed
+    End If
+    If userActivityPoints < activityPrice Then
+        Proc_6_244_801E80 socketIndex, "AD" & CStr(Proc_3_0_6D2AF0(2, Empty, vbNullString)), 0
+        GoTo GiftPurchaseFailed
+    End If
+
+    recipientUserId = CStr(Val(CStr(Proc_5_2_6D4690("SELECT id FROM users WHERE name='" & Proc_10_11_80A9C0(recipientName, 0, 0) & "' LIMIT 1", 0, 0))))
+    If Len(recipientUserId) = 0 Or recipientUserId = "0" Then recipientUserId = senderUserId
+
+    grantedFurnitureId = CLng(Val(CStr(Proc_6_133_760400(socketIndex, catalogProductId, giftMessage))))
+    If grantedFurnitureId <= 0 Then GoTo GiftPurchaseFailed
+
+    productSign = CStr(Proc_8_12_806C30(productId, 4, 0))
+    If StrComp(productSign, "TROPHY_VAR", vbTextCompare) = 0 Then
+        dateFormat = CStr(Proc_10_0_809570("com.client.format.date", "dd.mm.yyyy", 0))
+        senderName = HandlingUserName(senderUserId)
+        productSign = senderName & Chr$(8) & Format$(Now, dateFormat) & Chr$(8) & giftMessage
+    End If
+
+    giftSecondary = (colorId * 1000) + ribbonId
+    giftSignExtra = giftMessage
+    Proc_5_0_6D3CD0 "UPDATE furnitures SET sign_extra='" & Proc_10_11_80A9C0(Proc_10_10_80A7F0(giftSignExtra, 0, 0), 0, 0) & _
+        "',sign='" & Proc_10_11_80A9C0(Proc_10_10_80A7F0(productSign, 0, 0), 0, 0) & "',id_owner='" & Proc_10_11_80A9C0(recipientUserId, 0, 0) & _
+        "',id_destination='" & CStr(catalogProductId) & "',id_secondary='" & CStr(giftSecondary) & "' WHERE id='" & CStr(grantedFurnitureId) & "'", 0, 0
+
+    If creditPrice > 0 Or activityPrice > 0 Then
+        Proc_5_0_6D3CD0 "UPDATE users SET credits=credits-" & CStr(creditPrice) & ",activitypoints_" & CStr(activityType) & _
+            "=activitypoints_" & CStr(activityType) & "-" & CStr(activityPrice) & " WHERE id='" & Proc_10_11_80A9C0(senderUserId, 0, 0) & "'", 0, 0
+        If creditPrice > 0 Then Proc_10_16_80C480 senderUserId, 0, 0
+        If activityPrice > 0 Then Proc_10_17_80C6B0 senderUserId, activityType, 0
+    End If
+
+    Proc_5_0_6D3CD0 "UPDATE users SET gifts_given=gifts_given+1 WHERE id='" & Proc_10_11_80A9C0(senderUserId, 0, 0) & "'", 0, 0
+    If recipientUserId <> senderUserId Then
+        Proc_5_0_6D3CD0 "UPDATE users SET gifts_received=gifts_received+1 WHERE id='" & Proc_10_11_80A9C0(recipientUserId, 0, 0) & "'", 0, 0
+        Proc_6_205_7D9780 socketIndex, 6
+    End If
+
+    productType = CLng(Val(CStr(Proc_8_12_806C30(productId, 0, 0))))
+    purchasePayload = CStr(Proc_3_0_6D2AF0(catalogProductId, Empty, "AC"))
+    purchasePayload = purchasePayload & CStr(Proc_9_1_8072B0(catalogProductId, 0, 0)) & Chr$(2)
+    purchasePayload = CStr(Proc_3_0_6D2AF0(creditPrice, Empty, purchasePayload))
+    purchasePayload = CStr(Proc_3_0_6D2AF0(activityPrice, Empty, purchasePayload))
+    purchasePayload = CStr(Proc_3_0_6D2AF0(activityType, Empty, purchasePayload))
+    purchasePayload = CStr(Proc_3_0_6D2AF0(grantedFurnitureId, Empty, purchasePayload)) & Chr$(2) & "i" & Chr$(2) & "IH"
+    Proc_6_244_801E80 socketIndex, purchasePayload, 0
+
+    recipientSocket = CLng(Val(CStr(Proc_9_9_808AC0(recipientUserId, 0, 0))))
+    If recipientSocket > 0 Then
+        itemPayload = CStr(Proc_6_138_7678A0(grantedFurnitureId, productId, productSign, giftSecondary))
+        Proc_6_244_801E80 CInt(recipientSocket), "Ab" & itemPayload & Chr$(2), 0
+        Proc_6_205_7D9780 CInt(recipientSocket), 7
+    End If
+
+GiftPurchaseFailed:
     Proc_6_132_75D4A0 = Empty
 End Function
 
