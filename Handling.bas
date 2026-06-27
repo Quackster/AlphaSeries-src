@@ -4853,7 +4853,55 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_173_7C3430
 Public Function Proc_6_173_7C3430(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim userId As String
+    Dim targetUserId As String
+    Dim targetSocketIndex As Integer
+    Dim messageText As String
+    Dim filteredText As String
+    Dim currentRoomId As Long
+    Dim offset As Long
+    Dim payload As String
+
+    On Error GoTo ChatFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "@a" Then requestPayload = Mid$(requestPayload, 3)
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo ChatFailed
+
+    offset = 1
+    targetUserId = CStr(ReadWireLong(requestPayload, offset))
+    If Len(targetUserId) = 0 Or targetUserId = "0" Then targetUserId = CStr(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    If Len(targetUserId) = 0 Or targetUserId = "0" Then GoTo ChatFailed
+
+    messageText = Mid$(CStr(Proc_10_7_80A190(requestPayload, 0, 0)), 1, 122)
+    If Len(messageText) = 0 Then messageText = Mid$(ReadWireString(requestPayload, offset), 1, 122)
+    If Len(messageText) = 0 Or Len(messageText) > 255 Then GoTo ChatFailed
+
+    targetSocketIndex = HandlingSocketFromUserId(targetUserId)
+    If targetSocketIndex <= 0 Then GoTo ChatFailed
+
+    currentRoomId = HandlingCurrentRoomId(socketIndex, userId)
+    Proc_5_1_6D4110 "INSERT INTO logs_chat(id_user,id_room,timestamp,description,id_type,id_session) VALUES('" & _
+        Proc_10_11_80A9C0(userId, 0, 0) & "','" & CStr(currentRoomId) & "',UNIX_TIMESTAMP(),'" & _
+        Proc_10_11_80A9C0("(Chat To:     " & CStr(HandlingUserName(targetUserId)) & ") -- " & messageText, 0, 0) & "','3','" & CStr(socketIndex) & "')", 0, 0
+
+    filteredText = CStr(Proc_6_22_6E9300(messageText, 0, 0))
+    payload = CStr(Proc_3_0_6D2AF0(CLng(Val(userId)), Empty, "BF")) & filteredText & Chr$(2)
+    Proc_6_244_801E80 targetSocketIndex, payload, 0
+
+    Proc_6_173_7C3430 = payload
+    Exit Function
+
+ChatFailed:
     Proc_6_173_7C3430 = Empty
 End Function
 
@@ -5908,6 +5956,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_170_7C1100 socketIndex, "@f", packetPayload
         Case "DF"
             Proc_6_169_7C0DC0 socketIndex, "DF", packetPayload
+        Case "@a"
+            Proc_6_173_7C3430 socketIndex, "@a", packetPayload
         Case "E["
             Proc_6_45_714B60 socketIndex, "E[", packetPayload
         Case "A_"
@@ -6297,6 +6347,17 @@ Private Function HandlingSocketFromUserId(ByVal userId As String) As Integer
 
 LookupFailed:
     HandlingSocketFromUserId = 0
+End Function
+
+Private Function HandlingUserName(ByVal userId As String) As String
+    On Error GoTo LookupFailed
+    If Len(userId) = 0 Or userId = "0" Then GoTo LookupFailed
+
+    HandlingUserName = CStr(Proc_5_2_6D4690("SELECT name FROM users WHERE id='" & Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 1", 0, 0))
+    Exit Function
+
+LookupFailed:
+    HandlingUserName = vbNullString
 End Function
 
 Private Function HandlingUserHasRoomRight(ByVal userId As String, ByVal roomId As Long) As Boolean
