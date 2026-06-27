@@ -1192,7 +1192,50 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_74_7265B0
 Public Function Proc_6_74_7265B0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim callerUserId As String
+    Dim targetUserId As String
+    Dim roomId As Long
+    Dim targetSocketIndex As Integer
+    Dim offset As Long
+    Dim revokeCount As Long
+    Dim revokeIndex As Long
+
+    On Error GoTo RevokeFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "Aa" Then requestPayload = Mid$(requestPayload, 3)
+
+    callerUserId = HandlingUserIdFromSocket(socketIndex)
+    If Len(callerUserId) = 0 Or callerUserId = "0" Then GoTo RevokeFailed
+
+    roomId = HandlingCurrentRoomId(socketIndex, callerUserId)
+    If roomId <= 0 Then GoTo RevokeFailed
+    If Not HandlingUserHasRoomRight(callerUserId, roomId) Then GoTo RevokeFailed
+
+    offset = 1
+    revokeCount = ReadWireLong(requestPayload, offset)
+    If revokeCount < 1 Or revokeCount > 150 Then GoTo RevokeFailed
+
+    For revokeIndex = 1 To revokeCount
+        targetUserId = CStr(ReadWireLong(requestPayload, offset))
+        If Len(targetUserId) > 0 And targetUserId <> "0" Then
+            Proc_5_0_6D3CD0 "DELETE FROM rooms_rights WHERE id_user='" & Proc_10_11_80A9C0(targetUserId, 0, 0) & "' AND id_room='" & CStr(roomId) & "'", 0, 0
+
+            targetSocketIndex = HandlingSocketFromUserId(targetUserId)
+            If targetSocketIndex > 0 Then
+                Proc_6_244_801E80 targetSocketIndex, "@k", 0
+            End If
+        End If
+    Next revokeIndex
+
+RevokeFailed:
     Proc_6_74_7265B0 = Empty
 End Function
 
@@ -3221,6 +3264,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_64_721650 socketIndex, "D" & Chr$(127), packetPayload
         Case "EB"
             Proc_6_75_7269D0 socketIndex, "EB", packetPayload
+        Case "Aa"
+            Proc_6_74_7265B0 socketIndex, "Aa", packetPayload
         Case "Es"
             Proc_6_76_726CE0 socketIndex, "Es", packetPayload
         Case "FD"
