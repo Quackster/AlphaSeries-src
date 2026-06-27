@@ -5160,7 +5160,70 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_174_7C3BC0
 Public Function Proc_6_174_7C3BC0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim userId As String
+    Dim userName As String
+    Dim targetName As String
+    Dim targetUserId As String
+    Dim targetSocketIndex As Integer
+    Dim acceptFriends As Long
+    Dim friendshipRow As String
+    Dim offset As Long
+    Dim callerPayload As String
+    Dim targetPayload As String
+
+    On Error GoTo RequestFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "@g" Then requestPayload = Mid$(requestPayload, 3)
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo RequestFailed
+
+    targetName = CStr(Proc_10_7_80A190(requestPayload, 0, 0))
+    If Len(targetName) = 0 Then
+        offset = 1
+        targetName = ReadWireString(requestPayload, offset)
+    End If
+    targetName = Trim$(targetName)
+    If Len(targetName) = 0 Then GoTo RequestFailed
+
+    targetUserId = CStr(Val(CStr(Proc_5_2_6D4690("SELECT id FROM users WHERE name='" & Proc_10_11_80A9C0(targetName, 0, 0) & "' LIMIT 1", 0, 0))))
+    If Len(targetUserId) = 0 Or targetUserId = "0" Or targetUserId = userId Then GoTo RequestDenied
+
+    friendshipRow = CStr(Proc_5_2_6D4690("SELECT id_user FROM friendships WHERE (id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_friend='" & Proc_10_11_80A9C0(targetUserId, 0, 0) & "') OR (id_user='" & Proc_10_11_80A9C0(targetUserId, 0, 0) & "' AND id_friend='" & Proc_10_11_80A9C0(userId, 0, 0) & "') LIMIT 1", 0, 0))
+    If Len(friendshipRow) > 0 Then GoTo RequestDenied
+
+    acceptFriends = CLng(Val(CStr(Proc_5_2_6D4690("SELECT accept_friends FROM users WHERE id='" & Proc_10_11_80A9C0(targetUserId, 0, 0) & "' LIMIT 1", 0, 0))))
+    If acceptFriends <> 1 Then GoTo RequestDenied
+
+    Proc_5_0_6D3CD0 "INSERT IGNORE INTO friendships(id_user,id_friend) VALUES('" & Proc_10_11_80A9C0(targetUserId, 0, 0) & "','" & Proc_10_11_80A9C0(userId, 0, 0) & "')", 0, 0
+
+    userName = HandlingUserName(userId)
+    targetSocketIndex = HandlingSocketFromUserId(targetUserId)
+    If targetSocketIndex > 0 Then
+        targetPayload = CStr(Proc_3_0_6D2AF0(CLng(Val(userId)), Empty, "BD")) & userName & Chr$(2) & CStr(userId) & Chr$(2)
+        Proc_6_244_801E80 targetSocketIndex, targetPayload, 0
+    End If
+
+    callerPayload = CStr(Proc_3_0_6D2AF0(CLng(Val(targetUserId)), Empty, "DD")) & "H"
+    Proc_6_244_801E80 socketIndex, callerPayload, 0
+    Proc_6_174_7C3BC0 = callerPayload
+    Exit Function
+
+RequestDenied:
+    callerPayload = "DDH" & Chr$(2)
+    Proc_6_244_801E80 socketIndex, callerPayload, 0
+    Proc_6_174_7C3BC0 = callerPayload
+    Exit Function
+
+RequestFailed:
     Proc_6_174_7C3BC0 = Empty
 End Function
 
@@ -6262,6 +6325,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_167_7BECA0 socketIndex, "@e", packetPayload
         Case "@i"
             Proc_6_172_7C25B0 socketIndex, "@i", packetPayload
+        Case "@g"
+            Proc_6_174_7C3BC0 socketIndex, "@g", packetPayload
         Case "E["
             Proc_6_45_714B60 socketIndex, "E[", packetPayload
         Case "A_"
