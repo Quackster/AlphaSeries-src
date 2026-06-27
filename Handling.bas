@@ -781,7 +781,45 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_49_715D30
 Public Function Proc_6_49_715D30(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim userId As String
+    Dim roomId As Long
+    Dim eventName As String
+    Dim eventDescription As String
+    Dim tagOne As String
+    Dim tagTwo As String
+    Dim queryText As String
+
+    On Error GoTo EditFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then
+        packetPayload = CStr(args(2))
+    ElseIf UBound(args) >= 1 Then
+        packetPayload = CStr(args(1))
+    End If
+    If Left$(packetPayload, 2) = "E\" Then packetPayload = Mid$(packetPayload, 3)
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo EditFailed
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId <= 0 Then GoTo EditFailed
+
+    If Not RoomEventEditPayloadFromWire(packetPayload, eventName, eventDescription, tagOne, tagTwo) Then GoTo EditFailed
+
+    queryText = "UPDATE rooms_events SET id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "',name='"
+    queryText = queryText & Proc_10_11_80A9C0(eventName, 0, 0) & "',description='"
+    queryText = queryText & Proc_10_11_80A9C0(eventDescription, 0, 0) & "'"
+    queryText = queryText & ",tag_1=" & NullableSqlText(tagOne)
+    queryText = queryText & ",tag_2=" & NullableSqlText(tagTwo)
+    queryText = queryText & " WHERE id_room='" & CStr(roomId) & "'"
+
+    Proc_5_0_6D3CD0 queryText, 0, 0
+    Proc_6_247_8027E0 socketIndex, "Er" & CStr(Proc_6_51_716AC0(roomId)), 0
+
+EditFailed:
     Proc_6_49_715D30 = Empty
 End Function
 
@@ -2873,6 +2911,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_44_7145E0 socketIndex, "FB", packetPayload
         Case "EZ"
             Proc_6_48_7151E0 socketIndex, "EZ", packetPayload
+        Case "E\"
+            Proc_6_49_715D30 socketIndex, "E\", packetPayload
         Case "@H"
             Proc_6_108_74D800 socketIndex, "@H", packetPayload
         Case "@S"
@@ -3261,6 +3301,40 @@ Private Function RoomEventCreatePayloadFromWire(ByVal packetPayload As String, B
 
 ParseFailed:
     RoomEventCreatePayloadFromWire = False
+End Function
+
+Private Function RoomEventEditPayloadFromWire(ByVal packetPayload As String, ByRef eventName As String, ByRef eventDescription As String, ByRef tagOne As String, ByRef tagTwo As String) As Boolean
+    Dim offset As Long
+    Dim tagCount As Long
+    Dim tagIndex As Long
+    Dim tagText As String
+
+    On Error GoTo ParseFailed
+
+    offset = 1
+    eventName = CStr(Proc_10_10_80A7F0(ReadWireString(packetPayload, offset), 0, 0))
+    If Len(eventName) < 3 Then GoTo ParseFailed
+
+    eventDescription = CStr(Proc_10_10_80A7F0(ReadWireString(packetPayload, offset), 0, 0))
+    If Len(eventDescription) < 3 Then GoTo ParseFailed
+
+    tagCount = ReadWireLong(packetPayload, offset)
+    If tagCount < 0 Or tagCount > 2 Then GoTo ParseFailed
+
+    For tagIndex = 1 To tagCount
+        tagText = LCase$(Left$(CStr(Proc_10_10_80A7F0(ReadWireString(packetPayload, offset), 0, 0)), 30))
+        If tagIndex = 1 Then
+            tagOne = tagText
+        ElseIf tagIndex = 2 Then
+            tagTwo = tagText
+        End If
+    Next tagIndex
+
+    RoomEventEditPayloadFromWire = True
+    Exit Function
+
+ParseFailed:
+    RoomEventEditPayloadFromWire = False
 End Function
 
 Private Function NullableSqlText(ByVal valueText As String) As String
