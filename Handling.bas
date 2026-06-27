@@ -3304,6 +3304,8 @@ Public Function Proc_6_76_726CE0(ParamArray args() As Variant) As Variant
 
     Proc_5_0_6D3CD0 "UPDATE users SET respect_amount=respect_amount-1,respect_given=respect_given+1 WHERE id='" & Proc_10_11_80A9C0(giverUserId, 0, 0) & "'", 0, 0
     Proc_5_0_6D3CD0 "UPDATE users SET respect_received=respect_received+1 WHERE id='" & Proc_10_11_80A9C0(targetUserId, 0, 0) & "'", 0, 0
+    Proc_6_205_7D9780 socketIndex, 3
+    Proc_6_205_7D9780 targetSocketIndex, 2
 
     respectReceived = CLng(Val(CStr(Proc_5_2_6D4690("SELECT respect_received FROM users WHERE id='" & Proc_10_11_80A9C0(targetUserId, 0, 0) & "' LIMIT 1", 0, 0))))
     Proc_6_247_8027E0 socketIndex, CStr(Proc_3_0_6D2AF0(targetUserId, Empty, "Fx")) & CStr(Proc_3_0_6D2AF0(respectReceived, Empty, vbNullString)), 0
@@ -8168,7 +8170,61 @@ End Function
 
 ' Original declaration: Private  Proc_6_205_7D9780(arg_C, arg_10) '7D9780
 Public Function Proc_6_205_7D9780(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim achievementQuestId As Long
+    Dim achievementIndex As Long
+    Dim achievementId As Long
+    Dim badgePrefix As String
+    Dim progressStep As Long
+    Dim levelTotal As Long
+    Dim currentLevel As Long
+    Dim nextLevel As Long
+    Dim currentProgress As Long
+    Dim requiredProgress As Long
+    Dim rowText As String
+
+    On Error GoTo ProgressFailed
+
+    If UBound(args) < 1 Then GoTo ProgressFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex <= 0 And UBound(args) >= 1 Then socketIndex = CInt(Val(CStr(args(1))))
+    If socketIndex <= 0 Then GoTo ProgressFailed
+
+    achievementQuestId = CLng(Val(CStr(args(UBound(args)))))
+    If achievementQuestId <= 0 Then GoTo ProgressFailed
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo ProgressFailed
+    If Not IsArray(global_008291E8) Then GoTo ProgressFailed
+
+    For achievementIndex = LBound(global_008291E8, 1) To UBound(global_008291E8, 1)
+        achievementId = CLng(Val(CStr(global_008291E8(achievementIndex, 0))))
+        If achievementId = achievementQuestId Then
+            badgePrefix = CStr(global_008291E8(achievementIndex, 1))
+            progressStep = CLng(Val(CStr(global_008291E8(achievementIndex, 2))))
+            levelTotal = CLng(Val(CStr(global_008291E8(achievementIndex, 4))))
+            If Len(badgePrefix) = 0 Or progressStep <= 0 Then GoTo ProgressFailed
+            If levelTotal <= 0 Then levelTotal = 1
+
+            rowText = CStr(Proc_5_2_6D4690("SELECT REPLACE(id_badge,'" & Proc_10_11_80A9C0(badgePrefix, 0, 0) & "','') FROM users_badges WHERE id_user='" & _
+                Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_badge LIKE '" & Proc_10_11_80A9C0(badgePrefix, 0, 0) & "%' ORDER BY id DESC LIMIT 1", 0, 0))
+            currentLevel = CLng(Val(rowText))
+            If currentLevel < 0 Then currentLevel = 0
+            If currentLevel >= levelTotal Then GoTo ProgressFailed
+
+            nextLevel = currentLevel + 1
+            requiredProgress = progressStep * nextLevel
+            currentProgress = RepresentedAchievementProgress(userId, achievementQuestId)
+            If currentProgress >= requiredProgress Then
+                Proc_6_204_7D82E0 socketIndex, achievementIndex, nextLevel
+            End If
+            Exit For
+        End If
+    Next achievementIndex
+
+ProgressFailed:
     Proc_6_205_7D9780 = Empty
 End Function
 
@@ -9870,6 +9926,57 @@ Private Function HandlingUserIdFromSocket(ByVal socketIndex As Integer) As Strin
 
 LookupFailed:
     HandlingUserIdFromSocket = vbNullString
+End Function
+
+Private Function RepresentedAchievementProgress(ByVal userId As String, ByVal achievementQuestId As Long) As Long
+    Dim escapedUserId As String
+    Dim rowText As String
+    Dim fields() As String
+
+    On Error GoTo ProgressFailed
+    escapedUserId = Proc_10_11_80A9C0(userId, 0, 0)
+
+    Select Case achievementQuestId
+        Case 1
+            rowText = CStr(Proc_5_2_6D4690("SELECT COUNT(DISTINCT id_room) FROM logs_visitedrooms WHERE id_user='" & escapedUserId & "'", 0, 0))
+            RepresentedAchievementProgress = CLng(Val(rowText))
+        Case 2
+            rowText = CStr(Proc_5_2_6D4690("SELECT respect_received FROM users WHERE id='" & escapedUserId & "' LIMIT 1", 0, 0))
+            RepresentedAchievementProgress = CLng(Val(rowText))
+        Case 3
+            rowText = CStr(Proc_5_2_6D4690("SELECT respect_given FROM users WHERE id='" & escapedUserId & "' LIMIT 1", 0, 0))
+            RepresentedAchievementProgress = CLng(Val(rowText))
+        Case 4
+            rowText = CStr(Proc_5_2_6D4690("SELECT online_time FROM users WHERE id='" & escapedUserId & "' LIMIT 1", 0, 0))
+            RepresentedAchievementProgress = CLng(Val(rowText)) \ 60
+        Case 5
+            rowText = CStr(Proc_5_2_6D4690("SELECT create_time FROM users WHERE id='" & escapedUserId & "' LIMIT 1", 0, 0))
+            If CLng(Val(rowText)) > 0 Then RepresentedAchievementProgress = DateDiff("d", DateSerial(1970, 1, 1), Now) - (CLng(Val(rowText)) \ 86400)
+        Case 6
+            rowText = CStr(Proc_5_2_6D4690("SELECT gifts_given FROM users WHERE id='" & escapedUserId & "' LIMIT 1", 0, 0))
+            RepresentedAchievementProgress = CLng(Val(rowText))
+        Case 7
+            rowText = CStr(Proc_5_2_6D4690("SELECT gifts_received FROM users WHERE id='" & escapedUserId & "' LIMIT 1", 0, 0))
+            RepresentedAchievementProgress = CLng(Val(rowText))
+        Case 8
+            rowText = CStr(Proc_5_2_6D4690("SELECT hc_periods FROM users WHERE id='" & escapedUserId & "' LIMIT 1", 0, 0))
+            RepresentedAchievementProgress = CLng(Val(rowText))
+        Case 9
+            rowText = CStr(Proc_5_2_6D4690("SELECT hc2_periods FROM users WHERE id='" & escapedUserId & "' LIMIT 1", 0, 0))
+            RepresentedAchievementProgress = CLng(Val(rowText))
+        Case 11
+            rowText = CStr(Proc_5_2_6D4690("SELECT amount_staffpicked FROM users WHERE id='" & escapedUserId & "' LIMIT 1", 0, 0))
+            RepresentedAchievementProgress = CLng(Val(rowText))
+        Case Else
+            rowText = CStr(Proc_5_2_6D4690("SELECT respect_received,respect_given,gifts_given,gifts_received FROM users WHERE id='" & escapedUserId & "' LIMIT 1", 0, 0))
+            fields = Split(rowText, Chr$(9))
+            If UBound(fields) >= 0 Then RepresentedAchievementProgress = CLng(Val(CStr(fields(0))))
+    End Select
+    If RepresentedAchievementProgress < 0 Then RepresentedAchievementProgress = 0
+    Exit Function
+
+ProgressFailed:
+    RepresentedAchievementProgress = 0
 End Function
 
 Private Function RoomKickOrBanUser(ByRef args() As Variant, ByVal addRoomBan As Boolean) As Variant
