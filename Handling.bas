@@ -610,7 +610,39 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_44_7145E0
 Public Function Proc_6_44_7145E0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim userId As String
+    Dim roomId As Long
+    Dim iconPayload As String
+    Dim queryTail As String
+
+    On Error GoTo IconFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then
+        packetPayload = CStr(args(2))
+    ElseIf UBound(args) >= 1 Then
+        packetPayload = CStr(args(1))
+    End If
+    If Left$(packetPayload, 2) = "FB" Then packetPayload = Mid$(packetPayload, 3)
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo IconFailed
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId <= 0 Then GoTo IconFailed
+
+    iconPayload = RoomIconPayloadFromWire(packetPayload)
+    If Len(iconPayload) = 0 Then GoTo IconFailed
+
+    Proc_5_0_6D3CD0 "UPDATE rooms SET icon='" & Proc_10_11_80A9C0(iconPayload, 0, 0) & "' WHERE id='" & CStr(roomId) & "'", 0, 0
+    queryTail = "users,rooms,rooms_categories WHERE rooms.id='" & CStr(roomId) & "' AND users.id=rooms.id_owner AND rooms_categories.id=rooms.id_category LIMIT 1"
+    Proc_6_247_8027E0 socketIndex, CStr(Proc_6_112_74E0C0(socketIndex, queryTail, "GF")), 0
+    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(roomId, Empty, "GI")) & Chr$(2), 0
+    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(roomId, Empty, "GH")), 0
+
+IconFailed:
     Proc_6_44_7145E0 = Empty
 End Function
 
@@ -2789,6 +2821,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_107_74B7E0 socketIndex, "Gc", packetPayload
         Case "GG"
             Proc_6_47_714F60 socketIndex, "GG", packetPayload
+        Case "FB"
+            Proc_6_44_7145E0 socketIndex, "FB", packetPayload
         Case "@H"
             Proc_6_108_74D800 socketIndex, "@H", packetPayload
         Case "@S"
@@ -3082,6 +3116,61 @@ Private Function ReadWireLong(ByVal packetPayload As String, ByRef offset As Lon
 
 ReadFailed:
     ReadWireLong = 0
+End Function
+
+Private Function RoomIconPayloadFromWire(ByVal packetPayload As String) As String
+    Dim offset As Long
+    Dim backgroundId As Long
+    Dim foregroundId As Long
+    Dim itemCount As Long
+    Dim itemIndex As Long
+    Dim itemType As Long
+    Dim itemPosition As Long
+    Dim payload As String
+    Dim previousOffset As Long
+
+    On Error GoTo BuildFailed
+
+    offset = 1
+    previousOffset = offset
+    backgroundId = ReadWireLong(packetPayload, offset)
+    If offset <= previousOffset Then GoTo BuildFailed
+    If backgroundId < 0 Or backgroundId > 24 Then GoTo BuildFailed
+
+    previousOffset = offset
+    foregroundId = ReadWireLong(packetPayload, offset)
+    If offset <= previousOffset Then GoTo BuildFailed
+    If foregroundId < 0 Or foregroundId > 11 Then GoTo BuildFailed
+
+    previousOffset = offset
+    itemCount = ReadWireLong(packetPayload, offset)
+    If offset <= previousOffset Then GoTo BuildFailed
+    If itemCount < 0 Or itemCount > 12 Then GoTo BuildFailed
+
+    payload = CStr(Proc_3_0_6D2AF0(backgroundId, Empty, vbNullString))
+    payload = CStr(Proc_3_0_6D2AF0(foregroundId, Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(itemCount, Empty, payload))
+
+    For itemIndex = 1 To itemCount
+        previousOffset = offset
+        itemType = ReadWireLong(packetPayload, offset)
+        If offset <= previousOffset Then GoTo BuildFailed
+        If itemType < 0 Then GoTo BuildFailed
+
+        previousOffset = offset
+        itemPosition = ReadWireLong(packetPayload, offset)
+        If offset <= previousOffset Then GoTo BuildFailed
+        If itemPosition < 0 Then GoTo BuildFailed
+
+        payload = CStr(Proc_3_0_6D2AF0(itemType, Empty, payload))
+        payload = CStr(Proc_3_0_6D2AF0(itemPosition, Empty, payload))
+    Next itemIndex
+
+    RoomIconPayloadFromWire = payload
+    Exit Function
+
+BuildFailed:
+    RoomIconPayloadFromWire = vbNullString
 End Function
 
 Private Function NavigatorListLimit() As Long
