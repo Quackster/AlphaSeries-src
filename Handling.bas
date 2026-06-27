@@ -3506,7 +3506,107 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_87_73C120
 Public Function Proc_6_87_73C120(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim offset As Long
+    Dim furnitureId As Long
+    Dim petName As String
+    Dim validationCode As Long
+    Dim userId As String
+    Dim roomId As Long
+    Dim rowText As String
+    Dim fields() As String
+    Dim productId As Long
+    Dim ownerId As String
+    Dim packageRow As String
+    Dim packageFields() As String
+    Dim packageType As String
+    Dim containedPetId As Long
+    Dim petRow As String
+    Dim petFields() As String
+    Dim petFigure As String
+    Dim botId As Long
+    Dim inventoryRow As String
+    Dim responsePayload As String
+
+    On Error GoTo PackagePetDone
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "n~" Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    furnitureId = ReadWireLong(requestPayload, offset)
+    If furnitureId <= 0 Then furnitureId = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    petName = CStr(Proc_10_10_80A7F0(ReadWireString(requestPayload, offset), 0, 0))
+    If Len(petName) = 0 Then petName = CStr(Proc_10_10_80A7F0(Proc_10_7_80A190(requestPayload, 0, 0), 0, 0))
+
+    validationCode = CLng(Val(CStr(Proc_6_181_7CA920(petName, 0, 0))))
+    If validationCode > 0 Then
+        Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(validationCode, Empty, CStr(Proc_3_0_6D2AF0(furnitureId, Empty, "Lz")))) & petName & Chr$(2), 0
+        GoTo PackagePetDone
+    End If
+
+    If socketIndex <= 0 Or furnitureId <= 0 Then GoTo PackagePetDone
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo PackagePetDone
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId <= 0 Then GoTo PackagePetDone
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT id_product,id_owner FROM furnitures WHERE id='" & CStr(furnitureId) & _
+        "' AND id_room='" & CStr(roomId) & "' LIMIT 1", 0, 0))
+    If Len(rowText) = 0 Then GoTo PackagePetDone
+
+    fields = Split(rowText, Chr$(9))
+    productId = CLng(Val(HandlingField(fields, 0)))
+    ownerId = CStr(CLng(Val(HandlingField(fields, 1))))
+    If productId <= 0 Then GoTo PackagePetDone
+    If ownerId <> userId And Not HandlingUserOwnsRoom(userId, roomId) And Not HandlingUserHasRoomRight(userId, roomId) Then GoTo PackagePetDone
+
+    packageRow = CStr(Proc_5_2_6D4690("SELECT id_product,type_secondary,id_contain,type_check FROM packages WHERE id_product='" & _
+        CStr(productId) & "' LIMIT 1", 0, 0))
+    If Len(packageRow) = 0 Then GoTo PackagePetDone
+
+    packageFields = Split(packageRow, Chr$(9))
+    packageType = LCase$(HandlingField(packageFields, 1))
+    containedPetId = CLng(Val(HandlingField(packageFields, 2)))
+    If packageType <> "packages_pets" Or containedPetId <= 0 Then GoTo PackagePetDone
+
+    petRow = CStr(Proc_5_2_6D4690("SELECT id_pet,id_race,color FROM packages_pets WHERE id='" & _
+        CStr(containedPetId) & "' LIMIT 1", 0, 0))
+    If Len(petRow) = 0 Then GoTo PackagePetDone
+
+    petFields = Split(petRow, Chr$(9))
+    petFigure = CStr(CLng(Val(HandlingField(petFields, 0)))) & Chr$(32) & _
+        CStr(CLng(Val(HandlingField(petFields, 1)))) & Chr$(32) & HandlingField(petFields, 2)
+
+    Proc_5_0_6D3CD0 "INSERT INTO bots(id_user,figure,name,id_handle) VALUES('" & Proc_10_11_80A9C0(userId, 0, 0) & "','" & _
+        Proc_10_11_80A9C0(LCase$(petFigure), 0, 0) & "','" & Proc_10_11_80A9C0(petName, 0, 0) & "','3')", 0, 0
+    botId = CLng(Val(CStr(Proc_5_2_6D4690("SELECT id FROM bots WHERE id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & _
+        "' AND id_handle='3' ORDER BY id DESC LIMIT 1", 0, 0))))
+    If botId <= 0 Then GoTo PackagePetDone
+
+    Proc_5_0_6D3CD0 "INSERT INTO bots_petdata(id_bot,timestamp_buy,id_owner,energy,nutrition,scratches) VALUES('" & _
+        CStr(botId) & "',UNIX_TIMESTAMP(),'" & Proc_10_11_80A9C0(userId, 0, 0) & "','100','100','0')", 0, 0
+
+    inventoryRow = RepresentedPetInventoryRow(botId, petName, petFigure, 0)
+    If Len(inventoryRow) > 0 Then Proc_6_244_801E80 socketIndex, "I[" & inventoryRow, 0
+
+    Proc_6_146_76D300 socketIndex, furnitureId, productId
+    Proc_6_247_8027E0 socketIndex, "A^" & CStr(furnitureId) & Chr$(2) & "H" & Chr$(2), 0
+    Proc_5_0_6D3CD0 "DELETE FROM furnitures WHERE id='" & CStr(furnitureId) & "' LIMIT 1", 0, 0
+
+    responsePayload = CStr(Proc_3_0_6D2AF0(validationCode, Empty, CStr(Proc_3_0_6D2AF0(furnitureId, Empty, "Lz"))))
+    Proc_6_244_801E80 socketIndex, responsePayload & petName & Chr$(2), 0
+    Proc_6_87_73C120 = botId
+    Exit Function
+
+PackagePetDone:
     Proc_6_87_73C120 = Empty
 End Function
 
@@ -11269,6 +11369,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_178_7C6E60 socketIndex, "nx", packetPayload
         Case "nz"
             Proc_6_179_7C7790 socketIndex, "nz", packetPayload
+        Case "n~"
+            Proc_6_87_73C120 socketIndex, "n~", packetPayload
         Case "n|"
             Proc_7CC190 socketIndex, "n|", packetPayload
         Case "n{"
