@@ -5863,8 +5863,29 @@ End Function
 
 ' Original declaration: Private  Proc_6_245_801FA0(arg_C) '801FA0
 Public Function Proc_6_245_801FA0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_245_801FA0 = Empty
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim roomId As Long
+    Dim payload As String
+
+    On Error GoTo BroadcastFailed
+    If UBound(args) < 1 Then GoTo BroadcastFailed
+
+    socketIndex = CInt(Val(CStr(args(0))))
+    payload = CStr(args(1))
+    If socketIndex <= 0 Or Len(payload) = 0 Then GoTo BroadcastFailed
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo BroadcastFailed
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId <= 0 Then GoTo BroadcastFailed
+
+    Proc_6_245_801FA0 = BroadcastToRoomUsers(roomId, payload)
+    Exit Function
+
+BroadcastFailed:
+    Proc_6_245_801FA0 = 0
 End Function
 
 ' Original declaration: Private  Proc_6_246_8024C0(arg_C) '8024C0
