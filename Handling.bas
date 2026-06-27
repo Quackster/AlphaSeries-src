@@ -7743,8 +7743,104 @@ End Function
 
 ' Original declaration: Private  Proc_6_158_7987C0(arg_C, arg_10, arg_14, arg_18, arg_1C, arg_20) '7987C0
 Public Function Proc_6_158_7987C0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_158_7987C0 = Empty
+    Dim roomId As Long
+    Dim furnitureId As Long
+    Dim positionX As Long
+    Dim positionY As Long
+    Dim footprintX As Long
+    Dim footprintY As Long
+    Dim tileX As Long
+    Dim tileY As Long
+    Dim rowText As String
+    Dim fields() As String
+    Dim modelMap As String
+    Dim mapRows() As String
+    Dim mapCell As String
+    Dim allowWalkthrough As Long
+    Dim occupiedCount As Long
+    Dim roomSlot As Long
+    Dim occupantRows() As String
+    Dim occupantIndex As Long
+    Dim occupantRoomUserIndex As Long
+    Dim occupantX As Long
+    Dim occupantY As Long
+
+    On Error GoTo CheckFailed
+
+    If UBound(args) < 2 Then GoTo CheckFailed
+
+    furnitureId = CLng(Val(CStr(args(0))))
+    positionX = CLng(Val(CStr(args(1))))
+    positionY = CLng(Val(CStr(args(2))))
+    footprintX = 1
+    footprintY = 1
+    If UBound(args) >= 3 Then footprintX = CLng(Val(CStr(args(3))))
+    If UBound(args) >= 4 Then footprintY = CLng(Val(CStr(args(4))))
+    If footprintX <= 0 Then footprintX = 1
+    If footprintY <= 0 Then footprintY = 1
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT id_room FROM furnitures WHERE id='" & CStr(furnitureId) & "' LIMIT 1", 0, 0))
+    If Len(rowText) > 0 Then
+        roomId = CLng(Val(rowText))
+    Else
+        roomId = furnitureId
+        furnitureId = 0
+    End If
+    If roomId <= 0 Then GoTo CheckFailed
+    If positionX < 0 Or positionY < 0 Then GoTo CheckFailed
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT models.map,rooms.allow_walkthrough,rooms.id_slot FROM rooms,models WHERE rooms.id='" & _
+        CStr(roomId) & "' AND models.id=rooms.id_model LIMIT 1", 0, 0))
+    If Len(rowText) = 0 Then GoTo CheckFailed
+
+    fields = Split(rowText, Chr$(9))
+    modelMap = Replace(HandlingField(fields, 0), vbLf, vbCr, 1, -1, vbBinaryCompare)
+    Do While InStr(1, modelMap, vbCr & vbCr, vbBinaryCompare) > 0
+        modelMap = Replace(modelMap, vbCr & vbCr, vbCr, 1, -1, vbBinaryCompare)
+    Loop
+    If Right$(modelMap, 1) = vbCr Then modelMap = Left$(modelMap, Len(modelMap) - 1)
+    mapRows = Split(modelMap, vbCr)
+    allowWalkthrough = CLng(Val(HandlingField(fields, 1)))
+    roomSlot = CLng(Val(HandlingField(fields, 2)))
+
+    For tileY = positionY To positionY + footprintY - 1
+        If tileY < LBound(mapRows) Or tileY > UBound(mapRows) Then GoTo CheckFailed
+        For tileX = positionX To positionX + footprintX - 1
+            If tileX < 0 Or tileX + 1 > Len(CStr(mapRows(tileY))) Then GoTo CheckFailed
+            mapCell = LCase$(Mid$(CStr(mapRows(tileY)), tileX + 1, 1))
+            If mapCell = "x" Or Len(mapCell) = 0 Then GoTo CheckFailed
+
+            occupiedCount = CLng(Val(CStr(Proc_5_2_6D4690("SELECT COUNT(*) FROM furnitures WHERE id_room='" & _
+                CStr(roomId) & "' AND position_wall IS NULL AND position_x='" & CStr(tileX) & "' AND position_y='" & _
+                CStr(tileY) & "' AND id<>'" & CStr(furnitureId) & "' LIMIT 1", 0, 0))))
+            If occupiedCount > 0 Then GoTo CheckFailed
+
+            occupiedCount = CLng(Val(CStr(Proc_5_2_6D4690("SELECT COUNT(*) FROM bots WHERE id_room='" & _
+                CStr(roomId) & "' AND position_x='" & CStr(tileX) & "' AND position_y='" & CStr(tileY) & "' LIMIT 1", 0, 0))))
+            If occupiedCount > 0 Then GoTo CheckFailed
+
+            If allowWalkthrough = 0 Then
+                If roomSlot > 0 Then
+                    occupantRows = Split(CStr(Proc_5_2_6D4690("SELECT id FROM logs_visitedrooms WHERE id_room='" & _
+                        CStr(roomId) & "' AND timestamp_left IS NULL LIMIT 250", 0, 0)), Chr$(13))
+                    For occupantIndex = LBound(occupantRows) To UBound(occupantRows)
+                        occupantRoomUserIndex = CLng(Val(CStr(occupantRows(occupantIndex))))
+                        If occupantRoomUserIndex > 0 Then
+                            If HandlingRepresentedMovementPosition(roomSlot, occupantRoomUserIndex, occupantX, occupantY) Then
+                                If occupantX = tileX And occupantY = tileY Then GoTo CheckFailed
+                            End If
+                        End If
+                    Next occupantIndex
+                End If
+            End If
+        Next tileX
+    Next tileY
+
+    Proc_6_158_7987C0 = 1
+    Exit Function
+
+CheckFailed:
+    Proc_6_158_7987C0 = 0
 End Function
 
 ' Original declaration: Private Sub Proc_6_159_79FCD0
