@@ -479,7 +479,7 @@ End Function
 
 ' Original declaration: Private Sub Proc_0_24_68EEF0
 Private Sub Proc_0_24_68EEF0()
-    ' TODO: Reconstruct behavior from decompiled reference.
+    ' Recovered as an empty procedure in the decompiled reference.
 End Sub
 
 ' Original declaration: Private  Proc_0_25_68FBC0(arg_C, arg_10) '68FBC0
