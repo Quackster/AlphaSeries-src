@@ -5,4 +5,4 @@ Option Explicit
 ' Source reference: /opt/git/AlphaSeries_cracked/DECOMPILED/Walking.bas
 ' Decompiled procedure bodies are intentionally not copied until they are understood and made valid VB6.
 
-' No procedures were present in the decompiled module.
+' No valid procedure declarations were present in the decompiled module.

@@ -282,10 +282,7 @@ Private Sub DataProcess_Timer(Index As Integer)
     ' TODO: Reconstruct behavior from decompiled reference.
 End Sub
 
-' Original declaration: Private Sub gameServer_C_q]<lkamWk&_uo_lLfj`j=nEge]( '68F5C0
-Private Sub gameServer_C_q()
-    ' TODO: Reconstruct behavior from decompiled reference.
-End Sub
+' Skipped invalid decompiler procedure declaration: Private Sub gameServer_C_q]<lkamWk&_uo_lLfj`j=nEge]( '68F5C0
 
 ' Original declaration: Private Sub gameServer_UnknownEvent_C '68F4C0
 Private Sub gameServer_UnknownEvent_C()
@@ -340,42 +337,42 @@ End Sub
 ' Original declaration: Public Function EasyGetIdentity(arg1) '68C620
 Public Function EasyGetIdentity(Optional ByVal arg1 As Variant) As Variant
     ' TODO: Reconstruct behavior from decompiled reference.
-    Empty
+    EasyGetIdentity = Empty
 End Function
 
 ' Original declaration: Public Function NewPremiumCheck(arg0, arg1) '68C820
 Public Function NewPremiumCheck(Optional ByVal arg0 As Variant, Optional ByVal arg1 As Variant) As Variant
     ' TODO: Reconstruct behavior from decompiled reference.
-    Empty
+    NewPremiumCheck = Empty
 End Function
 
 ' Original declaration: Public Function CreateSuperEasyIdentity(arg1) '68CB10
 Public Function CreateSuperEasyIdentity(Optional ByVal arg1 As Variant) As Variant
     ' TODO: Reconstruct behavior from decompiled reference.
-    Empty
+    CreateSuperEasyIdentity = Empty
 End Function
 
 ' Original declaration: Public Function SuperEasyGetIdentity(arg1) '68CD20
 Public Function SuperEasyGetIdentity(Optional ByVal arg1 As Variant) As Variant
     ' TODO: Reconstruct behavior from decompiled reference.
-    Empty
+    SuperEasyGetIdentity = Empty
 End Function
 
 ' Original declaration: Public Function GetIdentity(arg1, arg2) '68CF20
 Public Function GetIdentity(Optional ByVal arg1 As Variant, Optional ByVal arg2 As Variant) As Variant
     ' TODO: Reconstruct behavior from decompiled reference.
-    Empty
+    GetIdentity = Empty
 End Function
 
 ' Original declaration: Public Sub runServer() '68EC00
-Private Sub runServer()
+Public Sub runServer()
     ' TODO: Reconstruct behavior from decompiled reference.
 End Sub
 
 ' Original declaration: Public Function getProcessor() '68EE00
 Public Function getProcessor() As Variant
     ' TODO: Reconstruct behavior from decompiled reference.
-    Empty
+    getProcessor = Empty
 End Function
 
 ' Original declaration: Private  Proc_0_22_68C1A0(arg_C) '68C1A0

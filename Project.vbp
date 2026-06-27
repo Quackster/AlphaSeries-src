@@ -57,7 +57,3 @@ MaxNumberOfThreads = 1
 
 [MS Transaction Server]
 AutoRefresh = 1
-
-
-; Reconstructed source tree generated from /opt/git/AlphaSeries_cracked/DECOMPILED/.
-; Procedure bodies are porting stubs until manually reconstructed.

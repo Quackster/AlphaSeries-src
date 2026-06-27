@@ -8,11 +8,11 @@ Option Explicit
 ' Original declaration: Private Sub Proc_12_0_8218C0
 Public Function Proc_12_0_8218C0(ParamArray args() As Variant) As Variant
     ' TODO: Reconstruct behavior from decompiled reference.
-    Empty
+    Proc_12_0_8218C0 = Empty
 End Function
 
 ' Original declaration: Private  Proc_12_1_821AA0(arg_C) '821AA0
 Public Function Proc_12_1_821AA0(ParamArray args() As Variant) As Variant
     ' TODO: Reconstruct behavior from decompiled reference.
-    Empty
+    Proc_12_1_821AA0 = Empty
 End Function

@@ -8,77 +8,77 @@ Option Explicit
 ' Original declaration: Private Sub Proc_8_0_804330
 Public Function Proc_8_0_804330(ParamArray args() As Variant) As Variant
     ' TODO: Reconstruct behavior from decompiled reference.
-    Empty
+    Proc_8_0_804330 = Empty
 End Function
 
 ' Original declaration: Private Sub Proc_8_1_804400
 Public Function Proc_8_1_804400(ParamArray args() As Variant) As Variant
     ' TODO: Reconstruct behavior from decompiled reference.
-    Empty
+    Proc_8_1_804400 = Empty
 End Function
 
 ' Original declaration: Private Sub Proc_8_2_804490
 Public Function Proc_8_2_804490(ParamArray args() As Variant) As Variant
     ' TODO: Reconstruct behavior from decompiled reference.
-    Empty
+    Proc_8_2_804490 = Empty
 End Function
 
 ' Original declaration: Private Sub Proc_8_3_804530
 Public Function Proc_8_3_804530(ParamArray args() As Variant) As Variant
     ' TODO: Reconstruct behavior from decompiled reference.
-    Empty
+    Proc_8_3_804530 = Empty
 End Function
 
 ' Original declaration: Private Sub Proc_8_4_804970
 Public Function Proc_8_4_804970(ParamArray args() As Variant) As Variant
     ' TODO: Reconstruct behavior from decompiled reference.
-    Empty
+    Proc_8_4_804970 = Empty
 End Function
 
 ' Original declaration: Private  Proc_8_5_804AB0(arg_C) '804AB0
 Public Function Proc_8_5_804AB0(ParamArray args() As Variant) As Variant
     ' TODO: Reconstruct behavior from decompiled reference.
-    Empty
+    Proc_8_5_804AB0 = Empty
 End Function
 
 ' Original declaration: Private Sub Proc_8_6_804D80
 Public Function Proc_8_6_804D80(ParamArray args() As Variant) As Variant
     ' TODO: Reconstruct behavior from decompiled reference.
-    Empty
+    Proc_8_6_804D80 = Empty
 End Function
 
 ' Original declaration: Private Sub Proc_8_7_8051C0
 Public Function Proc_8_7_8051C0(ParamArray args() As Variant) As Variant
     ' TODO: Reconstruct behavior from decompiled reference.
-    Empty
+    Proc_8_7_8051C0 = Empty
 End Function
 
 ' Original declaration: Private Sub Proc_8_8_806720
 Public Function Proc_8_8_806720(ParamArray args() As Variant) As Variant
     ' TODO: Reconstruct behavior from decompiled reference.
-    Empty
+    Proc_8_8_806720 = Empty
 End Function
 
 ' Original declaration: Private  Proc_8_9_806810(arg_C) '806810
 Public Function Proc_8_9_806810(ParamArray args() As Variant) As Variant
     ' TODO: Reconstruct behavior from decompiled reference.
-    Empty
+    Proc_8_9_806810 = Empty
 End Function
 
 ' Original declaration: Private  Proc_8_10_8068E0(arg_C) '8068E0
 Public Function Proc_8_10_8068E0(ParamArray args() As Variant) As Variant
     ' TODO: Reconstruct behavior from decompiled reference.
-    Empty
+    Proc_8_10_8068E0 = Empty
 End Function
 
 ' Original declaration: Private Sub Proc_8_11_8069B0
 Public Function Proc_8_11_8069B0(ParamArray args() As Variant) As Variant
     ' TODO: Reconstruct behavior from decompiled reference.
-    Empty
+    Proc_8_11_8069B0 = Empty
 End Function
 
 ' Original declaration: Private  Proc_8_12_806C30(arg_C) '806C30
 Public Function Proc_8_12_806C30(ParamArray args() As Variant) As Variant
     ' TODO: Reconstruct behavior from decompiled reference.
-    Empty
+    Proc_8_12_806C30 = Empty
 End Function
