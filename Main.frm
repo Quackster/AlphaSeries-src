@@ -353,8 +353,7 @@ End Sub
 
 ' Original declaration: Public Function EasyGetIdentity(arg1) '68C620
 Public Function EasyGetIdentity(Optional ByVal arg1 As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    EasyGetIdentity = Empty
+    EasyGetIdentity = ShiftIdentityText(CStr(arg1), -25)
 End Function
 
 ' Original declaration: Public Function NewPremiumCheck(arg0, arg1) '68C820
@@ -371,8 +370,7 @@ End Function
 
 ' Original declaration: Public Function SuperEasyGetIdentity(arg1) '68CD20
 Public Function SuperEasyGetIdentity(Optional ByVal arg1 As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    SuperEasyGetIdentity = Empty
+    SuperEasyGetIdentity = ShiftIdentityText(CStr(arg1), -2)
 End Function
 
 ' Original declaration: Public Function GetIdentity(arg1, arg2) '68CF20
@@ -388,8 +386,26 @@ End Sub
 
 ' Original declaration: Public Function getProcessor() '68EE00
 Public Function getProcessor() As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    getProcessor = Empty
+    On Error Resume Next
+    getProcessor = Environ$("USERNAME")
+End Function
+
+Private Function ShiftIdentityText(ByVal sourceText As String, ByVal shiftAmount As Long) As String
+    Dim index As Long
+    Dim charCode As Long
+    Dim outputText As String
+
+    On Error GoTo ShiftFailed
+    For index = 1 To Len(sourceText)
+        charCode = Asc(Mid$(sourceText, index, 1)) + shiftAmount
+        outputText = outputText & Chr$(charCode And &HFF&)
+    Next index
+
+    ShiftIdentityText = outputText
+    Exit Function
+
+ShiftFailed:
+    ShiftIdentityText = vbNullString
 End Function
 
 ' Original declaration: Private  Proc_0_22_68C1A0(arg_C) '68C1A0
