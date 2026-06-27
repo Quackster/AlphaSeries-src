@@ -7397,7 +7397,50 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_230_7F3D20
 Public Function Proc_6_230_7F3D20(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim userId As String
+    Dim rawMotto As String
+    Dim mottoText As String
+    Dim rowText As String
+    Dim fields() As String
+    Dim figureText As String
+    Dim genderText As String
+    Dim offset As Long
+
+    On Error GoTo MottoFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "Gd" Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    rawMotto = ReadWireString(requestPayload, offset)
+    If Len(rawMotto) = 0 Then rawMotto = CStr(Proc_10_7_80A190(requestPayload, 0, 0))
+    If Len(rawMotto) = 0 Then rawMotto = requestPayload
+
+    mottoText = Left$(CStr(Proc_10_10_80A7F0(rawMotto, 0, 0)), 255)
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo MottoFailed
+
+    Proc_5_0_6D3CD0 "UPDATE users SET motto='" & Proc_10_11_80A9C0(mottoText, 0, 0) & "' WHERE id='" & Proc_10_11_80A9C0(userId, 0, 0) & "'", 0, 0
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT figure,gender FROM users WHERE id='" & Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 1", 0, 0))
+    If Len(rowText) > 0 Then
+        fields = Split(rowText, Chr$(9))
+        figureText = HandlingField(fields, 0)
+        genderText = UCase$(Left$(HandlingField(fields, 1), 1))
+    End If
+    If genderText <> "M" And genderText <> "F" Then genderText = "M"
+
+    Proc_6_244_801E80 socketIndex, UserIdentityPayload(CLng(Val(userId)), mottoText, genderText, figureText), 0
+
+MottoFailed:
     Proc_6_230_7F3D20 = Empty
 End Function
 
