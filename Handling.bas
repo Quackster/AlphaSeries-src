@@ -4963,7 +4963,106 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_201_7D5AC0
 Public Function Proc_6_201_7D5AC0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim userId As String
+    Dim roomId As Long
+    Dim pollId As Long
+    Dim pollRow As String
+    Dim pollFields() As String
+    Dim questionRows() As String
+    Dim questionFields() As String
+    Dim answerRows() As String
+    Dim answerFields() As String
+    Dim questionRowText As String
+    Dim answerRowText As String
+    Dim questionPayload As String
+    Dim answerPayload As String
+    Dim payload As String
+    Dim questionCount As Long
+    Dim questionIndex As Long
+    Dim answerCount As Long
+    Dim answerIndex As Long
+    Dim questionId As Long
+    Dim questionType As Long
+    Dim questionText As String
+    Dim answerText As String
+    Dim offset As Long
+
+    On Error GoTo SendFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "Cj" Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    pollId = ReadWireLong(requestPayload, offset)
+    If pollId <= 0 Then pollId = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    If pollId <= 0 Then GoTo SendFailed
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo SendFailed
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId <= 0 Then GoTo SendFailed
+
+    pollRow = CStr(Proc_5_2_6D4690("SELECT id,description_title,description_thanks FROM poll WHERE id='" & CStr(pollId) & "' AND id_room='" & CStr(roomId) & "' LIMIT 1", 0, 0))
+    If Len(pollRow) = 0 Then GoTo SendFailed
+
+    pollFields = Split(pollRow, Chr$(9))
+    If UBound(pollFields) < 2 Then GoTo SendFailed
+
+    questionRowText = CStr(Proc_5_2_6D4690("SELECT id,description_question,id_type FROM poll_questions WHERE id_poll='" & CStr(pollId) & "' LIMIT 50", 0, 0))
+    If Len(questionRowText) > 0 Then questionRows = Split(questionRowText, Chr$(13))
+
+    If Len(questionRowText) > 0 Then
+        For questionIndex = LBound(questionRows) To UBound(questionRows)
+            If Len(questionRows(questionIndex)) > 0 Then
+                questionFields = Split(questionRows(questionIndex), Chr$(9))
+                If UBound(questionFields) >= 2 Then
+                    questionId = CLng(Val(CStr(questionFields(0))))
+                    questionText = CStr(questionFields(1))
+                    questionType = CLng(Val(CStr(questionFields(2))))
+
+                    answerPayload = vbNullString
+                    answerCount = 0
+                    answerRowText = CStr(Proc_5_2_6D4690("SELECT id,id_question,caption FROM poll_answers WHERE id_question='" & CStr(questionId) & "' LIMIT 5", 0, 0))
+                    If Len(answerRowText) > 0 Then
+                        answerRows = Split(answerRowText, Chr$(13))
+                        For answerIndex = LBound(answerRows) To UBound(answerRows)
+                            If Len(answerRows(answerIndex)) > 0 Then
+                                answerFields = Split(answerRows(answerIndex), Chr$(9))
+                                If UBound(answerFields) >= 2 Then
+                                    answerText = CStr(answerFields(2))
+                                    answerPayload = answerPayload & answerText & Chr$(2)
+                                    answerCount = answerCount + 1
+                                End If
+                            End If
+                        Next answerIndex
+                    End If
+
+                    questionCount = questionCount + 1
+                    questionPayload = CStr(Proc_3_0_6D2AF0(questionId, Empty, questionPayload))
+                    questionPayload = CStr(Proc_3_0_6D2AF0(questionCount, Empty, questionPayload))
+                    questionPayload = CStr(Proc_3_0_6D2AF0(questionType, Empty, questionPayload))
+                    questionPayload = questionPayload & questionText & Chr$(2)
+                    questionPayload = CStr(Proc_3_0_6D2AF0(answerCount, Empty, questionPayload))
+                    questionPayload = CStr(Proc_3_0_6D2AF0(0, Empty, questionPayload))
+                    questionPayload = CStr(Proc_3_0_6D2AF0(answerCount, Empty, questionPayload)) & answerPayload
+                End If
+            End If
+        Next questionIndex
+    End If
+
+    payload = CStr(Proc_3_0_6D2AF0(pollId, Empty, "D}")) & CStr(pollFields(1)) & Chr$(2) & CStr(pollFields(2)) & Chr$(2)
+    payload = CStr(Proc_3_0_6D2AF0(questionCount, Empty, payload)) & questionPayload
+    Proc_6_244_801E80 socketIndex, payload, 0
+
+SendFailed:
     Proc_6_201_7D5AC0 = Empty
 End Function
 
@@ -5382,6 +5481,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_203_7D7F80 socketIndex, "F]", packetPayload
         Case "F^"
             Proc_6_202_7D6760 socketIndex, "F^", packetPayload
+        Case "Cj"
+            Proc_6_201_7D5AC0 socketIndex, "Cj", packetPayload
         Case "Ck"
             Proc_6_199_7D54E0 socketIndex, "Ck", packetPayload
         Case "Cl"
