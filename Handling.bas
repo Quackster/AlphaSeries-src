@@ -4734,7 +4734,62 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_170_7C1100
 Public Function Proc_6_170_7C1100(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim userId As String
+    Dim offset As Long
+    Dim firstValue As Long
+    Dim targetUserId As Long
+    Dim targetList As String
+    Dim targetCount As Long
+    Dim maxTargets As Long
+    Dim previousOffset As Long
+
+    On Error GoTo DeleteFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "@f" Then requestPayload = Mid$(requestPayload, 3)
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo DeleteFailed
+
+    offset = 1
+    firstValue = ReadWireLong(requestPayload, offset)
+    If firstValue = 1 Then
+        Proc_5_0_6D3CD0 "DELETE FROM friendships WHERE id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND has_accept='0' LIMIT 75", 0, 0
+        Proc_6_170_7C1100 = 1
+        Exit Function
+    End If
+
+    maxTargets = firstValue
+    If maxTargets <= 0 Then maxTargets = 75
+    If maxTargets > 75 Then maxTargets = 75
+
+    Do While offset <= Len(requestPayload) And targetCount < maxTargets
+        previousOffset = offset
+        targetUserId = ReadWireLong(requestPayload, offset)
+        If targetUserId <= 0 Or offset = previousOffset Then Exit Do
+
+        If InStr(1, "," & targetList & ",", "," & CStr(targetUserId) & ",", vbBinaryCompare) = 0 Then
+            If Len(targetList) > 0 Then targetList = targetList & ","
+            targetList = targetList & CStr(targetUserId)
+            targetCount = targetCount + 1
+        End If
+    Loop
+
+    If Len(targetList) = 0 And firstValue > 1 Then targetList = CStr(firstValue)
+    If Len(targetList) = 0 Then GoTo DeleteFailed
+
+    Proc_5_0_6D3CD0 "DELETE FROM friendships WHERE id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND has_accept='0' AND id_friend IN (" & targetList & ") LIMIT 75", 0, 0
+    Proc_6_170_7C1100 = 1
+    Exit Function
+
+DeleteFailed:
     Proc_6_170_7C1100 = Empty
 End Function
 
@@ -5803,6 +5858,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_46_714D50 socketIndex, "EY", packetPayload
         Case "@L"
             Proc_6_88_73E4F0 socketIndex, "@L", packetPayload
+        Case "@f"
+            Proc_6_170_7C1100 socketIndex, "@f", packetPayload
         Case "E["
             Proc_6_45_714B60 socketIndex, "E[", packetPayload
         Case "A_"
