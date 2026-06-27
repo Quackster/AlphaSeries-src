@@ -2055,7 +2055,25 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_203_7D7F80
 Public Function Proc_6_203_7D7F80(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim enabledValue As Long
+    Dim remainingBlockTime As Long
+    Dim payload As String
+
+    On Error GoTo RecycleStatusFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    enabledValue = CLng(Val(CStr(Proc_10_0_809570("com.client.catalog.recycler.enabled", 0, 0))))
+    If enabledValue <> 0 Then enabledValue = 1
+
+    ' The original subtracts com.client.catalog.recycler.block.time from a per-session
+    ' recycle timestamp field. That field is still unrecovered, so report no cooldown.
+    remainingBlockTime = 0
+    payload = CStr(Proc_3_0_6D2AF0(enabledValue, Empty, "G{"))
+    payload = CStr(Proc_3_0_6D2AF0(remainingBlockTime, Empty, payload))
+    Proc_6_244_801E80 socketIndex, payload, 0
+
+RecycleStatusFailed:
     Proc_6_203_7D7F80 = Empty
 End Function
 
