@@ -6345,7 +6345,55 @@ End Function
 
 ' Original declaration: Private  Proc_6_154_78F040(arg_C, arg_10) '78F040
 Public Function Proc_6_154_78F040(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim furnitureId As Long
+    Dim productId As Long
+    Dim roomId As Long
+    Dim rowText As String
+    Dim fields() As String
+    Dim signText As String
+    Dim stateValue As Long
+    Dim productType As Long
+    Dim productSprite As String
+    Dim payload As String
+
+    On Error GoTo RefreshDone
+    If UBound(args) < 0 Then GoTo RefreshDone
+
+    furnitureId = CLng(Val(CStr(args(0))))
+    If UBound(args) >= 1 Then productId = CLng(Val(CStr(args(1))))
+    If furnitureId <= 0 Then GoTo RefreshDone
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT id_room,id_product,sign FROM furnitures WHERE id='" & CStr(furnitureId) & "' LIMIT 1", 0, 0))
+    If Len(rowText) = 0 Then GoTo RefreshDone
+
+    fields = Split(rowText, Chr$(9))
+    roomId = CLng(Val(HandlingField(fields, 0)))
+    If productId <= 0 Then productId = CLng(Val(HandlingField(fields, 1)))
+    signText = HandlingField(fields, 2)
+    If roomId <= 0 Or productId <= 0 Then GoTo RefreshDone
+
+    productType = CLng(Val(CStr(Proc_8_12_806C30(productId, 0, 0))))
+    productSprite = CStr(Proc_8_12_806C30(productId, 17, 0))
+    If Len(productSprite) = 0 Then productSprite = CStr(Proc_8_12_806C30(productId, 18, 0))
+
+    stateValue = CLng(Val(signText))
+    If LCase$(Left$(productSprite, 9)) = "bb_score_" Or LCase$(Left$(productSprite, 9)) = "es_score_" Then
+        If stateValue < 0 Then stateValue = 0
+    End If
+
+    Proc_6_151_78AC20 roomId, furnitureId, stateValue
+
+    payload = "AX" & CStr(furnitureId) & Chr$(2) & CStr(stateValue) & Chr$(2)
+    Proc_6_246_8024C0 roomId, payload, 0
+
+    If productType = 11 Or InStr(1, LCase$(productSprite), "soundmachine", vbTextCompare) > 0 Or InStr(1, LCase$(productSprite), "jukebox", vbTextCompare) > 0 Then
+        Proc_6_224_7EF5A0 0, roomId, furnitureId
+    End If
+
+    Proc_6_154_78F040 = payload
+    Exit Function
+
+RefreshDone:
     Proc_6_154_78F040 = Empty
 End Function
 
