@@ -2098,7 +2098,42 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_72_7250D0
 Public Function Proc_6_72_7250D0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim callerUserId As String
+    Dim roomId As Long
+    Dim requestFlag As Long
+    Dim offset As Long
+
+    On Error GoTo DeleteFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "@W" Then requestPayload = Mid$(requestPayload, 3)
+
+    requestFlag = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    If requestFlag = 0 And Len(requestPayload) > 0 Then
+        offset = 1
+        requestFlag = ReadWireLong(requestPayload, offset)
+    End If
+    If requestFlag <> 0 Then GoTo DeleteFailed
+
+    callerUserId = HandlingUserIdFromSocket(socketIndex)
+    If Len(callerUserId) = 0 Or callerUserId = "0" Then GoTo DeleteFailed
+
+    roomId = HandlingCurrentRoomId(socketIndex, callerUserId)
+    If roomId <= 0 Then GoTo DeleteFailed
+    If Not HandlingUserOwnsRoom(callerUserId, roomId) Then GoTo DeleteFailed
+
+    Proc_10_18_80C9E0 roomId, 0, 0
+    Proc_5_0_6D3CD0 "DELETE FROM rooms WHERE id='" & CStr(roomId) & "' LIMIT 1", 0, 0
+    Proc_6_53_718E00 socketIndex, 0, 0
+
+DeleteFailed:
     Proc_6_72_7250D0 = Empty
 End Function
 
@@ -4216,6 +4251,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_74_7265B0 socketIndex, "Aa", packetPayload
         Case "B["
             Proc_6_71_724CF0 socketIndex, "B[", packetPayload
+        Case "@W"
+            Proc_6_72_7250D0 socketIndex, "@W", packetPayload
         Case "Es"
             Proc_6_76_726CE0 socketIndex, "Es", packetPayload
         Case "FD"
