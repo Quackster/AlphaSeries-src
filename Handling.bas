@@ -1006,8 +1006,45 @@ End Function
 
 ' Original declaration: Private  Proc_6_161_7B2EE0(arg_C, arg_10, arg_14, arg_18, arg_1C, arg_20, arg_24, arg_28) '7B2EE0
 Public Function Proc_6_161_7B2EE0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_161_7B2EE0 = Empty
+    Dim baseValue As Long
+    Dim firstValue As Long
+    Dim secondValue As Long
+    Dim thirdValue As Long
+    Dim fourthValue As Long
+    Dim fifthValue As String
+    Dim sixthValue As String
+    Dim seventhValue As Long
+    Dim eighthValue As Long
+    Dim payload As String
+    Dim encodedBase As String
+
+    On Error GoTo BuildFailed
+    If UBound(args) < 0 Then GoTo BuildFailed
+
+    baseValue = CLng(Val(CStr(args(0))))
+    If UBound(args) >= 1 Then firstValue = CLng(Val(CStr(args(1))))
+    If UBound(args) >= 2 Then secondValue = CLng(Val(CStr(args(2))))
+    If UBound(args) >= 3 Then thirdValue = CLng(Val(CStr(args(3))))
+    If UBound(args) >= 4 Then fourthValue = CLng(Val(CStr(args(4))))
+    If UBound(args) >= 5 Then fifthValue = CStr(args(5))
+    If UBound(args) >= 6 Then sixthValue = CStr(args(6))
+    If UBound(args) >= 7 Then seventhValue = CLng(Val(CStr(args(7))))
+    If UBound(args) >= 8 Then eighthValue = CLng(Val(CStr(args(8))))
+
+    sixthValue = Replace(sixthValue, Chr$(8), Chr$(9), 1, -1, vbBinaryCompare)
+    sixthValue = Replace(sixthValue, "{{9}}", Chr$(9), 1, -1, vbBinaryCompare)
+
+    encodedBase = CStr(Proc_3_0_6D2AF0(baseValue, Empty, "0"))
+    payload = CStr(Proc_3_0_6D2AF0(firstValue, Empty, encodedBase))
+    payload = "0" & CStr(Proc_3_0_6D2AF0(secondValue, Empty, payload))
+    payload = "0" & CStr(Proc_3_0_6D2AF0(thirdValue, Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(fourthValue, Empty, payload)) & fifthValue & Chr$(2)
+    payload = CStr(Proc_3_0_6D2AF0(seventhValue, Empty, payload)) & sixthValue & Chr$(2) & "M"
+    Proc_6_161_7B2EE0 = CStr(Proc_3_0_6D2AF0(eighthValue, Empty, payload))
+    Exit Function
+
+BuildFailed:
+    Proc_6_161_7B2EE0 = vbNullString
 End Function
 
 ' Original declaration: Private Sub Proc_6_162_7B3310
