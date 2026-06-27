@@ -7826,7 +7826,130 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_236_7F8540
 Public Function Proc_6_236_7F8540(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim userQuestRows() As String
+    Dim questRows() As String
+    Dim userQuestFields() As String
+    Dim questFields() As String
+    Dim userQuestRow As String
+    Dim questRow As String
+    Dim userQuestText As String
+    Dim questId As Long
+    Dim userQuestId As Long
+    Dim questLevel As Long
+    Dim userLevel As Long
+    Dim timestampDone As String
+    Dim timestampAccepted As String
+    Dim timeNextText As String
+    Dim progressValue As Long
+    Dim waitSeconds As Long
+    Dim questCount As Long
+    Dim campaignId As Long
+    Dim lastCampaignId As Long
+    Dim campaignLevelCount As Long
+    Dim rowIndex As Long
+    Dim questIndex As Long
+    Dim questPayload As String
+    Dim rowPayload As String
+    Dim questName As String
+    Dim rewardType As Long
+    Dim rewardAmount As Long
+    Dim activityCount As Long
+    Dim stateCode As Long
+
+    On Error GoTo QuestListFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo QuestListFailed
+
+    userQuestText = CStr(Proc_5_2_6D4690("SELECT id_quest,id_level,timestamp_done,timestamp_accepted,time_next,progress FROM users_quests WHERE id_user='" & _
+        Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 250", Chr$(13), 0))
+    userQuestText = Chr$(13) & userQuestText & Chr$(13)
+
+    If Len(global_00829080) > 0 Then
+        questRows = Split(global_00829080, Chr$(13))
+    Else
+        questRows = Split(CStr(Proc_5_2_6D4690("SELECT id,level,name,NULL,reward,reward_type,require_action,id_additional,id_campaign,amount_activities,waitamount FROM quests ORDER BY id_campaign DESC,level ASC", 0, 0)), Chr$(13))
+    End If
+
+    lastCampaignId = -1
+    campaignLevelCount = 0
+
+    For questIndex = LBound(questRows) To UBound(questRows)
+        questRow = Trim$(CStr(questRows(questIndex)))
+        If Len(questRow) > 0 Then
+            questFields = Split(questRow, Chr$(9))
+            If UBound(questFields) >= 10 Then
+                questId = CLng(Val(HandlingField(questFields, 0)))
+                questLevel = CLng(Val(HandlingField(questFields, 1)))
+                questName = HandlingField(questFields, 2)
+                rewardAmount = CLng(Val(HandlingField(questFields, 4)))
+                rewardType = CLng(Val(HandlingField(questFields, 5)))
+                campaignId = CLng(Val(HandlingField(questFields, 8)))
+                activityCount = CLng(Val(HandlingField(questFields, 9)))
+                waitSeconds = CLng(Val(HandlingField(questFields, 10)))
+
+                If campaignId <> lastCampaignId Then
+                    lastCampaignId = campaignId
+                    campaignLevelCount = 0
+                End If
+                campaignLevelCount = campaignLevelCount + 1
+
+                userQuestId = 0
+                userLevel = 0
+                timestampDone = vbNullString
+                timestampAccepted = vbNullString
+                timeNextText = vbNullString
+                progressValue = 0
+
+                userQuestRows = Split(userQuestText, Chr$(13) & CStr(questId) & Chr$(9), -1, vbBinaryCompare)
+                If UBound(userQuestRows) > 0 Then
+                    userQuestRow = Split(CStr(userQuestRows(1)), Chr$(13), -1, vbBinaryCompare)(0)
+                    userQuestFields = Split(CStr(questId) & Chr$(9) & userQuestRow, Chr$(9))
+                    userQuestId = CLng(Val(HandlingField(userQuestFields, 0)))
+                    userLevel = CLng(Val(HandlingField(userQuestFields, 1)))
+                    timestampDone = HandlingField(userQuestFields, 2)
+                    timestampAccepted = HandlingField(userQuestFields, 3)
+                    timeNextText = HandlingField(userQuestFields, 4)
+                    progressValue = CLng(Val(HandlingField(userQuestFields, 5)))
+                End If
+
+                stateCode = 0
+                If Len(timestampDone) > 0 And timestampDone <> "0" Then
+                    stateCode = 2
+                ElseIf Len(timestampAccepted) > 0 And timestampAccepted <> "0" Then
+                    stateCode = 1
+                End If
+
+                If Len(timeNextText) > 0 And timeNextText <> "0" Then
+                    waitSeconds = CLng(Val(CStr(Proc_5_2_6D4690("SELECT GREATEST(0,UNIX_TIMESTAMP('" & _
+                        Proc_10_11_80A9C0(timeNextText, 0, 0) & "')-UNIX_TIMESTAMP())", 0, 0))))
+                End If
+
+                rowPayload = CStr(Proc_3_0_6D2AF0(campaignId, Empty, vbNullString)) & questName & Chr$(2)
+                rowPayload = rowPayload & CStr(Proc_3_0_6D2AF0(questId, Empty, vbNullString))
+                rowPayload = rowPayload & CStr(Proc_3_0_6D2AF0(questLevel, Empty, vbNullString))
+                rowPayload = rowPayload & CStr(Proc_3_0_6D2AF0(campaignLevelCount, Empty, vbNullString))
+                rowPayload = rowPayload & CStr(Proc_3_0_6D2AF0(stateCode, Empty, vbNullString))
+                rowPayload = rowPayload & CStr(Proc_3_0_6D2AF0(userLevel, Empty, vbNullString))
+                rowPayload = rowPayload & CStr(Proc_3_0_6D2AF0(progressValue, Empty, vbNullString))
+                rowPayload = rowPayload & CStr(Proc_3_0_6D2AF0(activityCount, Empty, vbNullString))
+                rowPayload = rowPayload & CStr(Proc_3_0_6D2AF0(rewardType, Empty, vbNullString))
+                rowPayload = rowPayload & CStr(Proc_3_0_6D2AF0(rewardAmount, Empty, vbNullString))
+                rowPayload = rowPayload & "HHH" & Chr$(2) & Chr$(2) & "H" & Chr$(2) & "HHH"
+                rowPayload = rowPayload & CStr(Proc_3_0_6D2AF0(waitSeconds, Empty, vbNullString))
+
+                questPayload = questPayload & rowPayload
+                questCount = questCount + 1
+            End If
+        End If
+    Next questIndex
+
+    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(0, Empty, CStr(Proc_3_0_6D2AF0(questCount, Empty, "L`")))) & questPayload, 0
+
+QuestListFailed:
     Proc_6_236_7F8540 = Empty
 End Function
 
