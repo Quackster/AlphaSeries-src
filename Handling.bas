@@ -4831,7 +4831,81 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_131_75C700
 Public Function Proc_6_131_75C700(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim rowText As String
+    Dim userFields() As String
+    Dim hcLevel As Long
+    Dim hcDays As Long
+    Dim vipDays As Long
+    Dim presentsAvailable As Long
+    Dim daysSinceStart As Long
+    Dim activeDays As Long
+    Dim giftRows() As String
+    Dim giftParts() As String
+    Dim giftIndex As Long
+    Dim catalogProductId As Long
+    Dim productId As Long
+    Dim requiredDays As Long
+    Dim canClaim As Long
+    Dim statusCount As Long
+    Dim statusPayload As String
+    Dim payload As String
+
+    On Error GoTo GiftListFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If socketIndex <= 0 Or Len(userId) = 0 Or userId = "0" Then GoTo GiftListFailed
+
+    If Len(global_00829178) = 0 Or Len(global_0082917C) = 0 Then Proc_1_18_6CE9C0 0, 0, 0
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT level_hc,hc_days,hc2_days,hc_presents,ROUND((UNIX_TIMESTAMP()-hc_startperiod)/60/60/24,0) FROM users WHERE id='" & _
+        Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 1", 0, 0))
+    If Len(rowText) > 0 Then
+        userFields = Split(rowText, Chr$(9))
+        hcLevel = CLng(Val(HandlingField(userFields, 0)))
+        hcDays = CLng(Val(HandlingField(userFields, 1)))
+        vipDays = CLng(Val(HandlingField(userFields, 2)))
+        presentsAvailable = CLng(Val(HandlingField(userFields, 3)))
+        daysSinceStart = CLng(Val(HandlingField(userFields, 4)))
+    End If
+
+    If hcLevel > 1 Then
+        activeDays = vipDays
+    Else
+        activeDays = hcDays
+    End If
+    activeDays = activeDays - daysSinceStart
+    If activeDays < 0 Then activeDays = 0
+
+    giftRows = Split(Replace(global_0082917C, "[", vbNullString, 1, -1, vbBinaryCompare), "]")
+    For giftIndex = LBound(giftRows) To UBound(giftRows)
+        If Len(giftRows(giftIndex)) > 0 Then
+            giftParts = Split(Replace(CStr(giftRows(giftIndex)), Chr$(1), Chr$(0), 1, -1, vbBinaryCompare), Chr$(0))
+            If UBound(giftParts) >= 2 Then
+                catalogProductId = CLng(Val(CStr(giftParts(0))))
+                productId = CLng(Val(CStr(giftParts(1))))
+                requiredDays = CLng(Val(CStr(giftParts(2))))
+                canClaim = 0
+                If presentsAvailable > 0 And activeDays >= requiredDays Then canClaim = 1
+
+                statusPayload = statusPayload & CStr(Proc_3_0_6D2AF0(catalogProductId, Empty, vbNullString))
+                statusPayload = statusPayload & CStr(Proc_3_0_6D2AF0(productId, Empty, vbNullString))
+                statusPayload = statusPayload & CStr(Proc_3_0_6D2AF0(requiredDays, Empty, vbNullString))
+                statusPayload = statusPayload & CStr(Proc_3_0_6D2AF0(canClaim, Empty, vbNullString))
+                statusPayload = statusPayload & "H"
+                statusCount = statusCount + 1
+            End If
+        End If
+    Next giftIndex
+
+    payload = CStr(Proc_3_0_6D2AF0(presentsAvailable, Empty, "Io" & "M"))
+    payload = payload & global_00829178
+    payload = payload & CStr(Proc_3_0_6D2AF0(statusCount, Empty, vbNullString)) & statusPayload
+    Proc_6_244_801E80 socketIndex, payload, 0
+
+GiftListFailed:
     Proc_6_131_75C700 = Empty
 End Function
 
