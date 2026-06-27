@@ -3557,7 +3557,56 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_85_73A8E0
 Public Function Proc_6_85_73A8E0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim roomId As Long
+    Dim rowText As String
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim furnitureId As Long
+    Dim productId As Long
+    Dim wallPosition As String
+    Dim signText As String
+    Dim secondaryValue As Long
+    Dim itemPayload As String
+    Dim itemCount As Long
+    Dim payload As String
+
+    On Error GoTo WallListDone
+
+    If UBound(args) >= 0 Then socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 1 Then roomId = CLng(Val(CStr(args(1))))
+    If roomId <= 0 And socketIndex > 0 Then
+        userId = HandlingUserIdFromSocket(socketIndex)
+        If Len(userId) > 0 And userId <> "0" Then roomId = HandlingCurrentRoomId(socketIndex, userId)
+    End If
+    If roomId <= 0 Then GoTo WallListDone
+
+    rows = Split(CStr(Proc_5_2_6D4690("SELECT id,id_product,position_wall,sign,id_secondary FROM furnitures WHERE id_room='" & CStr(roomId) & "' AND id_owner IS NULL AND position_wall IS NOT NULL LIMIT 100", 0, 0)), Chr$(13))
+    For rowIndex = LBound(rows) To UBound(rows)
+        rowText = Trim$(CStr(rows(rowIndex)))
+        If Len(rowText) > 0 Then
+            fields = Split(rowText, Chr$(9))
+            furnitureId = CLng(Val(HandlingField(fields, 0)))
+            productId = CLng(Val(HandlingField(fields, 1)))
+            wallPosition = HandlingField(fields, 2)
+            signText = HandlingField(fields, 3)
+            secondaryValue = CLng(Val(HandlingField(fields, 4)))
+
+            If furnitureId > 0 And productId > 0 And Len(wallPosition) > 0 Then
+                itemPayload = itemPayload & CStr(Proc_6_156_7972B0(furnitureId, productId, wallPosition, signText, secondaryValue))
+                itemCount = itemCount + 1
+            End If
+        End If
+    Next rowIndex
+
+    payload = CStr(Proc_3_0_6D2AF0(itemCount, Empty, "@m")) & itemPayload
+    If socketIndex > 0 Then Proc_6_244_801E80 socketIndex, payload, 0
+    Proc_6_85_73A8E0 = payload
+    Exit Function
+
+WallListDone:
     Proc_6_85_73A8E0 = Empty
 End Function
 
