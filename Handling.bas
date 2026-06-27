@@ -7440,7 +7440,75 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_226_7F0B20
 Public Function Proc_6_226_7F0B20(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim offset As Long
+    Dim playlistOrder As Long
+    Dim roomId As Long
+    Dim jukeboxRow As String
+    Dim jukeboxFields() As String
+    Dim jukeboxId As Long
+    Dim cdFurnitureId As Long
+    Dim songDiskProductId As Long
+
+    On Error GoTo RemoveFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex <= 0 Then GoTo RemoveFailed
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo RemoveFailed
+
+    If UBound(args) >= 1 Then packetPayload = CStr(args(1))
+    If Left$(packetPayload, 2) = "D@" Then
+        requestPayload = Mid$(packetPayload, 3)
+    Else
+        requestPayload = packetPayload
+    End If
+
+    offset = 1
+    playlistOrder = ReadWireLong(requestPayload, offset)
+    If playlistOrder < 0 Then playlistOrder = 0
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId <= 0 Then GoTo RemoveFailed
+
+    jukeboxRow = CStr(Proc_5_2_6D4690("SELECT furnitures.id,furnitures.id_product FROM furnitures,soundmachine_jb_playlist WHERE furnitures.id_room='" & _
+        CStr(roomId) & "' AND soundmachine_jb_playlist.id_jukebox=furnitures.id GROUP BY furnitures.id ORDER BY furnitures.id DESC LIMIT 1", 0, 0))
+    If Len(jukeboxRow) = 0 Then
+        jukeboxRow = CStr(Proc_5_2_6D4690("SELECT furnitures.id,furnitures.id_product FROM furnitures,products WHERE furnitures.id_room='" & _
+            CStr(roomId) & "' AND furnitures.id_product=products.id AND (products.action LIKE '%soundmachine%' OR products.action LIKE '%jukebox%' OR products.name LIKE '%jukebox%' OR products.sprite LIKE '%jukebox%') ORDER BY furnitures.id DESC LIMIT 1", 0, 0))
+    End If
+    If Len(jukeboxRow) = 0 Then GoTo RemoveFailed
+
+    jukeboxFields = Split(jukeboxRow, Chr$(9))
+    jukeboxId = CLng(Val(HandlingField(jukeboxFields, 0)))
+    If jukeboxId <= 0 Then GoTo RemoveFailed
+
+    cdFurnitureId = CLng(Val(CStr(Proc_5_2_6D4690("SELECT id_cd FROM soundmachine_jb_playlist WHERE id_jukebox='" & _
+        CStr(jukeboxId) & "' AND id_order='" & CStr(playlistOrder) & "' LIMIT 1", 0, 0))))
+    If cdFurnitureId <= 0 Then GoTo RemoveFailed
+
+    songDiskProductId = CLng(Val(CStr(Proc_10_0_809570("com.server.socket.game.default.songdisk", 0, 0))))
+    If songDiskProductId > 0 Then
+        Proc_5_0_6D3CD0 "UPDATE furnitures SET id_owner='" & Proc_10_11_80A9C0(userId, 0, 0) & "' WHERE id='" & _
+            CStr(cdFurnitureId) & "' AND id_product='" & CStr(songDiskProductId) & "' LIMIT 1", 0, 0
+    Else
+        Proc_5_0_6D3CD0 "UPDATE furnitures SET id_owner='" & Proc_10_11_80A9C0(userId, 0, 0) & "' WHERE id='" & _
+            CStr(cdFurnitureId) & "' LIMIT 1", 0, 0
+    End If
+
+    Proc_5_0_6D3CD0 "DELETE FROM soundmachine_jb_playlist WHERE id_jukebox='" & CStr(jukeboxId) & "' AND id_cd='" & _
+        CStr(cdFurnitureId) & "' LIMIT 1", 0, 0
+    Proc_5_0_6D3CD0 "UPDATE soundmachine_jb_playlist SET id_order=id_order-1 WHERE id_jukebox='" & _
+        CStr(jukeboxId) & "' AND id_order>'" & CStr(playlistOrder) & "'", 0, 0
+
+    Proc_6_227_7F2400 socketIndex, 0, 0
+    Proc_6_228_7F2AF0 socketIndex, 0, 0
+
+RemoveFailed:
     Proc_6_226_7F0B20 = Empty
 End Function
 
