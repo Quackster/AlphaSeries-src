@@ -2223,12 +2223,6 @@ Public Function Proc_6_54_719050(ParamArray args() As Variant) As Variant
     previousRoomId = HandlingCurrentRoomId(socketIndex, userId)
     If previousRoomId > 0 Then
         Proc_6_55_71A6E0 socketIndex, 0, 0
-        Proc_5_0_6D3CD0 "UPDATE logs_visitedrooms SET timestamp_left=UNIX_TIMESTAMP() WHERE id_user='" & _
-            Proc_10_11_80A9C0(userId, 0, 0) & "' AND timestamp_left IS NULL", 0, 0
-        If previousRoomId <> roomId Then
-            Proc_5_0_6D3CD0 "UPDATE rooms SET visitors_now=IF(visitors_now>0,visitors_now-1,0) WHERE id='" & _
-                CStr(previousRoomId) & "'", 0, 0
-        End If
     End If
 
     reservedSlot = ReserveRepresentedRoomSlot(preferredSlot)
@@ -2261,8 +2255,69 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_55_71A6E0
 Public Function Proc_6_55_71A6E0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_55_71A6E0 = Empty
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim roomRow As String
+    Dim fields() As String
+    Dim visitId As Long
+    Dim roomId As Long
+    Dim slotId As Long
+    Dim roomUserIndex As Long
+    Dim leavePayload As String
+
+    On Error GoTo LeaveFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex <= 0 Then GoTo LeaveFailed
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo LeaveFailed
+
+    roomRow = CStr(Proc_5_2_6D4690("SELECT logs_visitedrooms.id,logs_visitedrooms.id_room,rooms.id_slot FROM logs_visitedrooms,rooms WHERE logs_visitedrooms.id_user='" & _
+        Proc_10_11_80A9C0(userId, 0, 0) & "' AND logs_visitedrooms.timestamp_left IS NULL AND rooms.id=logs_visitedrooms.id_room ORDER BY logs_visitedrooms.timestamp_enter DESC LIMIT 1", 0, 0))
+    If Len(roomRow) = 0 Then
+        Proc_6_244_801E80 socketIndex, "J|H", 0
+        Proc_6_55_71A6E0 = 0
+        Exit Function
+    End If
+
+    fields = Split(roomRow, Chr$(9))
+    If UBound(fields) < 2 Then GoTo LeaveFailed
+
+    visitId = CLng(Val(HandlingField(fields, 0)))
+    roomId = CLng(Val(HandlingField(fields, 1)))
+    slotId = CLng(Val(HandlingField(fields, 2)))
+    If roomId <= 0 Then GoTo LeaveFailed
+
+    roomUserIndex = RepresentedRoomUserIndex(socketIndex, userId)
+    If roomUserIndex > 0 Then
+        leavePayload = CStr(Proc_3_0_6D2AF0(roomUserIndex, Empty, "@\"))
+        Proc_6_247_8027E0 socketIndex, leavePayload, 0
+    End If
+
+    Proc_6_94_746990 socketIndex, 0, 0
+    Proc_6_180_7C96F0 socketIndex, 0, 0
+
+    If visitId > 0 Then
+        Proc_5_0_6D3CD0 "UPDATE logs_visitedrooms SET timestamp_left=UNIX_TIMESTAMP() WHERE id='" & _
+            CStr(visitId) & "' AND timestamp_left IS NULL", 0, 0
+    Else
+        Proc_5_0_6D3CD0 "UPDATE logs_visitedrooms SET timestamp_left=UNIX_TIMESTAMP() WHERE id_user='" & _
+            Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_room='" & CStr(roomId) & "' AND timestamp_left IS NULL", 0, 0
+    End If
+
+    Proc_5_0_6D3CD0 "UPDATE rooms SET visitors_now=IF(visitors_now>0,visitors_now-1,0) WHERE id='" & CStr(roomId) & "'", 0, 0
+    If slotId > 0 Then
+        ReleaseRepresentedRoomSlot slotId
+        Proc_5_0_6D3CD0 "UPDATE rooms SET id_slot=null WHERE id='" & CStr(roomId) & "' AND id_slot='" & CStr(slotId) & "'", 0, 0
+    End If
+
+    Proc_6_244_801E80 socketIndex, "J|H", 0
+    Proc_6_55_71A6E0 = roomId
+    Exit Function
+
+LeaveFailed:
+    Proc_6_55_71A6E0 = 0
 End Function
 
 ' Original declaration: Private  Proc_6_56_71E730(arg_10) '71E730
