@@ -1582,8 +1582,73 @@ End Function
 
 ' Original declaration: Private  Proc_6_42_712FB0(arg_C) '712FB0
 Public Function Proc_6_42_712FB0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_42_712FB0 = Empty
+    Dim fields() As String
+    Dim recordText As String
+    Dim objectType As Long
+    Dim entityId As Long
+    Dim roomUserIndex As Long
+    Dim xValue As Long
+    Dim yValue As Long
+    Dim zValue As String
+    Dim displayName As String
+    Dim figureText As String
+    Dim genderText As String
+    Dim payload As String
+    Dim tailMarker As String
+
+    On Error GoTo BuildFailed
+    If UBound(args) < 0 Then GoTo BuildFailed
+
+    If UBound(args) = 0 Then
+        recordText = CStr(args(0))
+        If InStr(1, recordText, Chr$(9), vbBinaryCompare) > 0 Then
+            fields = Split(recordText, Chr$(9))
+            entityId = CLng(Val(HandlingField(fields, 0)))
+            displayName = HandlingField(fields, 1)
+            figureText = HandlingField(fields, 2)
+            genderText = HandlingField(fields, 3)
+            roomUserIndex = CLng(Val(HandlingField(fields, 4)))
+            xValue = CLng(Val(HandlingField(fields, 5)))
+            yValue = CLng(Val(HandlingField(fields, 6)))
+            zValue = HandlingField(fields, 7)
+            objectType = CLng(Val(HandlingField(fields, 8)))
+        Else
+            entityId = CLng(Val(recordText))
+            roomUserIndex = entityId
+        End If
+    Else
+        entityId = CLng(Val(CStr(args(0))))
+        displayName = CStr(args(1))
+        If UBound(args) >= 2 Then figureText = CStr(args(2))
+        If UBound(args) >= 3 Then genderText = CStr(args(3))
+        If UBound(args) >= 4 Then roomUserIndex = CLng(Val(CStr(args(4))))
+        If UBound(args) >= 5 Then xValue = CLng(Val(CStr(args(5))))
+        If UBound(args) >= 6 Then yValue = CLng(Val(CStr(args(6))))
+        If UBound(args) >= 7 Then zValue = CStr(args(7))
+        If UBound(args) >= 8 Then objectType = CLng(Val(CStr(args(8))))
+    End If
+
+    If roomUserIndex <= 0 Then roomUserIndex = entityId
+    If objectType = 3 Then
+        payload = CStr(Proc_3_0_6D2AF0(entityId, Empty, vbNullString))
+        tailMarker = "PAJJ"
+    Else
+        payload = "M"
+        tailMarker = "HK"
+    End If
+
+    payload = payload & displayName & Chr$(2)
+    payload = payload & figureText & Chr$(2)
+    payload = payload & genderText & Chr$(2)
+    payload = payload & CStr(Proc_3_0_6D2AF0(roomUserIndex, Empty, vbNullString))
+    payload = payload & CStr(Proc_3_0_6D2AF0(xValue, Empty, vbNullString))
+    payload = payload & CStr(Proc_3_0_6D2AF0(yValue, Empty, vbNullString))
+    payload = payload & zValue & Chr$(2)
+    Proc_6_42_712FB0 = payload & tailMarker
+    Exit Function
+
+BuildFailed:
+    Proc_6_42_712FB0 = vbNullString
 End Function
 
 ' Original declaration: Private Sub Proc_6_43_713680
