@@ -3555,7 +3555,65 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_89_73EA10
 Public Function Proc_6_89_73EA10(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim targetSocketIndex As Integer
+    Dim targetUserId As String
+    Dim sourceSqlIds As String
+    Dim targetSqlIds As String
+    Dim sourceLogItems As String
+    Dim targetLogItems As String
+    Dim roomId As Long
+    Dim sessionId As String
+
+    On Error GoTo TradeDone
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex <= 0 Then GoTo TradeDone
+
+    targetSocketIndex = RepresentedInteractionPartner(socketIndex)
+    If targetSocketIndex <= 0 Then GoTo TradeDone
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    targetUserId = HandlingUserIdFromSocket(targetSocketIndex)
+    If Len(userId) = 0 Or userId = "0" Or Len(targetUserId) = 0 Or targetUserId = "0" Then GoTo TradeDone
+
+    sourceSqlIds = RepresentedTradeOfferSqlIds(socketIndex)
+    targetSqlIds = RepresentedTradeOfferSqlIds(targetSocketIndex)
+    If Len(sourceSqlIds) = 0 And Len(targetSqlIds) = 0 Then GoTo TradeDone
+
+    sourceLogItems = RepresentedTradeOfferLogItems(socketIndex)
+    targetLogItems = RepresentedTradeOfferLogItems(targetSocketIndex)
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    sessionId = HandlingUserSessionId(userId)
+
+    If Len(sourceSqlIds) > 0 Then
+        Proc_5_0_6D3CD0 "UPDATE furnitures SET id_owner='" & Proc_10_11_80A9C0(targetUserId, 0, 0) & _
+            "' WHERE id IN (" & sourceSqlIds & ") AND id_owner='" & Proc_10_11_80A9C0(userId, 0, 0) & _
+            "' AND id_room IS NULL", 0, 0
+    End If
+    If Len(targetSqlIds) > 0 Then
+        Proc_5_0_6D3CD0 "UPDATE furnitures SET id_owner='" & Proc_10_11_80A9C0(userId, 0, 0) & _
+            "' WHERE id IN (" & targetSqlIds & ") AND id_owner='" & Proc_10_11_80A9C0(targetUserId, 0, 0) & _
+            "' AND id_room IS NULL", 0, 0
+    End If
+
+    Proc_5_1_6D4110 "INSERT INTO logs_trading(id_user,id_partner,items_user,items_partner,id_room,timestamp,id_session) VALUES('" & _
+        Proc_10_11_80A9C0(userId, 0, 0) & "','" & Proc_10_11_80A9C0(targetUserId, 0, 0) & "','" & _
+        Proc_10_11_80A9C0(sourceLogItems, 0, 0) & "','" & Proc_10_11_80A9C0(targetLogItems, 0, 0) & "','" & _
+        CStr(roomId) & "',UNIX_TIMESTAMP(),'" & Proc_10_11_80A9C0(sessionId, 0, 0) & "')", 0, 0
+
+    Proc_6_244_801E80 socketIndex, "Ap", 0
+    Proc_6_244_801E80 targetSocketIndex, "Ap", 0
+    Proc_6_140_769400 socketIndex, "FT", vbNullString
+    Proc_6_140_769400 targetSocketIndex, "FT", vbNullString
+    RemoveRepresentedInteractionPair socketIndex
+    RemoveRepresentedInteractionPair targetSocketIndex
+
+    Proc_6_89_73EA10 = "Ap"
+    Exit Function
+
+TradeDone:
     Proc_6_89_73EA10 = Empty
 End Function
 
@@ -11029,6 +11087,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_91_743480 socketIndex, "FU", packetPayload
         Case "AH"
             Proc_6_92_744870 socketIndex, "AH", packetPayload
+        Case "FR"
+            Proc_6_89_73EA10 socketIndex, "FR", packetPayload
         Case "EV"
             Proc_6_100_748C80 socketIndex, "EV", packetPayload
         Case "EU"
@@ -12074,6 +12134,68 @@ Private Sub RemoveRepresentedTradeOffer(ByVal socketIndex As Integer, ByVal furn
 
 RemoveDone:
 End Sub
+
+Private Function RepresentedTradeOfferSqlIds(ByVal socketIndex As Integer) As String
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim furnitureId As Long
+    Dim sqlIds As String
+
+    On Error GoTo BuildDone
+    If socketIndex <= 0 Or Len(representedTradeOffers) = 0 Then GoTo BuildDone
+
+    rows = Split(representedTradeOffers, Chr$(13))
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(rows(rowIndex)) > 0 Then
+            fields = Split(CStr(rows(rowIndex)), Chr$(9))
+            If UBound(fields) >= 1 Then
+                If CInt(Val(CStr(fields(0)))) = socketIndex Then
+                    furnitureId = CLng(Val(CStr(fields(1))))
+                    If furnitureId > 0 Then
+                        If Len(sqlIds) > 0 Then sqlIds = sqlIds & ","
+                        sqlIds = sqlIds & "'" & CStr(furnitureId) & "'"
+                    End If
+                End If
+            End If
+        End If
+    Next rowIndex
+
+BuildDone:
+    RepresentedTradeOfferSqlIds = sqlIds
+End Function
+
+Private Function RepresentedTradeOfferLogItems(ByVal socketIndex As Integer) As String
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim furnitureId As Long
+    Dim productId As Long
+    Dim logItems As String
+
+    On Error GoTo BuildDone
+    If socketIndex <= 0 Or Len(representedTradeOffers) = 0 Then GoTo BuildDone
+
+    rows = Split(representedTradeOffers, Chr$(13))
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(rows(rowIndex)) > 0 Then
+            fields = Split(CStr(rows(rowIndex)), Chr$(9))
+            If UBound(fields) >= 2 Then
+                If CInt(Val(CStr(fields(0)))) = socketIndex Then
+                    furnitureId = CLng(Val(CStr(fields(1))))
+                    productId = CLng(Val(CStr(fields(2))))
+                    If furnitureId > 0 Then
+                        If Len(logItems) > 0 Then logItems = logItems & Chr$(1)
+                        logItems = logItems & CStr(furnitureId) & ":" & CStr(productId)
+                    End If
+                End If
+            End If
+        End If
+    Next rowIndex
+
+BuildDone:
+    RepresentedTradeOfferLogItems = logItems
+End Function
 
 Private Function RepresentedTradeOfferItemPayload(ByVal socketIndex As Integer, ByRef itemCount As Long) As String
     Dim rows() As String
