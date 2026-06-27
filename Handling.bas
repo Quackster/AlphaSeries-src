@@ -1467,19 +1467,110 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_38_70FD10
 Public Function Proc_6_38_70FD10(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim candidateName As String
+    Dim offset As Long
+
+    On Error GoTo ApplyFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "GV" Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    candidateName = CStr(Proc_10_10_80A7F0(ReadWireString(requestPayload, offset), 0, 0))
+    If Len(candidateName) = 0 Then candidateName = CStr(Proc_10_10_80A7F0(Proc_10_7_80A190(requestPayload, 0, 0), 0, 0))
+
+    Proc_6_38_70FD10 = Proc_6_40_711770(socketIndex, 0, candidateName)
+    Exit Function
+
+ApplyFailed:
     Proc_6_38_70FD10 = Empty
 End Function
 
 ' Original declaration: Private Sub Proc_6_39_711650
 Public Function Proc_6_39_711650(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim candidateName As String
+    Dim offset As Long
+
+    On Error GoTo CheckFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "GW" Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    candidateName = CStr(Proc_10_10_80A7F0(ReadWireString(requestPayload, offset), 0, 0))
+    If Len(candidateName) = 0 Then candidateName = CStr(Proc_10_10_80A7F0(Proc_10_7_80A190(requestPayload, 0, 0), 0, 0))
+
+    Proc_6_39_711650 = Proc_6_40_711770(socketIndex, -1, candidateName)
+    Exit Function
+
+CheckFailed:
     Proc_6_39_711650 = Empty
 End Function
 
 ' Original declaration: Private  Proc_6_40_711770(arg_C, arg_10) '711770
 Public Function Proc_6_40_711770(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim checkOnly As Boolean
+    Dim candidateName As String
+    Dim userId As String
+    Dim oldName As String
+    Dim genderText As String
+    Dim roomId As Long
+    Dim validationCode As Long
+    Dim roomUserIndex As Long
+    Dim queryTail As String
+
+    On Error GoTo RenameFailed
+    If UBound(args) < 2 Then GoTo RenameFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    checkOnly = (CLng(Val(CStr(args(1)))) < 0)
+    candidateName = Trim$(CStr(args(2)))
+    If socketIndex <= 0 Then GoTo RenameFailed
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo RenameFailed
+
+    oldName = CStr(Proc_5_2_6D4690("SELECT name FROM users WHERE id='" & Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 1", 0, 0))
+    genderText = CStr(Proc_5_2_6D4690("SELECT gender FROM users WHERE id='" & Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 1", 0, 0))
+
+    validationCode = AvatarNameValidationCode(candidateName, oldName)
+    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(validationCode, Empty, "H{")) & candidateName & Chr$(2), 0
+    If checkOnly Or validationCode <> 0 Then
+        Proc_6_40_711770 = validationCode
+        Exit Function
+    End If
+
+    Proc_5_0_6D3CD0 "UPDATE users SET name='" & Proc_10_11_80A9C0(candidateName, 0, 0) & "',tutorial_name='1',merge_name='0' WHERE id='" & Proc_10_11_80A9C0(userId, 0, 0) & "'", 0, 0
+    Proc_5_1_6D4110 "INSERT INTO logs_identity(previous_identity,new_identity,timestamp,id_session) VALUES('" & Proc_10_11_80A9C0(oldName, 0, 0) & "','" & Proc_10_11_80A9C0(candidateName, 0, 0) & "',UNIX_TIMESTAMP(),'" & CStr(socketIndex) & "')", 0, 0
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId > 0 Then
+        roomUserIndex = RepresentedRoomUserIndex(socketIndex, userId)
+        Proc_6_247_8027E0 socketIndex, CStr(Proc_3_0_6D2AF0(roomUserIndex, Empty, CStr(Proc_3_0_6D2AF0(CLng(Val(userId)), Empty, "H|")))) & candidateName & Chr$(2), 0
+        queryTail = "users,rooms,rooms_categories WHERE rooms.id='" & CStr(roomId) & "' AND users.id=rooms.id_owner AND rooms_categories.id=rooms.id_category LIMIT 1"
+        Proc_6_247_8027E0 socketIndex, CStr(Proc_6_112_74E0C0(queryTail, "GF", 0)), 0
+        Proc_6_247_8027E0 socketIndex, CStr(Proc_3_0_6D2AF0(roomId, Empty, "GH")), 0
+    End If
+
+    Proc_6_40_711770 = 0
+    Exit Function
+
+RenameFailed:
     Proc_6_40_711770 = Empty
 End Function
 
@@ -5247,6 +5338,45 @@ Private Function RepresentedRoomUserIndex(ByVal socketIndex As Integer, ByVal us
 
 LookupFailed:
     RepresentedRoomUserIndex = CLng(socketIndex)
+End Function
+
+Private Function AvatarNameValidationCode(ByVal candidateName As String, ByVal currentName As String) As Long
+    Dim index As Long
+    Dim characterCode As Long
+    Dim existingCount As Long
+
+    On Error GoTo InvalidName
+
+    candidateName = Trim$(candidateName)
+    If Len(candidateName) < 3 Then GoTo InvalidName
+    If Len(candidateName) > 14 Then
+        AvatarNameValidationCode = 1
+        Exit Function
+    End If
+    If UCase$(Left$(candidateName, 4)) = "MOD-" Or UCase$(Left$(candidateName, 4)) = "VIP-" Then GoTo InvalidName
+
+    For index = 1 To Len(candidateName)
+        characterCode = Asc(Mid$(candidateName, index, 1))
+        If Not ((characterCode >= 65 And characterCode <= 90) Or (characterCode >= 97 And characterCode <= 122) Or (characterCode >= 48 And characterCode <= 57) Or characterCode = 45 Or characterCode = 95) Then
+            GoTo InvalidName
+        End If
+    Next index
+
+    If StrComp(candidateName, currentName, vbTextCompare) = 0 Then
+        AvatarNameValidationCode = 0
+        Exit Function
+    End If
+
+    existingCount = CLng(Val(CStr(Proc_5_2_6D4690("SELECT COUNT(*) FROM users WHERE name='" & Proc_10_11_80A9C0(candidateName, 0, 0) & "'", 0, 0))))
+    If existingCount > 0 Then
+        AvatarNameValidationCode = 3
+    Else
+        AvatarNameValidationCode = 0
+    End If
+    Exit Function
+
+InvalidName:
+    AvatarNameValidationCode = 2
 End Function
 
 Private Function HandlingSocketFromUserId(ByVal userId As String) As Integer
