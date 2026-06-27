@@ -39,13 +39,47 @@ End
 Attribute VB_Name = "privSockHTTP"
 Option Explicit
 
+Private httpAliveTicks(0 To 9999) As Integer
+Private httpResponseBuffer(0 To 9999) As String
+Private httpRequestPath(0 To 9999) As String
+Private httpRequestHost(0 To 9999) As String
+Private httpRequestPort(0 To 9999) As String
+
 ' Reconstructed code shell generated from decompiled output.
 ' Source reference: /opt/git/AlphaSeries_cracked/DECOMPILED/privSockHTTP.frm
 ' Event bodies are inert until each handler is manually reconstructed.
 
 ' Original declaration: Private Sub tmrCheckAlive_Timer(Index As Integer) '826A50
 Private Sub tmrCheckAlive_Timer(Index As Integer)
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim hostPort As String
+    Dim requestText As String
+
+    On Error Resume Next
+    If Index < LBound(httpAliveTicks) Or Index > UBound(httpAliveTicks) Then Exit Sub
+
+    If httpAliveTicks(Index) >= 200 Then
+        tmrCheckAlive(Index).Enabled = False
+        Exit Sub
+    End If
+
+    httpAliveTicks(Index) = httpAliveTicks(Index) + 1
+    If httpResponseBuffer(Index) = "-1" Then Exit Sub
+    If Len(httpRequestPath(Index)) = 0 Or Len(httpRequestHost(Index)) = 0 Then Exit Sub
+
+    httpResponseBuffer(Index) = vbNullString
+    If Len(httpRequestPort(Index)) > 0 And Val(httpRequestPort(Index)) <> 80 Then
+        hostPort = ":" & CStr(Val(httpRequestPort(Index)))
+    End If
+
+    requestText = "GET " & httpRequestPath(Index) & " HTTP/1.1" & vbCrLf & _
+                  "Host:   " & httpRequestHost(Index) & hostPort & vbCrLf & _
+                  "Connection:   keep-alive" & vbCrLf & _
+                  "Accept:   application/xml,application/xhtml+xml,text/html;q=0.9,text/plain;q=0.8,image/png,*/*;q=0.5" & vbCrLf & _
+                  "User-Agent:   FireFox/1.0" & vbCrLf & _
+                  "Accept-Language:   en-US,en;q=0.8;q=0.6,en;q=0.4" & vbCrLf & _
+                  "Accept-Charset:   ISO-8859-1,utf-8;q=0.7,*;q=0.3" & vbCrLf & vbCrLf
+
+    GetHTTP(Index).SendData requestText
 End Sub
 
 ' Original declaration: Public Function ReadHTTP(URL, Action) '825160
