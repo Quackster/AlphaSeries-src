@@ -1953,7 +1953,53 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_68_723170
 Public Function Proc_6_68_723170(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim callerUserId As String
+    Dim roomId As Long
+    Dim furnitureId As Long
+    Dim rowText As String
+    Dim fields() As String
+    Dim productId As Long
+    Dim offset As Long
+
+    On Error GoTo StickyDeleteFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "AU" Then requestPayload = Mid$(requestPayload, 3)
+
+    furnitureId = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    If furnitureId <= 0 Then
+        offset = 1
+        furnitureId = ReadWireLong(requestPayload, offset)
+    End If
+    If furnitureId <= 0 Then GoTo StickyDeleteFailed
+
+    callerUserId = HandlingUserIdFromSocket(socketIndex)
+    If Len(callerUserId) = 0 Or callerUserId = "0" Then GoTo StickyDeleteFailed
+
+    roomId = HandlingCurrentRoomId(socketIndex, callerUserId)
+    If roomId <= 0 Then GoTo StickyDeleteFailed
+    If Not HandlingUserOwnsRoom(callerUserId, roomId) Then GoTo StickyDeleteFailed
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT id,id_product,sign,caption FROM furnitures WHERE id='" & CStr(furnitureId) & "' AND id_room='" & CStr(roomId) & "' LIMIT 1", 0, 0))
+    If Len(rowText) = 0 Then GoTo StickyDeleteFailed
+
+    fields = Split(rowText, Chr$(9))
+    If UBound(fields) < 1 Then GoTo StickyDeleteFailed
+
+    productId = CLng(Val(CStr(fields(1))))
+    If Left$(LCase$(CStr(Proc_8_12_806C30(productId, 18, 0))), 7) <> "post.it" Then GoTo StickyDeleteFailed
+
+    Proc_5_0_6D3CD0 "DELETE FROM furnitures WHERE id='" & CStr(furnitureId) & "' LIMIT 1", 0, 0
+    Proc_6_247_8027E0 socketIndex, "AT" & CStr(furnitureId), 0
+
+StickyDeleteFailed:
     Proc_6_68_723170 = Empty
 End Function
 
@@ -4132,6 +4178,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_65_721A10 socketIndex, "A`", packetPayload
         Case "AS"
             Proc_6_67_722940 socketIndex, "AS", packetPayload
+        Case "AU"
+            Proc_6_68_723170 socketIndex, "AU", packetPayload
         Case "FA"
             Proc_6_60_720060 socketIndex, "FA", packetPayload
         Case "oL", "CD"
