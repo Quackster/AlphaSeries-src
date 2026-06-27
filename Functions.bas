@@ -397,8 +397,44 @@ End Function
 
 ' Original declaration: Private Sub Proc_10_18_80C9E0
 Public Function Proc_10_18_80C9E0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_10_18_80C9E0 = Empty
+    Dim roomId As Long
+    Dim rowText As String
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim socketIndex As Integer
+    Dim sentMarkers As String
+    Dim readyCount As Long
+
+    On Error GoTo RefreshFailed
+    If UBound(args) < 0 Then GoTo RefreshFailed
+
+    roomId = CLng(Val(CStr(args(0))))
+    If roomId <= 0 Then GoTo RefreshFailed
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT users.id_socket FROM logs_visitedrooms,users WHERE logs_visitedrooms.id_room='" & CStr(roomId) & "' AND logs_visitedrooms.timestamp_left IS NULL AND users.id=logs_visitedrooms.id_user AND users.id_socket IS NOT NULL", 0, 0))
+    If Len(rowText) > 0 Then
+        rows = Split(rowText, Chr$(13))
+        For rowIndex = LBound(rows) To UBound(rows)
+            If Len(rows(rowIndex)) > 0 Then
+                fields = Split(rows(rowIndex), Chr$(9))
+                socketIndex = CInt(Val(CStr(fields(0))))
+                If socketIndex > 0 Then
+                    If InStr(1, sentMarkers, "[" & CStr(socketIndex) & "]", vbBinaryCompare) = 0 Then
+                        Proc_6_53_718E00 socketIndex, 0, 0
+                        sentMarkers = sentMarkers & "[" & CStr(socketIndex) & "]"
+                        readyCount = readyCount + 1
+                    End If
+                End If
+            End If
+        Next rowIndex
+    End If
+
+    Proc_10_18_80C9E0 = readyCount
+    Exit Function
+
+RefreshFailed:
+    Proc_10_18_80C9E0 = 0
 End Function
 
 ' Original declaration: Private Sub Proc_10_19_80CCD0
