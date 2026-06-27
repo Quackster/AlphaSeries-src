@@ -139,8 +139,43 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_22_6E9300
 Public Function Proc_6_22_6E9300(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_22_6E9300 = Empty
+    Dim messageText As String
+    Dim filteredText As String
+    Dim filterEnabled As Boolean
+    Dim replacementText As String
+    Dim rows() As String
+    Dim rowIndex As Long
+    Dim blockedWord As String
+
+    On Error GoTo FilterFailed
+    If UBound(args) < 0 Then GoTo FilterFailed
+
+    messageText = CStr(args(0))
+    filteredText = messageText
+    filterEnabled = (CLng(Val(CStr(Proc_10_0_809570("com.client.chat.filter.enabled", 0, 0)))) <> 0)
+
+    If filterEnabled And Len(global_00829290) > 0 Then
+        replacementText = CStr(Proc_10_0_809570("com.client.chat.filter.replacement", vbNullString, 0))
+        rows = Split(global_00829290, Chr$(13))
+        For rowIndex = LBound(rows) To UBound(rows)
+            blockedWord = Trim$(Split(CStr(rows(rowIndex)), Chr$(9))(0))
+            If Len(blockedWord) > 0 Then
+                If Len(blockedWord) > 3 Then
+                    If InStr(1, filteredText, blockedWord, vbTextCompare) > 0 Then
+                        filteredText = Replace(filteredText, blockedWord, replacementText, 1, -1, vbTextCompare)
+                    End If
+                ElseIf StrComp(filteredText, blockedWord, vbTextCompare) = 0 Then
+                    filteredText = replacementText
+                End If
+            End If
+        Next rowIndex
+    End If
+
+    Proc_6_22_6E9300 = filteredText
+    Exit Function
+
+FilterFailed:
+    Proc_6_22_6E9300 = vbNullString
 End Function
 
 ' Original declaration: Private Sub Proc_6_23_6E9A90
