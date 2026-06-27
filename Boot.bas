@@ -188,7 +188,37 @@ End Function
 
 ' Original declaration: Private Sub Proc_1_19_6CF190
 Public Function Proc_1_19_6CF190(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim importanceLevel As Long
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim groupPayload As String
+    Dim groupCount As Long
+
+    On Error GoTo BuildFailed
+
+    global_00829204 = vbNullString
+    For importanceLevel = 1 To 2
+        groupPayload = vbNullString
+        groupCount = 0
+        rows = Split(CStr(Proc_5_2_6D4690("SELECT id,name FROM faq WHERE is_important='" & CStr(importanceLevel) & "' ORDER BY id DESC LIMIT 1", 0, 0)), Chr$(13))
+
+        For rowIndex = LBound(rows) To UBound(rows)
+            If Len(rows(rowIndex)) > 0 Then
+                fields = Split(rows(rowIndex), Chr$(9))
+                If UBound(fields) >= 1 Then
+                    groupPayload = CStr(Proc_3_0_6D2AF0(CLng(Val(CStr(fields(0)))), Empty, groupPayload)) & CStr(fields(1)) & Chr$(2)
+                    groupCount = groupCount + 1
+                End If
+            End If
+        Next rowIndex
+
+        global_00829204 = global_00829204 & CStr(Proc_3_0_6D2AF0(groupCount, Empty, vbNullString)) & groupPayload
+    Next importanceLevel
+
+    global_00829204 = CStr(Proc_3_0_6D2AF0(2, Empty, vbNullString)) & global_00829204
+
+BuildFailed:
     Proc_1_19_6CF190 = Empty
 End Function
 
