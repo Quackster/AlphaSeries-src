@@ -4110,7 +4110,66 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_139_768100
 Public Function Proc_6_139_768100(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim userId As String
+    Dim roomId As Long
+    Dim furnitureId As Long
+    Dim rowText As String
+    Dim fields() As String
+    Dim productId As Long
+    Dim productFields() As String
+    Dim productType As Long
+    Dim decoName As String
+    Dim decoColumn As String
+    Dim decoValue As String
+
+    On Error GoTo DecorationFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    userId = HandlingUserIdFromSocket(socketIndex)
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If Len(userId) = 0 Or roomId <= 0 Then GoTo DecorationFailed
+
+    Proc_10_5_809D80 packetPayload, 3, 0
+    furnitureId = CLng(Val(CStr(Proc_10_6_809F10(packetPayload, 0, 0))))
+    If furnitureId <= 0 Then GoTo DecorationFailed
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT id,id_product,sign FROM furnitures WHERE id_owner='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND id='" & CStr(furnitureId) & "' AND id_room IS NULL LIMIT 1", 0, 0))
+    If Len(rowText) = 0 Then GoTo DecorationFailed
+
+    fields = Split(rowText, Chr$(9))
+    productId = CLng(Val(NavigatorField(fields, 1)))
+    decoValue = NavigatorField(fields, 2)
+    productFields = Split(CStr(Proc_9_3_807930(productId, 0, 0)), Chr$(9))
+    productType = CLng(Val(NavigatorField(productFields, 1)))
+
+    Select Case productType
+        Case 2
+            decoName = "wallpaper"
+            decoColumn = "id_wallpaper"
+        Case 3
+            decoName = "floor"
+            decoColumn = "id_floor"
+        Case 4
+            decoName = "landscape"
+            decoColumn = "id_landscape"
+        Case Else
+            GoTo DecorationFailed
+    End Select
+
+    If Len(decoValue) = 0 Or decoValue = "0" Then decoValue = NavigatorField(productFields, 20)
+    If Len(decoValue) = 0 Then decoValue = NavigatorField(productFields, 18)
+    If Len(decoValue) = 0 Then GoTo DecorationFailed
+
+    Proc_6_247_8027E0 socketIndex, "@n" & decoName & Chr$(2) & decoValue & Chr$(2), 0
+    Proc_5_0_6D3CD0 "UPDATE rooms SET " & decoColumn & "='" & Proc_10_11_80A9C0(decoValue, 0, 0) & "' WHERE id='" & CStr(roomId) & "'", 0, 0
+    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(furnitureId, Empty, "Ac")), 0
+    Proc_5_0_6D3CD0 "DELETE FROM furnitures WHERE id='" & CStr(furnitureId) & "' LIMIT 1", 0, 0
+    Proc_6_140_769400 socketIndex, "FT", vbNullString
+
+DecorationFailed:
     Proc_6_139_768100 = Empty
 End Function
 
