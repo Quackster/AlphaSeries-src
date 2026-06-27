@@ -7,26 +7,88 @@ Option Explicit
 
 ' Original declaration: Private Sub Proc_3_0_6D2AF0
 Public Function Proc_3_0_6D2AF0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_3_0_6D2AF0 = Empty
+    Dim value As Long
+    Dim prefix As String
+
+    On Error GoTo EncodeFailed
+    If UBound(args) < 0 Then
+        Proc_3_0_6D2AF0 = vbNullString
+        Exit Function
+    End If
+
+    value = CLng(Val(CStr(args(0))))
+    If UBound(args) >= 2 Then prefix = CStr(args(2))
+    Proc_3_0_6D2AF0 = prefix & EncodeVl64(value)
+    Exit Function
+
+EncodeFailed:
+    Proc_3_0_6D2AF0 = vbNullString
 End Function
 
 ' Original declaration: Private  Proc_3_1_6D2E00(arg_C) '6D2E00
 Public Function Proc_3_1_6D2E00(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_3_1_6D2E00 = Empty
+    Dim valueText As String
+    Dim valueParts() As String
+
+    On Error GoTo IncrementFailed
+    If UBound(args) < 0 Then
+        Proc_3_1_6D2E00 = 0
+        Exit Function
+    End If
+
+    valueText = Replace(CStr(args(0)), ".", ",")
+    If InStr(1, valueText, ",", vbBinaryCompare) > 0 Then
+        valueParts = Split(valueText, ",")
+        valueText = valueParts(0)
+    End If
+    Proc_3_1_6D2E00 = CLng(Val(valueText)) + 1
+    Exit Function
+
+IncrementFailed:
+    Proc_3_1_6D2E00 = 0
 End Function
 
 ' Original declaration: Private Sub Proc_3_2_6D30A0
 Public Function Proc_3_2_6D30A0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_3_2_6D30A0 = Empty
+    Dim encodedValue As String
+    Dim firstByte As Long
+
+    On Error GoTo LengthFailed
+    If UBound(args) < 0 Then
+        Proc_3_2_6D30A0 = 0
+        Exit Function
+    End If
+
+    encodedValue = CStr(args(0))
+    If Len(encodedValue) = 0 Then
+        Proc_3_2_6D30A0 = 0
+        Exit Function
+    End If
+
+    firstByte = Asc(Mid$(encodedValue, 1, 1)) - 72
+    Proc_3_2_6D30A0 = CLng(firstByte \ 8) + 1
+    Exit Function
+
+LengthFailed:
+    Proc_3_2_6D30A0 = 0
 End Function
 
 ' Original declaration: Private Sub Proc_3_3_6D3240
 Public Function Proc_3_3_6D3240(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_3_3_6D3240 = Empty
+    Dim encodedValue As String
+
+    On Error GoTo DecodeFailed
+    If UBound(args) < 0 Then
+        Proc_3_3_6D3240 = 0
+        Exit Function
+    End If
+
+    encodedValue = CStr(args(0))
+    Proc_3_3_6D3240 = DecodeVl64(encodedValue)
+    Exit Function
+
+DecodeFailed:
+    Proc_3_3_6D3240 = 0
 End Function
 
 ' Original declaration: Private Sub Proc_3_4_6D3620
@@ -53,6 +115,58 @@ Public Function Proc_3_4_6D3620(ParamArray args() As Variant) As Variant
 
 DecodeFailed:
     Proc_3_4_6D3620 = 0
+End Function
+
+Private Function EncodeVl64(ByVal value As Long) As String
+    Dim absoluteValue As Long
+    Dim negativeFlag As Long
+    Dim encodedTail As String
+    Dim encodedLength As Long
+    Dim lowBits As Long
+
+    If value < 0 Then
+        negativeFlag = 4
+        absoluteValue = Abs(value)
+    Else
+        absoluteValue = value
+    End If
+
+    lowBits = absoluteValue And 3
+    absoluteValue = absoluteValue \ 4
+
+    Do
+        encodedTail = encodedTail & Chr$((absoluteValue And &H3F&) + 64)
+        absoluteValue = absoluteValue \ 64
+        encodedLength = encodedLength + 1
+    Loop While absoluteValue > 0 And encodedLength < 5
+
+    EncodeVl64 = Chr$(64 + (encodedLength * 8) + negativeFlag + lowBits) & encodedTail
+End Function
+
+Private Function DecodeVl64(ByVal encodedValue As String) As Long
+    Dim firstByte As Long
+    Dim byteCount As Long
+    Dim negativeValue As Boolean
+    Dim decodedValue As Long
+    Dim multiplier As Long
+    Dim index As Long
+
+    If Len(encodedValue) = 0 Then Exit Function
+
+    firstByte = Asc(Mid$(encodedValue, 1, 1)) - 64
+    byteCount = (firstByte And &H38&) \ 8
+    negativeValue = ((firstByte And 4) <> 0)
+    decodedValue = firstByte And 3
+    multiplier = 4
+
+    For index = 1 To byteCount
+        If index + 1 > Len(encodedValue) Then Exit For
+        decodedValue = decodedValue + ((Asc(Mid$(encodedValue, index + 1, 1)) - 64) * multiplier)
+        multiplier = multiplier * 64
+    Next index
+
+    If negativeValue Then decodedValue = -decodedValue
+    DecodeVl64 = decodedValue
 End Function
 
 ' Original declaration: Private  Proc_3_5_6D3880(arg_C, arg_10, arg_14, arg_18, arg_1C) '6D3880
