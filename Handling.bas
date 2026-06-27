@@ -5429,7 +5429,20 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_234_7F75C0
 Public Function Proc_6_234_7F75C0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+
+    On Error GoTo QuestResetFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo QuestResetFailed
+
+    Proc_5_0_6D3CD0 "UPDATE users_quests SET timestamp_done=NULL,timestamp_accepted=NULL WHERE id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 50", 0, 0
+    Proc_6_244_801E80 socketIndex, "Lc", 0
+    Proc_6_236_7F8540 socketIndex, Empty, Empty
+
+QuestResetFailed:
     Proc_6_234_7F75C0 = Empty
 End Function
 
