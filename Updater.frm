@@ -703,12 +703,14 @@ End Sub
 
 ' Original declaration: Private Sub Form_Unload(Cancel As Integer) '823170
 Private Sub Form_Unload(Cancel As Integer)
-    ' TODO: Reconstruct behavior from decompiled reference.
+    On Error Resume Next
+    End
 End Sub
 
 ' Original declaration: Private Sub Form_QueryUnload(Cancel As Integer, UnloadMode As Integer) '8230C0
 Private Sub Form_QueryUnload(Cancel As Integer, UnloadMode As Integer)
-    ' TODO: Reconstruct behavior from decompiled reference.
+    On Error Resume Next
+    End
 End Sub
 
 ' Original declaration: Private Sub walkPerCent_Timer() '824C00
