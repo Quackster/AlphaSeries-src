@@ -831,7 +831,29 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_111_74DF70
 Public Function Proc_6_111_74DF70(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim rankIndex As Long
+    Dim hcLevel As Long
+    Dim responsePayload As String
+
+    On Error GoTo SendFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 3 Then rankIndex = CLng(Val(CStr(args(3))))
+    If UBound(args) >= 4 Then hcLevel = CLng(Val(CStr(args(4))))
+
+    If rankIndex < 0 Then rankIndex = 0
+    If rankIndex > 20 Then rankIndex = 20
+    If hcLevel < 0 Then hcLevel = 0
+    If hcLevel > 2 Then hcLevel = 2
+
+    If IsArray(global_00829244) Then
+        responsePayload = CStr(global_00829244(rankIndex, hcLevel))
+    End If
+
+    Proc_6_244_801E80 socketIndex, "C]" & responsePayload, 0
+
+SendFailed:
     Proc_6_111_74DF70 = Empty
 End Function
 
