@@ -6,6 +6,8 @@ Option Explicit
 ' Decompiled procedure bodies are intentionally not copied until they are understood and made valid VB6.
 
 Public global_008291AC As String
+Public global_00829050 As String
+Public global_00829054 As Integer
 
 ' Original declaration: Private Sub Proc_8_0_804330
 Public Function Proc_8_0_804330(ParamArray args() As Variant) As Variant
@@ -49,7 +51,10 @@ End Function
 
 ' Original declaration: Private Sub Proc_8_4_804970
 Public Function Proc_8_4_804970(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    On Error Resume Next
+    Main.Hide
+    MsgBox "Das Lizenzsystem ist zurzeit nicht erreichbar. Versuch es spaeter wieder!", vbCritical
+    End
     Proc_8_4_804970 = Empty
 End Function
 
@@ -88,8 +93,29 @@ End Function
 
 ' Original declaration: Private Sub Proc_8_6_804D80
 Public Function Proc_8_6_804D80(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_8_6_804D80 = Empty
+    Dim keyName As String
+    Dim marker As String
+    Dim values() As String
+
+    On Error GoTo LookupFailed
+    If UBound(args) < 0 Then
+        Proc_8_6_804D80 = 0
+        Exit Function
+    End If
+
+    keyName = CStr(args(0))
+    marker = vbCr & keyName & ":" & CStr(global_00829054) & "="
+    If InStr(1, global_00829050, marker & "1", vbBinaryCompare) > 0 Then
+        Proc_8_6_804D80 = 1
+        Exit Function
+    End If
+
+    values = Split(CStr(Split(global_00829050, marker)(1)), vbCr)
+    Proc_8_6_804D80 = CInt(Val(values(0)))
+    Exit Function
+
+LookupFailed:
+    Proc_8_6_804D80 = 0
 End Function
 
 ' Original declaration: Private Sub Proc_8_7_8051C0
