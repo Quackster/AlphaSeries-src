@@ -5020,7 +5020,98 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_142_76B310
 Public Function Proc_6_142_76B310(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim normalizedPayload As String
+    Dim tokens() As String
+    Dim offset As Long
+    Dim userId As String
+    Dim roomId As Long
+    Dim furnitureId As Long
+    Dim productId As Long
+    Dim secondaryValue As Long
+    Dim productType As Long
+    Dim positionX As Long
+    Dim positionY As Long
+    Dim rotation As Long
+    Dim positionZ As String
+    Dim itemData As String
+    Dim itemRow As String
+    Dim itemFields() As String
+    Dim productFields() As String
+    Dim placementPayload As String
+
+    On Error GoTo PlaceFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "rv" Then requestPayload = Mid$(requestPayload, 3)
+
+    normalizedPayload = Replace(requestPayload, Chr$(1), Chr$(32), 1, -1, vbBinaryCompare)
+    normalizedPayload = Replace(normalizedPayload, Chr$(2), Chr$(32), 1, -1, vbBinaryCompare)
+    normalizedPayload = Replace(normalizedPayload, Chr$(9), Chr$(32), 1, -1, vbBinaryCompare)
+    normalizedPayload = Replace(normalizedPayload, Chr$(13), Chr$(32), 1, -1, vbBinaryCompare)
+    normalizedPayload = Replace(normalizedPayload, Chr$(10), Chr$(32), 1, -1, vbBinaryCompare)
+    Do While InStr(1, normalizedPayload, "  ", vbBinaryCompare) > 0
+        normalizedPayload = Replace(normalizedPayload, "  ", " ", 1, -1, vbBinaryCompare)
+    Loop
+    normalizedPayload = Trim$(normalizedPayload)
+
+    If Len(normalizedPayload) > 0 Then
+        tokens = Split(normalizedPayload, Chr$(32))
+        If UBound(tokens) >= 0 Then furnitureId = CLng(Val(tokens(0)))
+        If UBound(tokens) >= 1 Then positionX = CLng(Val(tokens(1)))
+        If UBound(tokens) >= 2 Then positionY = CLng(Val(tokens(2)))
+        If UBound(tokens) >= 3 Then rotation = CLng(Val(tokens(3)))
+    End If
+
+    If furnitureId <= 0 Then
+        offset = 1
+        furnitureId = ReadWireLong(requestPayload, offset)
+    End If
+    If furnitureId <= 0 Then GoTo PlaceFailed
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo PlaceFailed
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId <= 0 Then GoTo PlaceFailed
+    If Not HandlingUserHasRoomRight(userId, roomId) And Not HandlingUserHasPermission(userId, "fuse_pick_up_any_furni") Then GoTo PlaceFailed
+
+    itemRow = CStr(Proc_5_2_6D4690("SELECT id_product,id,sign,id_secondary,id_destination FROM furnitures WHERE id='" & CStr(furnitureId) & "' AND id_owner='" & _
+        Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_room IS NULL LIMIT 1", 0, 0))
+    If Len(itemRow) = 0 Then GoTo PlaceFailed
+
+    itemFields = Split(itemRow, Chr$(9))
+    productId = CLng(Val(NavigatorField(itemFields, 0)))
+    itemData = NavigatorField(itemFields, 2)
+    secondaryValue = CLng(Val(NavigatorField(itemFields, 3)))
+    If productId <= 0 Then GoTo PlaceFailed
+
+    productFields = Split(CStr(Proc_9_3_807930(productId, 0, 0)), Chr$(9))
+    productType = CLng(Val(NavigatorField(productFields, 1)))
+    If productType = 9 Then GoTo PlaceFailed
+
+    positionZ = CStr(Val(NavigatorField(productFields, 24)))
+
+    Proc_5_0_6D3CD0 "UPDATE furnitures SET id_owner=NULL,id_room='" & CStr(roomId) & "',position_x='" & CStr(positionX) & _
+        "',position_y='" & CStr(positionY) & "',position_z='" & Proc_10_11_80A9C0(positionZ, 0, 0) & "',position_r='" & _
+        CStr(rotation) & "',position_wall=NULL,task_owner='" & Proc_10_11_80A9C0(userId, 0, 0) & _
+        "',task_time=UNIX_TIMESTAMP() WHERE id='" & CStr(furnitureId) & "' AND id_owner='" & _
+        Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_room IS NULL LIMIT 1", 0, 0
+
+    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(furnitureId, Empty, "Ac")), 0
+    placementPayload = CStr(Proc_6_161_7B2EE0(furnitureId, positionX, positionY, rotation, CLng(Val(positionZ)), vbNullString, itemData, secondaryValue, productId))
+    If Len(placementPayload) > 0 Then Proc_6_247_8027E0 socketIndex, "A]" & placementPayload, 0
+    Proc_6_106_74B750 App.Path & "\CACHE\ROOMS\" & CStr(roomId) & ".cache", 0, 0
+    Proc_6_106_74B750 App.Path & "\CACHE\PATHFINDER\" & CStr(roomId) & ".cache", 0, 0
+    Proc_6_140_769400 socketIndex, "FT", vbNullString
+
+PlaceFailed:
     Proc_6_142_76B310 = Empty
 End Function
 
@@ -9018,6 +9109,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_228_7F2AF0 socketIndex, packetPayload, 0
         Case "AZ"
             Proc_6_144_76BE70 socketIndex, "AZ", packetPayload
+        Case "rv"
+            Proc_6_142_76B310 socketIndex, "rv", packetPayload
         Case "pa"
             Proc_6_244_801E80 socketIndex, "J|H", 0
         Case "pb"
