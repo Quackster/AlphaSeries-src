@@ -7176,7 +7176,24 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_159_79FCD0
 Public Function Proc_6_159_79FCD0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+
+    On Error GoTo MoveDone
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "AI" Then requestPayload = Mid$(requestPayload, 3)
+    If Len(requestPayload) = 0 Then GoTo MoveDone
+
+    Proc_6_159_79FCD0 = Proc_6_141_76A670(socketIndex, "A[", "A[" & requestPayload)
+    Exit Function
+
+MoveDone:
     Proc_6_159_79FCD0 = Empty
 End Function
 
@@ -11430,6 +11447,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_155_795C90 socketIndex, "AC", packetPayload
         Case "A["
             Proc_6_141_76A670 socketIndex, "A[", packetPayload
+        Case "AI"
+            Proc_6_159_79FCD0 socketIndex, "AI", packetPayload
         Case "rv"
             Proc_6_142_76B310 socketIndex, "rv", packetPayload
         Case "pa"
