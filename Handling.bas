@@ -6093,7 +6093,57 @@ End Function
 
 ' Original declaration: Private  Proc_6_145_76CA20(arg_C, arg_10, arg_14) '76CA20
 Public Function Proc_6_145_76CA20(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim roomId As Long
+    Dim furnitureId As Long
+    Dim userId As String
+    Dim markerText As String
+    Dim roomCacheText As String
+
+    On Error GoTo TrackDone
+
+    If UBound(args) >= 2 Then
+        socketIndex = CInt(Val(CStr(args(0))))
+        roomId = CLng(Val(CStr(args(1))))
+        furnitureId = CLng(Val(CStr(args(2))))
+    ElseIf UBound(args) >= 1 Then
+        roomId = CLng(Val(CStr(args(0))))
+        furnitureId = CLng(Val(CStr(args(1))))
+    ElseIf UBound(args) >= 0 Then
+        furnitureId = CLng(Val(CStr(args(0))))
+    End If
+
+    If roomId <= 0 And socketIndex > 0 Then
+        userId = HandlingUserIdFromSocket(socketIndex)
+        If Len(userId) > 0 And userId <> "0" Then roomId = HandlingCurrentRoomId(socketIndex, userId)
+    End If
+    If furnitureId <= 0 Then GoTo TrackDone
+
+    markerText = Chr$(1) & CStr(furnitureId) & Chr$(2)
+    global_008291FC = Replace(global_008291FC, markerText, vbNullString, 1, -1, vbBinaryCompare)
+    global_008291FC = global_008291FC & markerText
+
+    markerText = Chr$(1) & CStr(furnitureId) & Chr$(9)
+    global_008291FC = RemoveRepresentedCacheRecord(global_008291FC, markerText)
+
+    If Len(global_00829310) > 0 Then
+        roomCacheText = CStr(global_00829310)
+        roomCacheText = RemoveRepresentedCacheRecord(roomCacheText, Chr$(1) & CStr(furnitureId) & Chr$(2))
+        roomCacheText = RemoveRepresentedCacheRecord(roomCacheText, Chr$(1) & CStr(furnitureId) & Chr$(9))
+        global_00829310 = roomCacheText
+    End If
+
+    If roomId > 0 Then
+        markerText = Chr$(1) & CStr(roomId) & Chr$(2)
+        global_008291F8 = Replace(global_008291F8, markerText, vbNullString, 1, -1, vbBinaryCompare)
+        global_008291F8 = RemoveRepresentedCacheRecord(global_008291F8, Chr$(1) & CStr(roomId) & Chr$(9))
+        global_008291F8 = global_008291F8 & markerText
+
+        Proc_6_106_74B750 App.Path & "\CACHE\ROOMS\" & CStr(roomId) & ".cache", 0, 0
+        Proc_6_106_74B750 App.Path & "\CACHE\PATHFINDER\" & CStr(roomId) & ".cache", 0, 0
+    End If
+
+TrackDone:
     Proc_6_145_76CA20 = Empty
 End Function
 
