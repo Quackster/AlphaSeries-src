@@ -668,8 +668,129 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_16_6E2320
 Public Function Proc_6_16_6E2320(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim userId As String
+    Dim slotId As Long
+    Dim figureText As String
+    Dim genderText As String
+    Dim maxSlots As Long
+    Dim offset As Long
+
+    On Error GoTo SaveFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "Ex" Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    slotId = ReadWireLong(requestPayload, offset)
+    figureText = CStr(Proc_10_10_80A7F0(ReadWireString(requestPayload, offset), 0, 0))
+    genderText = UCase$(Left$(CStr(ReadWireString(requestPayload, offset)), 1))
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo SaveFailed
+    If Not HandlingUserHasPermission(userId, "fuse_use_wardrobe") Then GoTo SaveFailed
+
+    maxSlots = 5
+    If HandlingUserHasPermission(userId, "fuse_larger_wardrobe") Then maxSlots = 10
+    If slotId < 1 Or slotId > maxSlots Then GoTo SaveFailed
+    If genderText <> "M" And genderText <> "F" Then GoTo SaveFailed
+    If Not IsValidWardrobeFigure(figureText, genderText) Then GoTo SaveFailed
+
+    Proc_5_0_6D3CD0 "DELETE FROM users_wardrobe WHERE id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_slot='" & CStr(slotId) & "' LIMIT 1", 0, 0
+    Proc_5_0_6D3CD0 "INSERT INTO users_wardrobe(id_user,id_slot,figure,gender) VALUES('" & Proc_10_11_80A9C0(userId, 0, 0) & "','" & CStr(slotId) & "','" & Proc_10_11_80A9C0(figureText, 0, 0) & "','" & Proc_10_11_80A9C0(genderText, 0, 0) & "')", 0, 0
+
+    Proc_6_15_6E1900 socketIndex, "Ew", "Ew"
+
+SaveFailed:
     Proc_6_16_6E2320 = Empty
+End Function
+
+Private Function IsValidWardrobeFigure(ByVal figureText As String, ByVal genderText As String) As Boolean
+    Dim allowedTypes As String
+    Dim figureData As String
+    Dim parts() As String
+    Dim piece() As String
+    Dim partIndex As Long
+    Dim figureType As String
+    Dim setId As String
+    Dim setTypeStart As Long
+    Dim setTypeEnd As Long
+    Dim setTypeXml As String
+    Dim setMarker As String
+
+    On Error GoTo InvalidFigure
+    If Len(figureText) = 0 Or Len(figureText) > 255 Then GoTo InvalidFigure
+    If InStr(1, figureText, "'", vbBinaryCompare) > 0 Or InStr(1, figureText, Chr$(34), vbBinaryCompare) > 0 Then GoTo InvalidFigure
+
+    allowedTypes = ";lg;ha;wa;hr;ch;sh;cc;ea;he;ca;hd;fa;cp;"
+    parts = Split(figureText, ".")
+    figureData = CStr(Proc_6_239_7FC170(App.Path & "\figuredata.cache", 0, 0))
+
+    For partIndex = LBound(parts) To UBound(parts)
+        If Len(parts(partIndex)) > 0 Then
+            piece = Split(CStr(parts(partIndex)), "-")
+            If UBound(piece) < 1 Then GoTo InvalidFigure
+
+            figureType = LCase$(CStr(piece(0)))
+            setId = CStr(piece(1))
+            If InStr(1, allowedTypes, ";" & figureType & ";", vbBinaryCompare) = 0 Then GoTo InvalidFigure
+            If CLng(Val(setId)) <= 0 Then GoTo InvalidFigure
+
+            If Len(figureData) > 0 Then
+                setTypeStart = InStr(1, figureData, "<settype type=""" & figureType & """", vbTextCompare)
+                If setTypeStart = 0 Then GoTo InvalidFigure
+                setTypeEnd = InStr(setTypeStart, figureData, "</settype>", vbTextCompare)
+                If setTypeEnd = 0 Then GoTo InvalidFigure
+
+                setTypeXml = Mid$(figureData, setTypeStart, setTypeEnd - setTypeStart)
+                setMarker = "<set id=""" & CStr(CLng(Val(setId))) & """"
+                If InStr(1, setTypeXml, setMarker, vbTextCompare) = 0 Then GoTo InvalidFigure
+                If Not FigureSetAllowsGender(setTypeXml, setMarker, genderText) Then GoTo InvalidFigure
+            End If
+        End If
+    Next partIndex
+
+    IsValidWardrobeFigure = True
+    Exit Function
+
+InvalidFigure:
+    IsValidWardrobeFigure = False
+End Function
+
+Private Function FigureSetAllowsGender(ByVal setTypeXml As String, ByVal setMarker As String, ByVal genderText As String) As Boolean
+    Dim setStart As Long
+    Dim setEnd As Long
+    Dim setXml As String
+    Dim genderStart As Long
+    Dim genderValue As String
+
+    On Error GoTo GenderCheckFailed
+    setStart = InStr(1, setTypeXml, setMarker, vbTextCompare)
+    If setStart = 0 Then GoTo GenderCheckFailed
+
+    setEnd = InStr(setStart, setTypeXml, "</set>", vbTextCompare)
+    If setEnd = 0 Then setEnd = InStr(setStart, setTypeXml, "/>", vbTextCompare)
+    If setEnd = 0 Then setEnd = Len(setTypeXml)
+
+    setXml = Mid$(setTypeXml, setStart, setEnd - setStart)
+    genderStart = InStr(1, setXml, "gender=""", vbTextCompare)
+    If genderStart = 0 Then
+        FigureSetAllowsGender = True
+        Exit Function
+    End If
+
+    genderValue = Mid$(setXml, genderStart + 8, 1)
+    FigureSetAllowsGender = (UCase$(genderValue) = "U" Or UCase$(genderValue) = UCase$(genderText))
+    Exit Function
+
+GenderCheckFailed:
+    FigureSetAllowsGender = False
 End Function
 
 ' Original declaration: Private Sub Proc_6_17_6E48D0
@@ -3794,6 +3915,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_136_765F10 socketIndex, "Af", packetPayload
         Case "Ew"
             Proc_6_15_6E1900 socketIndex, "Ew", packetPayload
+        Case "Ex"
+            Proc_6_16_6E2320 socketIndex, "Ex", packetPayload
         Case "oC"
             Proc_6_135_765D80 socketIndex, "oC", packetPayload
         Case "oV"
