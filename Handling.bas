@@ -3452,7 +3452,71 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_78_7279A0
 Public Function Proc_6_78_7279A0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim roomId As Long
+    Dim roomRow As String
+    Dim fields() As String
+    Dim modelId As Long
+    Dim modelMap As String
+    Dim modelPayload As String
+    Dim pollRow As String
+    Dim pollFields() As String
+    Dim pollId As Long
+
+    On Error GoTo BootstrapFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex <= 0 Then GoTo BootstrapFailed
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo BootstrapFailed
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId <= 0 Then GoTo BootstrapFailed
+
+    roomRow = CStr(Proc_5_2_6D4690("SELECT rooms.id,rooms.id_slot,NULL,models.name,models.id,rooms.id_floor,rooms.id_wallpaper,rooms.id_landscape,rooms.rate,models.map,models.position_x,models.position_y,NULL,rooms.name,rooms.disable_walls,rooms.allow_otherspets,rooms.allow_walkthrough,rooms.allow_feedpets,models.type,rooms.visitors_primaryid FROM rooms,models WHERE rooms.id='" & CStr(roomId) & "' AND models.id=rooms.id_model LIMIT 1", 0, 0))
+    If Len(roomRow) = 0 Then GoTo BootstrapFailed
+
+    fields = Split(roomRow, Chr$(9))
+    modelId = CLng(Val(HandlingField(fields, 4)))
+    modelMap = HandlingField(fields, 9)
+
+    Proc_6_244_801E80 socketIndex, "Bf" & "/client.php" & Chr$(2), 0
+    Proc_6_244_801E80 socketIndex, "AE" & CStr(roomId) & Chr$(2) & "H", 0
+
+    modelPayload = Replace(modelMap, vbLf, vbCr, 1, -1, vbBinaryCompare)
+    Do While InStr(1, modelPayload, vbCr & vbCr, vbBinaryCompare) > 0
+        modelPayload = Replace(modelPayload, vbCr & vbCr, vbCr, 1, -1, vbBinaryCompare)
+    Loop
+    If Len(modelPayload) > 0 Then
+        Proc_6_244_801E80 socketIndex, "@_" & modelPayload & Chr$(2), 0
+        Proc_6_244_801E80 socketIndex, "GV" & modelPayload & Chr$(2), 0
+        Proc_6_244_801E80 socketIndex, "GWH" & modelPayload & Chr$(2) & "H", 0
+    End If
+
+    Proc_6_81_730010 socketIndex, roomId, -1
+    Proc_6_82_731070 socketIndex, roomId, 0
+    Proc_6_84_733600 socketIndex, roomId
+    Proc_6_83_732640 socketIndex, modelId
+    Proc_6_85_73A8E0 socketIndex, roomId
+    Proc_6_235_7F77E0 socketIndex, 0, 0
+    Proc_6_244_801E80 socketIndex, "CP" & Chr$(2) & Chr$(2), 0
+
+    pollRow = CStr(Proc_5_2_6D4690("SELECT id,description_title FROM poll WHERE id_room='" & CStr(roomId) & "' AND timestamp_hide>UNIX_TIMESTAMP() LIMIT 1", 0, 0))
+    If Len(pollRow) > 0 Then
+        pollFields = Split(pollRow, Chr$(9))
+        pollId = CLng(Val(HandlingField(pollFields, 0)))
+        If pollId > 0 Then
+            If Len(CStr(Proc_5_2_6D4690("SELECT id_user FROM poll_exit WHERE id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_poll='" & CStr(pollId) & "' LIMIT 1", 0, 0))) = 0 Then
+                If Len(CStr(Proc_5_2_6D4690("SELECT id FROM poll_results WHERE id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_poll='" & CStr(pollId) & "' LIMIT 1", 0, 0))) = 0 Then
+                    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(pollId, Empty, "D|")) & HandlingField(pollFields, 1) & Chr$(2), 0
+                End If
+            End If
+        End If
+    End If
+
+BootstrapFailed:
     Proc_6_78_7279A0 = Empty
 End Function
 
@@ -11688,6 +11752,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_141_76A670 socketIndex, "A[", packetPayload
         Case "AI"
             Proc_6_159_79FCD0 socketIndex, "AI", packetPayload
+        Case "@B"
+            Proc_6_78_7279A0 socketIndex, "@B", packetPayload
         Case "rv"
             Proc_6_142_76B310 socketIndex, "rv", packetPayload
         Case "pa"
