@@ -7,6 +7,7 @@ Option Explicit
 
 Private representedActivityPointTicks As String
 Private representedInteractionPairs As String
+Private representedTradeOffers As String
 Private representedSoundMachineStoppedAt As Date
 
 ' Original declaration: Private Sub Proc_6_0_6D7FF0
@@ -3523,7 +3524,67 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_91_743480
 Public Function Proc_6_91_743480(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim userId As String
+    Dim targetSocketIndex As Integer
+    Dim targetUserId As String
+    Dim furnitureId As Long
+    Dim productId As Long
+    Dim signText As String
+    Dim secondaryValue As Long
+    Dim rowText As String
+    Dim fields() As String
+    Dim offset As Long
+    Dim sourcePayload As String
+    Dim targetPayload As String
+
+    On Error GoTo CarryItemDone
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex <= 0 Then GoTo CarryItemDone
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "FU" Then requestPayload = Mid$(requestPayload, 3)
+
+    targetSocketIndex = RepresentedInteractionPartner(socketIndex)
+    If targetSocketIndex <= 0 Then GoTo CarryItemDone
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    targetUserId = HandlingUserIdFromSocket(targetSocketIndex)
+    If Len(userId) = 0 Or userId = "0" Or Len(targetUserId) = 0 Or targetUserId = "0" Then GoTo CarryItemDone
+
+    furnitureId = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    If furnitureId <= 0 Then
+        offset = 1
+        furnitureId = ReadWireLong(requestPayload, offset)
+    End If
+    If furnitureId <= 0 Then GoTo CarryItemDone
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT id,id_product,sign,id_secondary FROM furnitures WHERE id='" & CStr(furnitureId) & _
+        "' AND id_owner='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_room IS NULL LIMIT 1", 0, 0))
+    If Len(rowText) = 0 Then GoTo CarryItemDone
+
+    fields = Split(rowText, Chr$(9))
+    productId = CLng(Val(HandlingField(fields, 1)))
+    signText = HandlingField(fields, 2)
+    secondaryValue = CLng(Val(HandlingField(fields, 3)))
+    If productId <= 0 Then GoTo CarryItemDone
+
+    StoreRepresentedTradeOffer socketIndex, furnitureId, productId, signText, secondaryValue
+
+    sourcePayload = RepresentedTradeOfferPayload(socketIndex, targetSocketIndex, userId, targetUserId)
+    targetPayload = RepresentedTradeOfferPayload(targetSocketIndex, socketIndex, targetUserId, userId)
+    If Len(sourcePayload) > 0 Then Proc_6_244_801E80 socketIndex, sourcePayload, 0
+    If Len(targetPayload) > 0 Then Proc_6_244_801E80 targetSocketIndex, targetPayload, 0
+
+    Proc_6_91_743480 = sourcePayload
+    Exit Function
+
+CarryItemDone:
     Proc_6_91_743480 = Empty
 End Function
 
@@ -10823,6 +10884,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_97_747640 socketIndex, "AL", packetPayload
         Case "AM"
             Proc_6_96_747000 socketIndex, "AM", packetPayload
+        Case "FU"
+            Proc_6_91_743480 socketIndex, "FU", packetPayload
         Case "EV"
             Proc_6_100_748C80 socketIndex, "EV", packetPayload
         Case "EU"
@@ -11790,6 +11853,104 @@ Private Function RepresentedInteractionState(ByVal socketIndex As Integer) As Lo
 
 LookupFailed:
     RepresentedInteractionState = 0
+End Function
+
+Private Sub StoreRepresentedTradeOffer(ByVal socketIndex As Integer, ByVal furnitureId As Long, ByVal productId As Long, ByVal signText As String, ByVal secondaryValue As Long)
+    Dim rows() As String
+    Dim rowIndex As Long
+    Dim fields() As String
+    Dim rebuiltText As String
+    Dim rowText As String
+    Dim replacedExisting As Boolean
+
+    If socketIndex <= 0 Or furnitureId <= 0 Or productId <= 0 Then Exit Sub
+
+    rowText = CStr(socketIndex) & Chr$(9) & CStr(furnitureId) & Chr$(9) & CStr(productId) & Chr$(9) & _
+        Replace(signText, Chr$(13), vbNullString, 1, -1, vbBinaryCompare) & Chr$(9) & CStr(secondaryValue)
+
+    If Len(representedTradeOffers) > 0 Then
+        rows = Split(representedTradeOffers, Chr$(13))
+        For rowIndex = LBound(rows) To UBound(rows)
+            If Len(rows(rowIndex)) > 0 Then
+                fields = Split(CStr(rows(rowIndex)), Chr$(9))
+                If UBound(fields) >= 1 Then
+                    If CInt(Val(CStr(fields(0)))) = socketIndex And CLng(Val(CStr(fields(1)))) = furnitureId Then
+                        If Len(rebuiltText) > 0 Then rebuiltText = rebuiltText & Chr$(13)
+                        rebuiltText = rebuiltText & rowText
+                        replacedExisting = True
+                    Else
+                        If Len(rebuiltText) > 0 Then rebuiltText = rebuiltText & Chr$(13)
+                        rebuiltText = rebuiltText & CStr(rows(rowIndex))
+                    End If
+                End If
+            End If
+        Next rowIndex
+    End If
+
+    If Not replacedExisting Then
+        If Len(rebuiltText) > 0 Then rebuiltText = rebuiltText & Chr$(13)
+        rebuiltText = rebuiltText & rowText
+    End If
+    representedTradeOffers = rebuiltText
+End Sub
+
+Private Function RepresentedTradeOfferItemPayload(ByVal socketIndex As Integer, ByRef itemCount As Long) As String
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim furnitureId As Long
+    Dim productId As Long
+    Dim signText As String
+    Dim secondaryValue As Long
+    Dim payload As String
+
+    On Error GoTo BuildDone
+    If socketIndex <= 0 Or Len(representedTradeOffers) = 0 Then GoTo BuildDone
+
+    rows = Split(representedTradeOffers, Chr$(13))
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(rows(rowIndex)) > 0 Then
+            fields = Split(CStr(rows(rowIndex)), Chr$(9))
+            If UBound(fields) >= 4 Then
+                If CInt(Val(CStr(fields(0)))) = socketIndex Then
+                    furnitureId = CLng(Val(CStr(fields(1))))
+                    productId = CLng(Val(CStr(fields(2))))
+                    signText = CStr(fields(3))
+                    secondaryValue = CLng(Val(CStr(fields(4))))
+                    payload = payload & CStr(Proc_6_138_7678A0(furnitureId, productId, signText, secondaryValue))
+                    itemCount = itemCount + 1
+                End If
+            End If
+        End If
+    Next rowIndex
+
+BuildDone:
+    RepresentedTradeOfferItemPayload = payload
+End Function
+
+Private Function RepresentedTradeOfferPayload(ByVal sourceSocketIndex As Integer, ByVal targetSocketIndex As Integer, ByVal sourceUserId As String, ByVal targetUserId As String) As String
+    Dim sourceCount As Long
+    Dim targetCount As Long
+    Dim sourceItems As String
+    Dim targetItems As String
+    Dim payload As String
+
+    On Error GoTo BuildFailed
+    If sourceSocketIndex <= 0 Or targetSocketIndex <= 0 Then GoTo BuildFailed
+
+    sourceItems = RepresentedTradeOfferItemPayload(sourceSocketIndex, sourceCount)
+    targetItems = RepresentedTradeOfferItemPayload(targetSocketIndex, targetCount)
+
+    payload = CStr(Proc_3_0_6D2AF0(CLng(Val(sourceUserId)), Empty, "Al"))
+    payload = CStr(Proc_3_0_6D2AF0(CLng(Val(targetUserId)), Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(sourceCount, Empty, payload)) & sourceItems
+    payload = CStr(Proc_3_0_6D2AF0(targetCount, Empty, payload)) & targetItems
+
+    RepresentedTradeOfferPayload = payload
+    Exit Function
+
+BuildFailed:
+    RepresentedTradeOfferPayload = vbNullString
 End Function
 
 Private Function RepresentedRecyclerRewardProduct() As Long
