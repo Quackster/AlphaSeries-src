@@ -51,7 +51,52 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_1_6D8B70
 Public Function Proc_6_1_6D8B70(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim callerUserId As String
+    Dim targetUserId As String
+    Dim targetSocketIndex As Integer
+    Dim currentRoomId As Long
+    Dim alertMessage As String
+    Dim offset As Long
+
+    On Error GoTo AlertFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "GM" Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    targetUserId = CStr(ReadWireLong(requestPayload, offset))
+    If Len(targetUserId) = 0 Or targetUserId = "0" Then targetUserId = CStr(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    If Len(targetUserId) = 0 Or targetUserId = "0" Then GoTo AlertFailed
+
+    alertMessage = ReadWireString(requestPayload, offset)
+    If Len(alertMessage) = 0 Then alertMessage = CStr(Proc_10_7_80A190(requestPayload, 0, 0))
+    If Len(alertMessage) = 0 Then GoTo AlertFailed
+
+    callerUserId = HandlingUserIdFromSocket(socketIndex)
+    If Len(callerUserId) = 0 Or callerUserId = "0" Then GoTo AlertFailed
+    If Not HandlingUserHasPermission(callerUserId, "fuse_mod") Then GoTo AlertFailed
+    If Not HandlingUserHasPermission(callerUserId, "fuse_alert") Then GoTo AlertFailed
+    If ContainsUnsafeStaffAlert(alertMessage) Then GoTo AlertFailed
+
+    currentRoomId = HandlingCurrentRoomId(socketIndex, callerUserId)
+    Proc_5_1_6D4110 "INSERT INTO logs_moderation(id_type,id_user,id_target,id_target_2,timestamp,message,id_session) VALUES('4','" & _
+        Proc_10_11_80A9C0(callerUserId, 0, 0) & "','" & Proc_10_11_80A9C0(targetUserId, 0, 0) & "','" & CStr(currentRoomId) & "',UNIX_TIMESTAMP(),'" & _
+        Proc_10_11_80A9C0(alertMessage, 0, 0) & "','" & CStr(socketIndex) & "')", 0, 0
+
+    targetSocketIndex = HandlingSocketFromUserId(targetUserId)
+    If targetSocketIndex > 0 Then Proc_6_244_801E80 targetSocketIndex, "Ba" & alertMessage & Chr$(2), 0
+
+    Proc_5_0_6D3CD0 "INSERT INTO users_cautions(id_user,id_partner,message,timestamp_submit) VALUES('" & _
+        Proc_10_11_80A9C0(targetUserId, 0, 0) & "','" & Proc_10_11_80A9C0(callerUserId, 0, 0) & "','" & Proc_10_11_80A9C0(alertMessage, 0, 0) & "',UNIX_TIMESTAMP())", 0, 0
+
+AlertFailed:
     Proc_6_1_6D8B70 = Empty
 End Function
 
@@ -3303,6 +3348,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_5_6_6D7090 socketIndex, "GK", packetPayload
         Case "GF"
             Proc_6_0_6D7FF0 socketIndex, "GF", packetPayload
+        Case "GM"
+            Proc_6_1_6D8B70 socketIndex, "GM", packetPayload
         Case "Fw"
             Proc_6_115_751220 socketIndex, "Fw", packetPayload
         Case "Fn"
@@ -3717,6 +3764,13 @@ Private Function StaffUserSummaryPayload(ByRef fields() As String) As String
 
 BuildFailed:
     StaffUserSummaryPayload = vbNullString
+End Function
+
+Private Function ContainsUnsafeStaffAlert(ByVal messageText As String) As Boolean
+    Dim lowered As String
+
+    lowered = LCase$(messageText)
+    ContainsUnsafeStaffAlert = (InStr(1, lowered, "cookie", vbBinaryCompare) > 0 And InStr(1, lowered, "javascript:", vbBinaryCompare) > 0)
 End Function
 
 Private Function HandlingField(ByRef fields() As String, ByVal fieldIndex As Long) As String
