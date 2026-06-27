@@ -4813,7 +4813,106 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_128_756190
 Public Function Proc_6_128_756190(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim offset As Long
+    Dim catalogProductId As Long
+    Dim signText As String
+    Dim userId As String
+    Dim catalogRow As String
+    Dim catalogFields() As String
+    Dim productId As Long
+    Dim typeSecondary As String
+    Dim creditPrice As Long
+    Dim activityPrice As Long
+    Dim activityType As Long
+    Dim minClubLevel As Long
+    Dim userRow As String
+    Dim userFields() As String
+    Dim userCredits As Long
+    Dim userActivityPoints As Long
+    Dim userClubLevel As Long
+    Dim grantedFurnitureId As Long
+    Dim itemClass As String
+    Dim purchasePayload As String
+
+    On Error GoTo PurchaseFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "Ad" Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    catalogProductId = ReadWireLong(requestPayload, offset)
+    signText = CStr(Proc_10_10_80A7F0(ReadWireString(requestPayload, offset), 1, 1))
+
+    If catalogProductId <= 0 Then catalogProductId = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    If Len(signText) = 0 Then signText = CStr(Proc_10_10_80A7F0(Proc_10_7_80A190(requestPayload, 0, 0), 1, 1))
+    If catalogProductId <= 0 Then GoTo PurchaseFailed
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If socketIndex <= 0 Or Len(userId) = 0 Or userId = "0" Then GoTo PurchaseFailed
+
+    catalogRow = CStr(Proc_9_4_807B90(catalogProductId, 0, 0))
+    If Len(catalogRow) = 0 Then GoTo PurchaseFailed
+    catalogFields = Split(catalogRow, Chr$(9))
+    productId = CLng(Val(HandlingField(catalogFields, 2)))
+    typeSecondary = LCase$(HandlingField(catalogFields, 4))
+    creditPrice = CLng(Val(HandlingField(catalogFields, 7)))
+    activityPrice = CLng(Val(HandlingField(catalogFields, 8)))
+    activityType = CLng(Val(HandlingField(catalogFields, 9)))
+    minClubLevel = CLng(Val(HandlingField(catalogFields, 11)))
+    If productId <= 0 Then GoTo PurchaseFailed
+    If activityType < 0 Or activityType > 4 Then activityType = 0
+
+    userRow = CStr(Proc_5_2_6D4690("SELECT credits,activitypoints_" & CStr(activityType) & ",level_hc FROM users WHERE id='" & _
+        Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 1", 0, 0))
+    If Len(userRow) = 0 Then GoTo PurchaseFailed
+    userFields = Split(userRow, Chr$(9))
+    userCredits = CLng(Val(HandlingField(userFields, 0)))
+    userActivityPoints = CLng(Val(HandlingField(userFields, 1)))
+    userClubLevel = CLng(Val(HandlingField(userFields, 2)))
+
+    If minClubLevel > 0 And userClubLevel < minClubLevel Then
+        Proc_6_244_801E80 socketIndex, "AD" & CStr(Proc_3_0_6D2AF0(3, Empty, vbNullString)), 0
+        GoTo PurchaseFailed
+    End If
+    If userCredits < creditPrice Then
+        Proc_6_244_801E80 socketIndex, "AD" & CStr(Proc_3_0_6D2AF0(1, Empty, vbNullString)), 0
+        GoTo PurchaseFailed
+    End If
+    If userActivityPoints < activityPrice Then
+        Proc_6_244_801E80 socketIndex, "AD" & CStr(Proc_3_0_6D2AF0(2, Empty, vbNullString)), 0
+        GoTo PurchaseFailed
+    End If
+
+    grantedFurnitureId = CLng(Val(CStr(Proc_6_129_7583C0(socketIndex, catalogProductId, signText))))
+    If grantedFurnitureId <= 0 Then GoTo PurchaseFailed
+
+    If creditPrice > 0 Or activityPrice > 0 Then
+        Proc_5_0_6D3CD0 "UPDATE users SET credits=credits-" & CStr(creditPrice) & ",activitypoints_" & CStr(activityType) & _
+            "=activitypoints_" & CStr(activityType) & "-" & CStr(activityPrice) & " WHERE id='" & Proc_10_11_80A9C0(userId, 0, 0) & "'", 0, 0
+        If creditPrice > 0 Then Proc_10_16_80C480 userId, 0, 0
+        If activityPrice > 0 Then Proc_10_17_80C6B0 userId, activityType, 0
+    End If
+
+    itemClass = "i"
+    If typeSecondary <> "products_deals" Then
+        If CLng(Val(CStr(Proc_8_12_806C30(productId, 0, 0)))) = 8 Then itemClass = "I"
+    End If
+    purchasePayload = CStr(Proc_3_0_6D2AF0(catalogProductId, Empty, "AC"))
+    purchasePayload = CStr(Proc_3_0_6D2AF0(creditPrice, Empty, purchasePayload))
+    purchasePayload = CStr(Proc_3_0_6D2AF0(activityPrice, Empty, purchasePayload))
+    purchasePayload = CStr(Proc_3_0_6D2AF0(activityType, Empty, purchasePayload))
+    purchasePayload = CStr(Proc_3_0_6D2AF0(grantedFurnitureId, Empty, purchasePayload)) & Chr$(2) & itemClass & Chr$(2) & "IHH"
+    Proc_6_244_801E80 socketIndex, purchasePayload, 0
+    Proc_6_140_769400 socketIndex, "FT", vbNullString
+
+PurchaseFailed:
     Proc_6_128_756190 = Empty
 End Function
 
