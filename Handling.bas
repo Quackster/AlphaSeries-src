@@ -238,7 +238,34 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_6_6DC9D0
 Public Function Proc_6_6_6DC9D0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim callerUserId As String
+    Dim whereClause As String
+    Dim offset As Long
+
+    On Error GoTo PickFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "GB" Then requestPayload = Mid$(requestPayload, 3)
+
+    callerUserId = HandlingUserIdFromSocket(socketIndex)
+    If Len(callerUserId) = 0 Or callerUserId = "0" Then GoTo PickFailed
+    If Not HandlingUserHasPermission(callerUserId, "fuse_mod") Then GoTo PickFailed
+    If Not HandlingUserHasPermission(callerUserId, "fuse_receive_calls_for_help") Then GoTo PickFailed
+
+    offset = 1
+    whereClause = StaffCallForHelpWhereClause(requestPayload, offset)
+    If Len(whereClause) = 0 Then GoTo PickFailed
+
+    Proc_5_0_6D3CD0 "UPDATE staff_cfh SET id_tab='2',id_picker='" & Proc_10_11_80A9C0(callerUserId, 0, 0) & "',timestamp_picked=UNIX_TIMESTAMP() WHERE " & whereClause, 0, 0
+
+PickFailed:
     Proc_6_6_6DC9D0 = Empty
 End Function
 
@@ -250,7 +277,34 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_8_6DD790
 Public Function Proc_6_8_6DD790(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim callerUserId As String
+    Dim whereClause As String
+    Dim offset As Long
+
+    On Error GoTo ReleaseFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "GC" Then requestPayload = Mid$(requestPayload, 3)
+
+    callerUserId = HandlingUserIdFromSocket(socketIndex)
+    If Len(callerUserId) = 0 Or callerUserId = "0" Then GoTo ReleaseFailed
+    If Not HandlingUserHasPermission(callerUserId, "fuse_mod") Then GoTo ReleaseFailed
+    If Not HandlingUserHasPermission(callerUserId, "fuse_receive_calls_for_help") Then GoTo ReleaseFailed
+
+    offset = 1
+    whereClause = StaffCallForHelpWhereClause(requestPayload, offset)
+    If Len(whereClause) = 0 Then GoTo ReleaseFailed
+
+    Proc_5_0_6D3CD0 "UPDATE staff_cfh SET id_tab='1',id_picker=0,timestamp_picked=NULL WHERE " & whereClause, 0, 0
+
+ReleaseFailed:
     Proc_6_8_6DD790 = Empty
 End Function
 
@@ -3466,6 +3520,10 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_2_6D9880 socketIndex, "GO", packetPayload
         Case "GP"
             Proc_6_3_6DA490 socketIndex, "GP", packetPayload
+        Case "GB"
+            Proc_6_6_6DC9D0 socketIndex, "GB", packetPayload
+        Case "GC"
+            Proc_6_8_6DD790 socketIndex, "GC", packetPayload
         Case "Fw"
             Proc_6_115_751220 socketIndex, "Fw", packetPayload
         Case "Fn"
@@ -3841,6 +3899,32 @@ Private Function CallForHelpRowPayload(ByRef fields() As String) As String
 
 BuildFailed:
     CallForHelpRowPayload = vbNullString
+End Function
+
+Private Function StaffCallForHelpWhereClause(ByVal packetPayload As String, ByRef offset As Long) As String
+    Dim requestedCount As Long
+    Dim index As Long
+    Dim callForHelpId As Long
+    Dim whereClause As String
+
+    On Error GoTo BuildFailed
+
+    requestedCount = ReadWireLong(packetPayload, offset)
+    If requestedCount < 1 Or requestedCount > 150 Then GoTo BuildFailed
+
+    For index = 1 To requestedCount
+        callForHelpId = ReadWireLong(packetPayload, offset)
+        If callForHelpId > 0 Then
+            If Len(whereClause) > 0 Then whereClause = whereClause & " OR "
+            whereClause = whereClause & "id='" & CStr(callForHelpId) & "'"
+        End If
+    Next index
+
+    StaffCallForHelpWhereClause = whereClause
+    Exit Function
+
+BuildFailed:
+    StaffCallForHelpWhereClause = vbNullString
 End Function
 
 Private Function StaffUserSummaryPayload(ByRef fields() As String) As String
