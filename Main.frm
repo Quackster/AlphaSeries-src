@@ -475,7 +475,30 @@ End Sub
 
 ' Original declaration: Private Sub tmrWalking_Timer(Index As Integer) '693B20
 Private Sub tmrWalking_Timer(Index As Integer)
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim userMarkers As String
+    Dim botMarkers As String
+    Dim markerIndex As Long
+    Dim entityId As Long
+
+    On Error GoTo WalkDone
+
+    tmrWalking(Index).Enabled = False
+
+    userMarkers = MainRepresentedEntityIds(MainRepresentedRoomRecordField(Index, 1) & MainRepresentedRoomRecordField(Index, 4))
+    For markerIndex = 0 To UBound(Split(userMarkers, "]"))
+        entityId = MainRepresentedEntityIdAt(userMarkers, markerIndex)
+        If entityId > 0 Then Proc_0_29_6B0E10 entityId
+    Next markerIndex
+
+    botMarkers = MainRepresentedEntityIds(MainRepresentedRoomRecordField(Index, 2) & MainRepresentedRoomRecordField(Index, 5))
+    For markerIndex = 0 To UBound(Split(botMarkers, "]"))
+        entityId = MainRepresentedEntityIdAt(botMarkers, markerIndex)
+        If entityId > 0 Then Proc_0_28_6AD850 entityId
+    Next markerIndex
+
+WalkDone:
+    On Error Resume Next
+    tmrWalking(Index).Enabled = True
 End Sub
 
 ' Original declaration: Public Function EasyGetIdentity(arg1) '68C620
@@ -876,6 +899,18 @@ Private Function MainRepresentedRoomRecord(ByVal roomSlot As Long) As String
     MainRepresentedRoomRecord = MainRepresentedRecordByKey(CStr(global_00829310), roomSlot)
 End Function
 
+Private Function MainRepresentedRoomRecordField(ByVal roomSlot As Long, ByVal fieldIndex As Long) As String
+    Dim fields() As String
+
+    On Error GoTo LookupFailed
+    fields = Split(MainRepresentedRoomRecord(roomSlot), Chr$(9))
+    If fieldIndex <= UBound(fields) Then MainRepresentedRoomRecordField = CStr(fields(fieldIndex))
+    Exit Function
+
+LookupFailed:
+    MainRepresentedRoomRecordField = vbNullString
+End Function
+
 Private Sub MainRepresentedRoomRecordSet(ByVal roomSlot As Long, ByVal roomRecord As String)
     Dim cacheText As String
 
@@ -910,6 +945,41 @@ End Function
 Private Sub MainEnsureFieldCount(ByRef fields() As String, ByVal requiredIndex As Long)
     If UBound(fields) < requiredIndex Then ReDim Preserve fields(0 To requiredIndex)
 End Sub
+
+Private Function MainRepresentedEntityIds(ByVal markerText As String) As String
+    Dim parts() As String
+    Dim partIndex As Long
+    Dim entityId As Long
+    Dim outputText As String
+    Dim marker As String
+
+    On Error GoTo BuildDone
+    If Len(markerText) = 0 Then GoTo BuildDone
+
+    parts = Split(markerText, Chr$(1))
+    For partIndex = LBound(parts) To UBound(parts)
+        entityId = CLng(Val(CStr(parts(partIndex))))
+        If entityId > 0 Then
+            marker = "[" & CStr(entityId) & "]"
+            If InStr(1, outputText, marker, vbBinaryCompare) = 0 Then outputText = outputText & marker
+        End If
+    Next partIndex
+
+BuildDone:
+    MainRepresentedEntityIds = outputText
+End Function
+
+Private Function MainRepresentedEntityIdAt(ByVal entityMarkers As String, ByVal entityIndex As Long) As Long
+    Dim markerParts() As String
+
+    On Error GoTo LookupFailed
+    markerParts = Split(entityMarkers, "]")
+    If entityIndex <= UBound(markerParts) Then MainRepresentedEntityIdAt = CLng(Val(Replace(CStr(markerParts(entityIndex)), "[", vbNullString, 1, -1, vbBinaryCompare)))
+    Exit Function
+
+LookupFailed:
+    MainRepresentedEntityIdAt = 0
+End Function
 
 ' Original declaration: Private  Proc_0_26_6ACF30(arg_C, arg_10) '6ACF30
 Private Sub Proc_0_26_6ACF30(ParamArray args() As Variant)
