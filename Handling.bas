@@ -3655,7 +3655,63 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_97_747640
 Public Function Proc_6_97_747640(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim userId As String
+    Dim roomId As Long
+    Dim furnitureId As Long
+    Dim rowText As String
+    Dim fields() As String
+    Dim furnitureX As Long
+    Dim furnitureY As Long
+    Dim productId As Long
+    Dim productType As String
+    Dim userX As Long
+    Dim userY As Long
+    Dim hasUserPosition As Boolean
+    Dim payload As String
+
+    On Error GoTo UseFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+    If Left$(packetPayload, 2) = "AL" Then
+        requestPayload = Mid$(packetPayload, 3)
+    Else
+        requestPayload = packetPayload
+    End If
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If Len(userId) = 0 Or userId = "0" Or roomId <= 0 Then GoTo UseFailed
+
+    furnitureId = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    If furnitureId <= 0 Then GoTo UseFailed
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT id,position_x,position_y,id_product FROM furnitures WHERE id='" & CStr(furnitureId) & "' AND id_room='" & CStr(roomId) & "' LIMIT 1", 0, 0))
+    If Len(rowText) = 0 Then GoTo UseFailed
+
+    fields = Split(rowText, Chr$(9))
+    furnitureX = CLng(Val(HandlingField(fields, 1)))
+    furnitureY = CLng(Val(HandlingField(fields, 2)))
+    productId = CLng(Val(HandlingField(fields, 3)))
+    If productId <= 0 Then GoTo UseFailed
+
+    productType = CStr(Proc_8_12_806C30(productId, 0, 0))
+    If Len(productType) > 0 And Val(productType) <> 0 Then GoTo UseFailed
+
+    hasUserPosition = HandlingRepresentedUserPosition(args, userX, userY)
+    If hasUserPosition Then
+        If Abs(userX - furnitureX) > 2 Or Abs(userY - furnitureY) > 2 Then GoTo UseFailed
+    End If
+
+    payload = "0" & CStr(Proc_3_0_6D2AF0(-1, Empty, CStr(Proc_3_0_6D2AF0(furnitureId, Empty, "AZ"))))
+    Proc_6_247_8027E0 socketIndex, payload, 0
+    Proc_6_145_76CA20 socketIndex, roomId, furnitureId
+
+UseFailed:
     Proc_6_97_747640 = Empty
 End Function
 
@@ -8934,6 +8990,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_99_748460 socketIndex, "EW", packetPayload
         Case "Cw"
             Proc_6_95_746CD0 socketIndex, "Cw", packetPayload
+        Case "AL"
+            Proc_6_97_747640 socketIndex, "AL", packetPayload
         Case "AM"
             Proc_6_96_747000 socketIndex, "AM", packetPayload
         Case "EV"
