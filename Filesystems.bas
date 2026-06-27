@@ -45,9 +45,63 @@ End Function
 
 ' Original declaration: Private  Proc_7_2_803D60(arg_C) '803D60
 Public Function Proc_7_2_803D60(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Long
+    Dim packetBuffer As String
+    Dim packetLength As Long
+    Dim packetPayload As String
+    Dim packetCode As String
+
+    On Error GoTo DispatchDone
+    If UBound(args) < 1 Then GoTo DispatchDone
+
+    socketIndex = CLng(Val(CStr(args(0))))
+    packetBuffer = CStr(args(1))
+    If Proc_11_2_821390(socketIndex, 0, 0) <> 1 Then GoTo DispatchDone
+
+    If InStr(1, packetBuffer, Chr$(0), vbBinaryCompare) > 0 Then
+        Proc_12_1_821AA0 socketIndex, BuildCrossDomainPolicy()
+        GoTo DispatchDone
+    End If
+
+    Do While Len(packetBuffer) > 2
+        packetBuffer = Mid$(packetBuffer, 2)
+        packetLength = CLng(Val(CStr(Proc_3_4_6D3620(Mid$(packetBuffer, 1, 2)))))
+        If packetLength <= 0 Or Len(packetBuffer) < packetLength + 2 Then Exit Do
+
+        packetPayload = Mid$(packetBuffer, 3, packetLength)
+        packetCode = Left$(packetPayload, 2)
+
+        If global_00829190 Then
+            Proc_2_0_6D1510 "[" & CStr(socketIndex) & "] " & packetPayload, "GAME", CStr(16711680)
+        End If
+
+        DispatchReadyPacket socketIndex, packetCode, packetPayload
+        packetBuffer = Mid$(packetBuffer, packetLength + 3)
+    Loop
+
+DispatchDone:
     Proc_7_2_803D60 = Empty
 End Function
+
+Private Function BuildCrossDomainPolicy() As String
+    BuildCrossDomainPolicy = "<?xml version=""1.0""?>" & vbCrLf & _
+        "<!DOCTYPE cross-domain-policy SYSTEM ""/xml/dtds/cross-domain-policy.dtd"">" & vbCrLf & _
+        "<cross-domain-policy>" & vbCrLf & _
+        "<allow-access-from domain=""images.habbo.com"" to-ports=""1-50000"" />" & vbCrLf & _
+        "<allow-access-from domain=""*"" to-ports=""1-50000"" />" & vbCrLf & _
+        "</cross-domain-policy>" & Chr$(0)
+End Function
+
+Private Sub DispatchReadyPacket(ByVal socketIndex As Long, ByVal packetCode As String, ByVal packetPayload As String)
+    Select Case packetCode
+        Case "CN"
+            Proc_6_162_7B3310 socketIndex, packetPayload, 0
+        Case "F_"
+            Proc_6_163_7B3480 socketIndex, packetPayload, 0
+        Case "CD"
+            ' Decompiled target was an unresolved Proc_7FA5A0 symbol; leave CD packets for a later exact mapping pass.
+    End Select
+End Sub
 
 Private Function BroadcastToActiveSessions(ByVal payload As String, ByVal onlyUserName As String) As Long
     Dim records() As String
