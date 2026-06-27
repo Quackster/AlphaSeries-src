@@ -232,7 +232,42 @@ End Function
 
 ' Original declaration: Private  Proc_6_5_6DC340(arg_C) '6DC340
 Public Function Proc_6_5_6DC340(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim callForHelpId As Long
+    Dim socketIndex As Integer
+    Dim rowText As String
+    Dim fields() As String
+    Dim representedFields(0 To 10) As String
+    Dim payload As String
+
+    On Error GoTo SendFailed
+    If UBound(args) < 0 Then GoTo SendFailed
+
+    callForHelpId = CLng(Val(CStr(args(0))))
+    If UBound(args) >= 1 Then socketIndex = CInt(Val(CStr(args(1))))
+    If callForHelpId <= 0 Then GoTo SendFailed
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT staff_cfh.id,users.id,users.name,staff_cfh.id_partner,staff_cfh.id_room,staff_cfh.id_category,staff_cfh.description,rooms.id,rooms.name FROM staff_cfh,users,rooms WHERE staff_cfh.id='" & CStr(callForHelpId) & "' AND staff_cfh.id_closed='0' AND users.id=staff_cfh.id_user AND rooms.id=staff_cfh.id_room LIMIT 1", 0, 0))
+    If Len(rowText) = 0 Then GoTo SendFailed
+
+    fields = Split(rowText, Chr$(9))
+    If UBound(fields) < 8 Then GoTo SendFailed
+
+    representedFields(0) = HandlingField(fields, 0)
+    representedFields(1) = vbNullString
+    representedFields(2) = HandlingField(fields, 1)
+    representedFields(3) = HandlingField(fields, 2)
+    representedFields(4) = HandlingField(fields, 3)
+    representedFields(5) = HandlingField(fields, 4)
+    representedFields(6) = HandlingField(fields, 5)
+    representedFields(7) = HandlingField(fields, 6)
+    representedFields(8) = HandlingField(fields, 7)
+    representedFields(9) = HandlingField(fields, 8)
+    representedFields(10) = vbNullString
+
+    payload = "HR" & CallForHelpRowPayload(representedFields)
+    If socketIndex > 0 Then Proc_6_244_801E80 socketIndex, payload, 0
+
+SendFailed:
     Proc_6_5_6DC340 = Empty
 End Function
 
