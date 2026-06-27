@@ -4819,7 +4819,101 @@ End Function
 
 ' Original declaration: Private  Proc_6_129_7583C0(arg_C, arg_10) '7583C0
 Public Function Proc_6_129_7583C0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim catalogProductId As Long
+    Dim signText As String
+    Dim catalogRow As String
+    Dim catalogFields() As String
+    Dim typeSecondary As String
+    Dim productId As Long
+    Dim grantResult As String
+    Dim grantedIds() As String
+    Dim dealRow As String
+    Dim dealFields() As String
+    Dim dealItems() As String
+    Dim productIds() As Long
+    Dim itemCount As Long
+    Dim itemIndex As Long
+    Dim furnitureId As Long
+    Dim itemData As String
+    Dim secondaryValue As Long
+    Dim addPayload As String
+    Dim firstFurnitureId As Long
+    Dim trophySign As String
+    Dim dateFormat As String
+    Dim productType As Long
+
+    On Error GoTo PurchaseGrantFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 1 Then catalogProductId = CLng(Val(CStr(args(1))))
+    If UBound(args) >= 2 Then signText = CStr(args(2))
+    If socketIndex <= 0 Or catalogProductId <= 0 Then GoTo PurchaseGrantFailed
+
+    catalogRow = CStr(Proc_9_4_807B90(catalogProductId, 0, 0))
+    If Len(catalogRow) = 0 Then GoTo PurchaseGrantFailed
+    catalogFields = Split(catalogRow, Chr$(9))
+    productId = CLng(Val(HandlingField(catalogFields, 2)))
+    typeSecondary = LCase$(HandlingField(catalogFields, 4))
+    If productId <= 0 Then GoTo PurchaseGrantFailed
+
+    grantResult = CStr(Proc_6_133_760400(socketIndex, catalogProductId, signText))
+    If Len(grantResult) = 0 Then GoTo PurchaseGrantFailed
+    grantedIds = Split(grantResult, global_004092F0)
+
+    If typeSecondary = "products_deals" Then
+        dealRow = CStr(Proc_9_5_807DF0(productId, 0, 0))
+        dealFields = Split(dealRow, Chr$(9))
+        If UBound(dealFields) >= 1 Then dealRow = CStr(dealFields(1))
+        dealItems = Split(Replace(dealRow, ",", ";", 1, -1, vbBinaryCompare), ";")
+        ReDim productIds(0 To UBound(dealItems))
+        For itemIndex = LBound(dealItems) To UBound(dealItems)
+            If CLng(Val(CStr(dealItems(itemIndex)))) > 0 Then
+                productIds(itemCount) = CLng(Val(CStr(dealItems(itemIndex))))
+                itemCount = itemCount + 1
+            End If
+        Next itemIndex
+    Else
+        itemCount = UBound(grantedIds) - LBound(grantedIds) + 1
+        If itemCount < 1 Then itemCount = 1
+        ReDim productIds(0 To itemCount - 1)
+        For itemIndex = 0 To itemCount - 1
+            productIds(itemIndex) = productId
+        Next itemIndex
+    End If
+
+    If itemCount > 0 Then
+        For itemIndex = 0 To itemCount - 1
+            If itemIndex <= UBound(grantedIds) Then furnitureId = CLng(Val(CStr(grantedIds(itemIndex)))) Else furnitureId = 0
+            If furnitureId > 0 And productIds(itemIndex) > 0 Then
+                If firstFurnitureId = 0 Then firstFurnitureId = furnitureId
+                itemData = CStr(Proc_8_12_806C30(productIds(itemIndex), 24, 0))
+                If Len(itemData) = 0 Then itemData = CStr(Proc_8_12_806C30(productIds(itemIndex), 4, 0))
+                productType = CLng(Val(CStr(Proc_8_12_806C30(productIds(itemIndex), 0, 0))))
+                secondaryValue = 0
+
+                addPayload = "Ab" & CStr(Proc_6_138_7678A0(furnitureId, productIds(itemIndex), itemData, secondaryValue))
+                Proc_6_244_801E80 socketIndex, addPayload & Chr$(2), 0
+
+                If StrComp(CStr(Proc_8_12_806C30(productIds(itemIndex), 4, 0)), "TROPHY_VAR", vbTextCompare) = 0 Then
+                    dateFormat = CStr(Proc_10_0_809570("com.client.format.date", "dd.mm.yyyy", 0))
+                    trophySign = HandlingUserName(HandlingUserIdFromSocket(socketIndex)) & Chr$(8) & Format$(Now, dateFormat) & Chr$(8) & signText
+                    Proc_5_0_6D3CD0 "UPDATE furnitures SET sign='" & Proc_10_11_80A9C0(Proc_10_10_80A7F0(trophySign, 1, 1), 0, 0) & _
+                        "' WHERE id='" & CStr(furnitureId) & "'", 0, 0
+                End If
+
+                If productType = 8 Then
+                    Proc_6_244_801E80 socketIndex, "GM" & CStr(Proc_3_0_6D2AF0(furnitureId, Empty, vbNullString)) & _
+                        CStr(Proc_3_0_6D2AF0(CLng(Val(CStr(Proc_8_12_806C30(productIds(itemIndex), 20, 0)))), Empty, vbNullString)), 0
+                End If
+            End If
+        Next itemIndex
+    End If
+
+    Proc_6_129_7583C0 = firstFurnitureId
+    Exit Function
+
+PurchaseGrantFailed:
     Proc_6_129_7583C0 = Empty
 End Function
 
