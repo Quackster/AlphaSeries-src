@@ -1075,8 +1075,54 @@ End Function
 
 ' Original declaration: Private  Proc_6_138_7678A0(arg_C, arg_10, arg_14, arg_18) '7678A0
 Public Function Proc_6_138_7678A0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_138_7678A0 = Empty
+    Dim itemId As Long
+    Dim productId As Long
+    Dim itemData As String
+    Dim extraValue As Long
+    Dim productFields() As String
+    Dim productType As Long
+    Dim itemClass As String
+    Dim productName As String
+    Dim productDescription As String
+    Dim productSprite As String
+    Dim payload As String
+
+    On Error GoTo BuildFailed
+    If UBound(args) < 1 Then GoTo BuildFailed
+
+    itemId = CLng(Val(CStr(args(0))))
+    productId = CLng(Val(CStr(args(1))))
+    If UBound(args) >= 2 Then itemData = Replace(CStr(args(2)), Chr$(8), Chr$(9), 1, -1, vbBinaryCompare)
+    If UBound(args) >= 3 Then extraValue = CLng(Val(CStr(args(3))))
+
+    productFields = Split(CStr(Proc_9_3_807930(productId, 0, 0)), Chr$(9))
+    If UBound(productFields) >= 18 Then
+        productType = CLng(Val(CStr(productFields(1))))
+        productName = CStr(productFields(14))
+        productDescription = CStr(productFields(15))
+        productSprite = CStr(productFields(18))
+    End If
+
+    itemClass = "S"
+    If productType = 9 Then itemClass = "I"
+
+    payload = CStr(Proc_3_0_6D2AF0(itemId, Empty, "0")) & itemClass & Chr$(2)
+    payload = payload & CStr(Proc_3_0_6D2AF0(itemId, Empty, vbNullString))
+    payload = payload & CStr(Proc_3_0_6D2AF0(productId, Empty, vbNullString))
+    payload = payload & CStr(Proc_3_0_6D2AF0(productType, Empty, vbNullString))
+    payload = payload & itemData & Chr$(2)
+    payload = payload & CStr(Proc_3_0_6D2AF0(extraValue, Empty, vbNullString))
+    payload = payload & productName & Chr$(2)
+    payload = payload & productDescription & Chr$(2)
+    payload = payload & productSprite & Chr$(2)
+    payload = payload & "M" & Chr$(2)
+    payload = payload & CStr(Proc_3_0_6D2AF0(extraValue, Empty, vbNullString))
+
+    Proc_6_138_7678A0 = payload
+    Exit Function
+
+BuildFailed:
+    Proc_6_138_7678A0 = vbNullString
 End Function
 
 ' Original declaration: Private Sub Proc_6_139_768100
