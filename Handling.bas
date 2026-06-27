@@ -3759,8 +3759,21 @@ End Function
 
 ' Original declaration: Private  Proc_6_246_8024C0(arg_C) '8024C0
 Public Function Proc_6_246_8024C0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_246_8024C0 = Empty
+    Dim roomId As Long
+    Dim payload As String
+
+    On Error GoTo BroadcastFailed
+    If UBound(args) < 1 Then GoTo BroadcastFailed
+
+    roomId = CLng(Val(CStr(args(0))))
+    payload = CStr(args(1))
+    If roomId <= 0 Or Len(payload) = 0 Then GoTo BroadcastFailed
+
+    Proc_6_246_8024C0 = BroadcastToRoomUsers(roomId, payload)
+    Exit Function
+
+BroadcastFailed:
+    Proc_6_246_8024C0 = 0
 End Function
 
 ' Original declaration: Private  Proc_6_247_8027E0(arg_C) '8027E0
