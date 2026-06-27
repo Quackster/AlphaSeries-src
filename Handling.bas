@@ -3226,7 +3226,50 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_90_742E80
 Public Function Proc_6_90_742E80(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim targetSocketIndex As Integer
+    Dim targetUserId As String
+    Dim sourceRoomUserIndex As Long
+    Dim interactionState As Long
+    Dim sourcePayload As String
+    Dim targetPayload As String
+
+    On Error GoTo InteractionStateFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex <= 0 Then GoTo InteractionStateFailed
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo InteractionStateFailed
+
+    sourceRoomUserIndex = RepresentedRoomUserIndex(socketIndex, userId)
+    If sourceRoomUserIndex <= 0 Then GoTo InteractionStateFailed
+
+    ' The original reads the paired socket from hidden session slot +15Ch and the
+    ' interaction state from +160h. Until those slots are fully represented, accept
+    ' the recovered pair/state as explicit arguments from callers that know them.
+    If UBound(args) >= 1 Then targetSocketIndex = CInt(Val(CStr(args(1))))
+    If UBound(args) >= 2 Then interactionState = CLng(Val(CStr(args(2))))
+    If targetSocketIndex <= 0 Then GoTo InteractionStateFailed
+
+    targetUserId = HandlingUserIdFromSocket(targetSocketIndex)
+    If Len(targetUserId) = 0 Or targetUserId = "0" Then GoTo InteractionStateFailed
+
+    sourcePayload = "0" & CStr(Proc_3_0_6D2AF0(interactionState, Empty, _
+        "0" & CStr(Proc_3_0_6D2AF0(sourceRoomUserIndex, Empty, "Am"))))
+    targetPayload = CStr(Proc_3_0_6D2AF0(interactionState, Empty, _
+        CStr(Proc_3_0_6D2AF0(sourceRoomUserIndex, Empty, "Am"))))
+
+    Proc_6_244_801E80 socketIndex, sourcePayload, 0
+    Proc_6_244_801E80 targetSocketIndex, targetPayload, 0
+
+    If interactionState = 1 Then
+        Proc_6_244_801E80 socketIndex, "Ao", 0
+        Proc_6_244_801E80 targetSocketIndex, "Ao", 0
+    End If
+
+InteractionStateFailed:
     Proc_6_90_742E80 = Empty
 End Function
 
