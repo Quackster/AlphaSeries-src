@@ -4716,7 +4716,95 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_167_7BECA0
 Public Function Proc_6_167_7BECA0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim userId As String
+    Dim acceptCount As Long
+    Dim acceptIndex As Long
+    Dim acceptedCount As Long
+    Dim targetUserId As String
+    Dim targetSocketIndex As Integer
+    Dim targetIds As String
+    Dim targetParts As Variant
+    Dim rowText As String
+    Dim fields As Variant
+    Dim offset As Long
+    Dim payloadRows As String
+    Dim callerPayload As String
+    Dim notifyPayload As String
+    Dim dateFormat As String
+    Dim timeFormat As String
+
+    On Error GoTo AcceptFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "@e" Then requestPayload = Mid$(requestPayload, 3)
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo AcceptFailed
+
+    offset = 1
+    acceptCount = ReadWireLong(requestPayload, offset)
+    If acceptCount <= 0 Then GoTo AcceptFailed
+    If acceptCount > 75 Then acceptCount = 75
+
+    dateFormat = CStr(Proc_10_0_809570("com.mysql.format.date", "%d-%m-%Y", 0))
+    timeFormat = CStr(Proc_10_0_809570("com.mysql.format.time", "%H:%i", 0))
+
+    For acceptIndex = 1 To acceptCount
+        targetUserId = CStr(ReadWireLong(requestPayload, offset))
+        If Len(targetUserId) > 0 And targetUserId <> "0" Then
+            If InStr(1, "," & targetIds & ",", "," & targetUserId & ",", vbBinaryCompare) = 0 Then
+                rowText = CStr(Proc_5_2_6D4690("SELECT users.id,users.name,users.motto,users.figure,users.level,users.id_socket,DATE_FORMAT(FROM_UNIXTIME(users.lastonline_time), '" & _
+                    Proc_10_11_80A9C0(dateFormat & " " & timeFormat, 0, 0) & "') FROM users,friendships WHERE friendships.has_accept='0' AND friendships.id_user='" & _
+                    Proc_10_11_80A9C0(userId, 0, 0) & "' AND friendships.id_friend='" & Proc_10_11_80A9C0(targetUserId, 0, 0) & "' AND users.id=friendships.id_friend LIMIT 1", 0, 0))
+                If Len(rowText) > 0 Then
+                    If Len(targetIds) > 0 Then targetIds = targetIds & ","
+                    targetIds = targetIds & targetUserId
+                End If
+            End If
+        End If
+    Next acceptIndex
+
+    If Len(targetIds) = 0 Then GoTo AcceptFailed
+    targetParts = Split(targetIds, ",")
+
+    For acceptIndex = LBound(targetParts) To UBound(targetParts)
+        targetUserId = CStr(targetParts(acceptIndex))
+        rowText = CStr(Proc_5_2_6D4690("SELECT id,name,motto,figure,level,id_socket,DATE_FORMAT(FROM_UNIXTIME(lastonline_time), '" & _
+            Proc_10_11_80A9C0(dateFormat & " " & timeFormat, 0, 0) & "') FROM users WHERE id='" & Proc_10_11_80A9C0(targetUserId, 0, 0) & "' LIMIT 1", 0, 0))
+        If Len(rowText) > 0 Then
+            fields = Split(rowText, Chr$(9))
+            If UBound(fields) >= 6 Then
+                targetSocketIndex = CInt(Val(CStr(fields(5))))
+                payloadRows = payloadRows & "H" & CStr(Proc_6_166_7BE940(CLng(Val(CStr(fields(0)))), CStr(fields(1)), CStr(fields(2)), CStr(fields(3)), _
+                    CLng(Val(CStr(fields(4)))), IIf(targetSocketIndex > 0, 2, 0), IIf(targetSocketIndex > 0, 1, 0), CStr(fields(6)), 0))
+
+                Proc_5_0_6D3CD0 "INSERT IGNORE INTO friendships(id_user,id_friend,has_accept) VALUES('" & Proc_10_11_80A9C0(targetUserId, 0, 0) & "','" & Proc_10_11_80A9C0(userId, 0, 0) & "','0')", 0, 0
+                Proc_5_0_6D3CD0 "UPDATE friendships SET has_accept='1' WHERE ((id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_friend='" & Proc_10_11_80A9C0(targetUserId, 0, 0) & "') OR (id_user='" & Proc_10_11_80A9C0(targetUserId, 0, 0) & "' AND id_friend='" & Proc_10_11_80A9C0(userId, 0, 0) & "')) AND has_accept='0' LIMIT 2", 0, 0
+
+                If targetSocketIndex > 0 Then
+                    notifyPayload = "@MHIH" & CStr(MessengerFriendSummaryPayload(userId, 1))
+                    Proc_6_244_801E80 targetSocketIndex, notifyPayload, 0
+                End If
+                acceptedCount = acceptedCount + 1
+            End If
+        End If
+    Next acceptIndex
+
+    If acceptedCount > 0 Then
+        callerPayload = CStr(Proc_3_0_6D2AF0(acceptedCount, Empty, "@MH")) & payloadRows
+        Proc_6_244_801E80 socketIndex, callerPayload, 0
+        Proc_6_167_7BECA0 = callerPayload
+        Exit Function
+    End If
+
+AcceptFailed:
     Proc_6_167_7BECA0 = Empty
 End Function
 
@@ -6082,6 +6170,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_175_7C4800 socketIndex, "Ci", packetPayload
         Case "@b"
             Proc_6_168_7C05F0 socketIndex, "@b", packetPayload
+        Case "@e"
+            Proc_6_167_7BECA0 socketIndex, "@e", packetPayload
         Case "E["
             Proc_6_45_714B60 socketIndex, "E[", packetPayload
         Case "A_"
@@ -6482,6 +6572,34 @@ Private Function HandlingUserName(ByVal userId As String) As String
 
 LookupFailed:
     HandlingUserName = vbNullString
+End Function
+
+Private Function MessengerFriendSummaryPayload(ByVal userId As String, ByVal relationshipState As Long) As String
+    Dim rowText As String
+    Dim fields As Variant
+    Dim socketIndex As Integer
+    Dim dateFormat As String
+    Dim timeFormat As String
+
+    On Error GoTo BuildFailed
+    If Len(userId) = 0 Or userId = "0" Then GoTo BuildFailed
+
+    dateFormat = CStr(Proc_10_0_809570("com.mysql.format.date", "%d-%m-%Y", 0))
+    timeFormat = CStr(Proc_10_0_809570("com.mysql.format.time", "%H:%i", 0))
+    rowText = CStr(Proc_5_2_6D4690("SELECT id,name,motto,figure,level,id_socket,DATE_FORMAT(FROM_UNIXTIME(lastonline_time), '" & _
+        Proc_10_11_80A9C0(dateFormat & " " & timeFormat, 0, 0) & "') FROM users WHERE id='" & Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 1", 0, 0))
+    If Len(rowText) = 0 Then GoTo BuildFailed
+
+    fields = Split(rowText, Chr$(9))
+    If UBound(fields) < 6 Then GoTo BuildFailed
+
+    socketIndex = CInt(Val(CStr(fields(5))))
+    MessengerFriendSummaryPayload = CStr(Proc_6_166_7BE940(CLng(Val(CStr(fields(0)))), CStr(fields(1)), CStr(fields(2)), CStr(fields(3)), _
+        CLng(Val(CStr(fields(4)))), IIf(socketIndex > 0, 2, 0), IIf(socketIndex > 0, 1, 0), CStr(fields(6)), relationshipState))
+    Exit Function
+
+BuildFailed:
+    MessengerFriendSummaryPayload = vbNullString
 End Function
 
 Private Function HandlingUserHasRoomRight(ByVal userId As String, ByVal roomId As Long) As Boolean
