@@ -5976,7 +5976,10 @@ Public Function Proc_6_142_76B310(ParamArray args() As Variant) As Variant
 
     productFields = Split(CStr(Proc_9_3_807930(productId, 0, 0)), Chr$(9))
     productType = CLng(Val(NavigatorField(productFields, 1)))
-    If productType = 9 Then GoTo PlaceFailed
+    If productType = 9 Then
+        Proc_6_157_7974B0 socketIndex, requestPayload, itemFields
+        GoTo PlaceFailed
+    End If
 
     positionZ = CStr(Val(NavigatorField(productFields, 24)))
 
@@ -6380,7 +6383,81 @@ End Function
 
 ' Original declaration: Private  Proc_6_157_7974B0(arg_C, arg_10, arg_14) '7974B0
 Public Function Proc_6_157_7974B0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim wallPayload As String
+    Dim itemFields() As String
+    Dim userId As String
+    Dim roomId As Long
+    Dim furnitureId As Long
+    Dim productId As Long
+    Dim productType As Long
+    Dim wallPosition As String
+    Dim wallX As Long
+    Dim wallY As Long
+    Dim localX As Long
+    Dim localY As Long
+    Dim itemRow As String
+    Dim fieldIndex As Long
+    Dim payload As String
+
+    On Error GoTo WallPlaceDone
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex <= 0 Then GoTo WallPlaceDone
+
+    If UBound(args) >= 1 Then wallPayload = CStr(args(1))
+    If Left$(wallPayload, 2) = "rv" Then wallPayload = Mid$(wallPayload, 3)
+
+    If UBound(args) >= 2 Then
+        If IsArray(args(2)) Then
+            ReDim itemFields(LBound(args(2)) To UBound(args(2)))
+            For fieldIndex = LBound(args(2)) To UBound(args(2))
+                itemFields(fieldIndex) = CStr(args(2)(fieldIndex))
+            Next fieldIndex
+        Else
+            itemFields = Split(CStr(args(2)), Chr$(9))
+        End If
+    End If
+
+    furnitureId = CLng(Val(HandlingField(itemFields, 1)))
+    productId = CLng(Val(HandlingField(itemFields, 0)))
+    If furnitureId <= 0 Then furnitureId = CLng(Val(CStr(Proc_10_6_809F10(wallPayload, 0, 0))))
+    If furnitureId <= 0 Then GoTo WallPlaceDone
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo WallPlaceDone
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId <= 0 Then GoTo WallPlaceDone
+    If Not HandlingUserHasRoomRight(userId, roomId) And Not HandlingUserHasPermission(userId, "fuse_pick_up_any_furni") Then GoTo WallPlaceDone
+
+    If productId <= 0 Then
+        itemRow = CStr(Proc_5_2_6D4690("SELECT id_product,id,sign,id_secondary,id_destination FROM furnitures WHERE id='" & CStr(furnitureId) & _
+            "' AND id_owner='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_room IS NULL LIMIT 1", 0, 0))
+        If Len(itemRow) > 0 Then itemFields = Split(itemRow, Chr$(9))
+        productId = CLng(Val(HandlingField(itemFields, 0)))
+    End If
+    If productId <= 0 Then GoTo WallPlaceDone
+
+    productType = CLng(Val(CStr(Proc_8_12_806C30(productId, 0, 0))))
+    If productType <> 9 Then GoTo WallPlaceDone
+
+    If Not WallPlacementFromPayload(wallPayload, wallX, wallY, localX, localY) Then GoTo WallPlaceDone
+    wallPosition = Proc_10_11_80A9C0(LCase$(":w=" & CStr(wallX) & "," & CStr(wallY) & " l=" & CStr(localX) & "," & CStr(localY)), 0, 0)
+
+    Proc_5_0_6D3CD0 "UPDATE furnitures SET position_wall='" & wallPosition & "',id_room='" & CStr(roomId) & _
+        "',id_owner=NULL,task_owner='" & Proc_10_11_80A9C0(userId, 0, 0) & "',task_time=UNIX_TIMESTAMP() WHERE id='" & _
+        CStr(furnitureId) & "' AND id_owner='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_room IS NULL LIMIT 1", 0, 0
+
+    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(furnitureId, Empty, "Ac")), 0
+    payload = CStr(Proc_6_156_7972B0(furnitureId, productId, wallPosition, HandlingField(itemFields, 2), CLng(Val(HandlingField(itemFields, 3)))))
+    If Len(payload) > 0 Then Proc_6_247_8027E0 socketIndex, "AS" & payload, 0
+
+    Proc_6_106_74B750 App.Path & "\CACHE\ROOMS\" & CStr(roomId) & ".cache", 0, 0
+    Proc_6_106_74B750 App.Path & "\CACHE\PATHFINDER\" & CStr(roomId) & ".cache", 0, 0
+    Proc_6_140_769400 socketIndex, "FT", vbNullString
+
+WallPlaceDone:
     Proc_6_157_7974B0 = Empty
 End Function
 
@@ -12368,6 +12445,51 @@ Private Function IsDimmerColour(ByVal colourText As String) As Boolean
         Case "#0053F7", "#74F5F5", "#E759DE", "#EA4532", "#F2F851", "#82F349", "#000000"
             IsDimmerColour = True
     End Select
+End Function
+
+Private Function WallPlacementFromPayload(ByVal packetPayload As String, ByRef wallX As Long, ByRef wallY As Long, ByRef localX As Long, ByRef localY As Long) As Boolean
+    Dim normalizedPayload As String
+    Dim wallAt As Long
+    Dim localAt As Long
+    Dim wallText As String
+    Dim localText As String
+    Dim wallParts() As String
+    Dim localParts() As String
+
+    On Error GoTo ParseFailed
+
+    normalizedPayload = Replace(packetPayload, Chr$(1), Chr$(32), 1, -1, vbBinaryCompare)
+    normalizedPayload = Replace(normalizedPayload, Chr$(2), Chr$(32), 1, -1, vbBinaryCompare)
+    normalizedPayload = Replace(normalizedPayload, Chr$(9), Chr$(32), 1, -1, vbBinaryCompare)
+    normalizedPayload = Replace(normalizedPayload, Chr$(13), Chr$(32), 1, -1, vbBinaryCompare)
+    normalizedPayload = Replace(normalizedPayload, Chr$(10), Chr$(32), 1, -1, vbBinaryCompare)
+    Do While InStr(1, normalizedPayload, "  ", vbBinaryCompare) > 0
+        normalizedPayload = Replace(normalizedPayload, "  ", " ", 1, -1, vbBinaryCompare)
+    Loop
+    normalizedPayload = Trim$(normalizedPayload)
+
+    wallAt = InStr(1, normalizedPayload, ":w=", vbTextCompare)
+    localAt = InStr(1, normalizedPayload, "l=", vbTextCompare)
+    If wallAt <= 0 Or localAt <= wallAt Then GoTo ParseFailed
+
+    wallText = Trim$(Mid$(normalizedPayload, wallAt + 3, localAt - (wallAt + 3)))
+    localText = Trim$(Mid$(normalizedPayload, localAt + 2))
+    wallText = Replace(wallText, Chr$(32), vbNullString, 1, -1, vbBinaryCompare)
+    localText = Replace(localText, Chr$(32), vbNullString, 1, -1, vbBinaryCompare)
+
+    wallParts = Split(wallText, ",")
+    localParts = Split(localText, ",")
+    If UBound(wallParts) < 1 Or UBound(localParts) < 1 Then GoTo ParseFailed
+
+    wallX = CLng(Val(wallParts(0)))
+    wallY = CLng(Val(wallParts(1)))
+    localX = CLng(Val(localParts(0)))
+    localY = CLng(Val(localParts(1)))
+    WallPlacementFromPayload = True
+    Exit Function
+
+ParseFailed:
+    WallPlacementFromPayload = False
 End Function
 
 Private Function ReadWireString(ByVal packetPayload As String, ByRef offset As Long) As String
