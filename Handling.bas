@@ -7367,7 +7367,87 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_202_7D6760
 Public Function Proc_6_202_7D6760(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim userId As String
+    Dim requestedCount As Long
+    Dim offset As Long
+    Dim itemIndex As Long
+    Dim furnitureId As Long
+    Dim selectedItems As String
+    Dim itemWhere As String
+    Dim validCount As Long
+    Dim rewardProductId As Long
+    Dim rewardDestinationId As Long
+    Dim dateFormatText As String
+    Dim rewardSign As String
+    Dim payload As String
+
+    On Error GoTo RecycleFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex <= 0 Then GoTo RecycleFailed
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "F^" Then requestPayload = Mid$(requestPayload, 3)
+
+    If CLng(Val(CStr(Proc_10_0_809570("com.client.catalog.recycler.enabled", 0, 0)))) = 0 Then GoTo RecycleFailed
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo RecycleFailed
+
+    offset = 1
+    requestedCount = ReadWireLong(requestPayload, offset)
+    If requestedCount <> 5 Then GoTo RecycleFailed
+
+    For itemIndex = 1 To requestedCount
+        furnitureId = ReadWireLong(requestPayload, offset)
+        If furnitureId <= 0 Then GoTo RecycleFailed
+        If InStr(1, "," & selectedItems & ",", "," & CStr(furnitureId) & ",", vbBinaryCompare) > 0 Then GoTo RecycleFailed
+
+        If Len(selectedItems) > 0 Then selectedItems = selectedItems & ","
+        selectedItems = selectedItems & CStr(furnitureId)
+        itemWhere = itemWhere & " OR furnitures.id_owner='" & Proc_10_11_80A9C0(userId, 0, 0) & _
+            "' AND furnitures.id_room IS NULL AND furnitures.id='" & CStr(furnitureId) & _
+            "' AND products.id=furnitures.id_product AND products.is_recycleable='1'"
+    Next itemIndex
+
+    If Len(itemWhere) = 0 Then GoTo RecycleFailed
+    validCount = CLng(Val(CStr(Proc_5_2_6D4690("SELECT COUNT(*) FROM furnitures,products WHERE " & Mid$(itemWhere, 5), 0, 0))))
+    If validCount <> requestedCount Then GoTo RecycleFailed
+
+    rewardProductId = RepresentedRecyclerRewardProduct()
+    If rewardProductId <= 0 Then GoTo RecycleFailed
+
+    rewardDestinationId = CLng(Val(CStr(Proc_5_2_6D4690("SELECT id_destination FROM catalog_products WHERE id_product='" & CStr(rewardProductId) & "' ORDER BY id DESC LIMIT 1", 0, 0))))
+    If rewardDestinationId <= 0 Then rewardDestinationId = rewardProductId
+
+    dateFormatText = CStr(Proc_10_0_809570("com.client.format.date", 0, 0))
+    If Len(dateFormatText) = 0 Or dateFormatText = "0" Then dateFormatText = "yyyy-mm-dd hh:nn:ss"
+    rewardSign = Format$(Now, dateFormatText)
+
+    Proc_5_0_6D3CD0 "UPDATE furnitures SET sign='" & Proc_10_11_80A9C0(rewardSign, 0, 0) & _
+        "',id_owner='" & Proc_10_11_80A9C0(userId, 0, 0) & "',id_destination='" & CStr(rewardDestinationId) & _
+        "' WHERE id_owner='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_product='" & _
+        CStr(global_0082916C) & "' ORDER BY id DESC LIMIT 1", 1, 0
+    Proc_5_0_6D3CD0 "UPDATE furnitures SET id_owner=NULL WHERE id_owner='" & Proc_10_11_80A9C0(userId, 0, 0) & _
+        "' AND id_room IS NULL AND id IN (" & selectedItems & ")", 0, 0
+    Proc_5_1_6D4110 "INSERT INTO logs_recycler(id_user,timestamp,items,id_reward,id_session) VALUES('" & _
+        Proc_10_11_80A9C0(userId, 0, 0) & "',UNIX_TIMESTAMP(),'" & Proc_10_11_80A9C0(selectedItems, 0, 0) & "','" & _
+        CStr(rewardProductId) & "','0')", 0, 0
+
+    For itemIndex = 1 To requestedCount
+        furnitureId = CLng(Val(Split(selectedItems, ",")(itemIndex - 1)))
+        Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(furnitureId, Empty, "Ac")), 0
+    Next itemIndex
+
+    payload = CStr(Proc_3_0_6D2AF0(rewardProductId, Empty, "G|" & global_004096B0))
+    Proc_6_244_801E80 socketIndex, payload, 0
+
+RecycleFailed:
     Proc_6_202_7D6760 = Empty
 End Function
 
@@ -9551,6 +9631,77 @@ Private Function RepresentedInteractionState(ByVal socketIndex As Integer) As Lo
 
 LookupFailed:
     RepresentedInteractionState = 0
+End Function
+
+Private Function RepresentedRecyclerRewardProduct() As Long
+    Dim rewardGroupIndex As Long
+    Dim productList As String
+    Dim rewardRows As String
+    Dim rewardRowsArray() As String
+    Dim rowIndex As Long
+
+    On Error GoTo RewardFailed
+
+    If IsArray(global_00829140) And IsArray(global_0082915C) Then
+        For rewardGroupIndex = 0 To CLng(global_00829168) - 1
+            If rewardGroupIndex >= LBound(global_00829140) And rewardGroupIndex <= UBound(global_00829140) Then
+                If CLng(Val(CStr(global_0082915C(rewardGroupIndex)))) > 0 Then
+                    If CLng(Val(CStr(Proc_10_4_809CA0(1, CLng(Val(CStr(global_0082915C(rewardGroupIndex)))), 0)))) = 1 Then
+                        productList = CStr(global_00829140(rewardGroupIndex))
+                        RepresentedRecyclerRewardProduct = RepresentedRandomProductFromList(productList)
+                        If RepresentedRecyclerRewardProduct > 0 Then Exit Function
+                    End If
+                End If
+            End If
+        Next rewardGroupIndex
+
+        For rewardGroupIndex = 0 To CLng(global_00829168) - 1
+            If rewardGroupIndex >= LBound(global_00829140) And rewardGroupIndex <= UBound(global_00829140) Then
+                RepresentedRecyclerRewardProduct = RepresentedRandomProductFromList(CStr(global_00829140(rewardGroupIndex)))
+                If RepresentedRecyclerRewardProduct > 0 Then Exit Function
+            End If
+        Next rewardGroupIndex
+    End If
+
+    rewardRows = CStr(Proc_5_2_6D4690("SELECT id_product FROM settings_recycler ORDER BY chance DESC LIMIT 100", 0, 0))
+    If Len(rewardRows) > 0 Then
+        rewardRowsArray = Split(rewardRows, Chr$(13))
+        rowIndex = CLng(Val(CStr(Proc_10_4_809CA0(LBound(rewardRowsArray), UBound(rewardRowsArray), 0))))
+        If rowIndex < LBound(rewardRowsArray) Then rowIndex = LBound(rewardRowsArray)
+        If rowIndex > UBound(rewardRowsArray) Then rowIndex = UBound(rewardRowsArray)
+        RepresentedRecyclerRewardProduct = CLng(Val(CStr(rewardRowsArray(rowIndex))))
+    End If
+
+RewardFailed:
+End Function
+
+Private Function RepresentedRandomProductFromList(ByVal productList As String) As Long
+    Dim productRows() As String
+    Dim productIndex As Long
+    Dim nonEmptyProducts As String
+    Dim productCount As Long
+    Dim selectedIndex As Long
+
+    On Error GoTo SelectFailed
+    If Len(productList) = 0 Then GoTo SelectFailed
+
+    productRows = Split(productList, Chr$(2))
+    For productIndex = LBound(productRows) To UBound(productRows)
+        If CLng(Val(CStr(productRows(productIndex)))) > 0 Then
+            If Len(nonEmptyProducts) > 0 Then nonEmptyProducts = nonEmptyProducts & Chr$(2)
+            nonEmptyProducts = nonEmptyProducts & CStr(CLng(Val(CStr(productRows(productIndex)))))
+            productCount = productCount + 1
+        End If
+    Next productIndex
+    If productCount <= 0 Then GoTo SelectFailed
+
+    productRows = Split(nonEmptyProducts, Chr$(2))
+    selectedIndex = CLng(Val(CStr(Proc_10_4_809CA0(LBound(productRows), UBound(productRows), 0))))
+    If selectedIndex < LBound(productRows) Then selectedIndex = LBound(productRows)
+    If selectedIndex > UBound(productRows) Then selectedIndex = UBound(productRows)
+    RepresentedRandomProductFromList = CLng(Val(CStr(productRows(selectedIndex))))
+
+SelectFailed:
 End Function
 
 Private Sub StoreRepresentedBotPosition(ByVal botEntityId As Long, ByVal positionX As Long, ByVal positionY As Long, ByVal positionZ As String, ByVal positionR As Long)
