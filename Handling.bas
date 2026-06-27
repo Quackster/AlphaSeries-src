@@ -1250,13 +1250,56 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_181_7CA920
 Public Function Proc_6_181_7CA920(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_181_7CA920 = Empty
+    Dim candidateName As String
+    Dim index As Long
+    Dim characterCode As Long
+
+    On Error GoTo ValidationFailed
+    If UBound(args) < 0 Then GoTo InvalidName
+
+    candidateName = CStr(args(0))
+    If Len(candidateName) > 30 Then
+        Proc_6_181_7CA920 = 1
+        Exit Function
+    End If
+    If Len(candidateName) < 1 Then GoTo InvalidName
+
+    For index = 1 To Len(candidateName)
+        characterCode = Asc(Mid$(candidateName, index, 1))
+        If Not ((characterCode >= 65 And characterCode <= 90) Or (characterCode >= 97 And characterCode <= 122)) Then
+            GoTo InvalidName
+        End If
+    Next index
+
+    Proc_6_181_7CA920 = 0
+    Exit Function
+
+InvalidName:
+    Proc_6_181_7CA920 = 2
+    Exit Function
+
+ValidationFailed:
+    Proc_6_181_7CA920 = 2
 End Function
 
 ' Original declaration: Private Sub Proc_6_182_7CAAD0
 Public Function Proc_6_182_7CAAD0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestedName As String
+    Dim validationCode As Long
+
+    On Error GoTo CheckFailed
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+
+    Proc_10_5_809D80 packetPayload, 3, 0
+    requestedName = CStr(Proc_10_7_80A190(packetPayload, 0, 0))
+    requestedName = CStr(Proc_10_11_80A9C0(Proc_10_10_80A7F0(requestedName), 0, 0))
+    validationCode = CLng(Val(CStr(Proc_6_181_7CA920(requestedName, 0, 0))))
+    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(validationCode, Empty, "@d")), 0
+
+CheckFailed:
     Proc_6_182_7CAAD0 = Empty
 End Function
 
