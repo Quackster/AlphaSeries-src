@@ -444,7 +444,31 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_47_714F60
 Public Function Proc_6_47_714F60(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim roomId As Long
+    Dim userId As String
+
+    On Error GoTo HomeRoomFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then
+        packetPayload = CStr(args(2))
+    ElseIf UBound(args) >= 1 Then
+        packetPayload = CStr(args(1))
+    End If
+
+    If Len(packetPayload) > 2 Then packetPayload = Mid$(packetPayload, 3)
+    roomId = CLng(Val(CStr(Proc_3_3_6D3240(packetPayload, 0, 0))))
+    If roomId <= 0 Then GoTo HomeRoomFailed
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo HomeRoomFailed
+
+    Proc_5_0_6D3CD0 "UPDATE users SET homeroom='" & CStr(roomId) & "' WHERE id='" & Proc_10_11_80A9C0(userId, 0, 0) & "'", 0, 0
+    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(roomId, Empty, "GG")), 0
+
+HomeRoomFailed:
     Proc_6_47_714F60 = Empty
 End Function
 
@@ -2542,6 +2566,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_130_75B770 socketIndex, "G[", packetPayload
         Case "Gc"
             Proc_6_107_74B7E0 socketIndex, "Gc", packetPayload
+        Case "GG"
+            Proc_6_47_714F60 socketIndex, "GG", packetPayload
         Case "@H"
             Proc_6_108_74D800 socketIndex, "@H", packetPayload
         Case "@S"
