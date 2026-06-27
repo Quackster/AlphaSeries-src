@@ -4300,7 +4300,52 @@ End Function
 
 ' Original declaration: Private  Proc_6_148_7756D0(arg_C, arg_10, arg_14) '7756D0
 Public Function Proc_6_148_7756D0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim productId As Long
+    Dim furnitureId As Long
+    Dim productFields() As String
+    Dim chargePath As String
+    Dim currentCharges As Long
+    Dim hasCharge As Long
+    Dim chargePriceCredits As Long
+    Dim chargePricePoints As Long
+    Dim chargePointType As Long
+    Dim chargeSize As Long
+    Dim payload As String
+
+    On Error GoTo ChargeInfoFailed
+    If UBound(args) < 2 Then GoTo ChargeInfoFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    productId = CLng(Val(CStr(args(1))))
+    furnitureId = CLng(Val(CStr(args(2))))
+    If socketIndex <= 0 Or productId <= 0 Or furnitureId <= 0 Then GoTo ChargeInfoFailed
+
+    productFields = Split(CStr(Proc_9_3_807930(productId, 0, 0)), Chr$(9))
+    hasCharge = CLng(Val(NavigatorField(productFields, 34)))
+    If hasCharge = 0 Then GoTo ChargeInfoFailed
+
+    chargeSize = CLng(Val(NavigatorField(productFields, 34)))
+    chargePriceCredits = CLng(Val(NavigatorField(productFields, 35)))
+    chargePricePoints = CLng(Val(NavigatorField(productFields, 36)))
+    chargePointType = CLng(Val(NavigatorField(productFields, 37)))
+
+    chargePath = App.Path & "\cache\items_charges\" & CStr(furnitureId) & ".cache"
+    currentCharges = CLng(Val(CStr(Proc_6_239_7FC170(chargePath, 0, 0))))
+
+    If currentCharges < 1 Then
+        payload = CStr(Proc_3_0_6D2AF0(furnitureId, Empty, "Iu"))
+        payload = payload & CStr(Proc_3_0_6D2AF0(currentCharges, Empty, vbNullString))
+        payload = payload & CStr(Proc_3_0_6D2AF0(chargeSize, Empty, vbNullString))
+        payload = payload & CStr(Proc_3_0_6D2AF0(chargePriceCredits, Empty, vbNullString))
+        payload = payload & CStr(Proc_3_0_6D2AF0(chargePricePoints, Empty, vbNullString))
+        payload = payload & CStr(Proc_3_0_6D2AF0(chargePointType, Empty, vbNullString))
+        Proc_6_244_801E80 socketIndex, payload, 0
+    Else
+        Proc_8_10_8068E0 chargePath, CStr(currentCharges - 1), 0
+    End If
+
+ChargeInfoFailed:
     Proc_6_148_7756D0 = Empty
 End Function
 
