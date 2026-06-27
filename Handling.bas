@@ -2202,8 +2202,61 @@ End Function
 
 ' Original declaration: Private  Proc_6_54_719050(arg_C, arg_10) '719050
 Public Function Proc_6_54_719050(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_54_719050 = Empty
+    Dim socketIndex As Integer
+    Dim roomId As Long
+    Dim preferredSlot As Long
+    Dim reservedSlot As Long
+    Dim userId As String
+    Dim previousRoomId As Long
+    Dim sessionId As String
+
+    On Error GoTo EnterFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 1 Then roomId = CLng(Val(CStr(args(1))))
+    If UBound(args) >= 2 Then preferredSlot = CLng(Val(CStr(args(2))))
+    If socketIndex <= 0 Or roomId <= 0 Then GoTo EnterFailed
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo EnterFailed
+
+    previousRoomId = HandlingCurrentRoomId(socketIndex, userId)
+    If previousRoomId > 0 Then
+        Proc_6_55_71A6E0 socketIndex, 0, 0
+        Proc_5_0_6D3CD0 "UPDATE logs_visitedrooms SET timestamp_left=UNIX_TIMESTAMP() WHERE id_user='" & _
+            Proc_10_11_80A9C0(userId, 0, 0) & "' AND timestamp_left IS NULL", 0, 0
+        If previousRoomId <> roomId Then
+            Proc_5_0_6D3CD0 "UPDATE rooms SET visitors_now=IF(visitors_now>0,visitors_now-1,0) WHERE id='" & _
+                CStr(previousRoomId) & "'", 0, 0
+        End If
+    End If
+
+    reservedSlot = ReserveRepresentedRoomSlot(preferredSlot)
+    If reservedSlot <= 0 Then
+        Proc_6_244_801E80 socketIndex, CStr(Proc_10_8_80A580(1, 0, 0)), 0
+        Proc_6_54_719050 = 0
+        Exit Function
+    End If
+
+    LoadRepresentedRoomBots reservedSlot, roomId
+
+    sessionId = CStr(Proc_5_2_6D4690("SELECT login_session FROM users WHERE id='" & _
+        Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 1", 0, 0))
+    Proc_5_1_6D4110 "INSERT INTO logs_visitedrooms(id_user,id_room,timestamp_enter,id_session) VALUES('" & _
+        Proc_10_11_80A9C0(userId, 0, 0) & "','" & CStr(roomId) & "',UNIX_TIMESTAMP(),'" & _
+        Proc_10_11_80A9C0(sessionId, 0, 0) & "')", 0, 0
+    Proc_5_0_6D3CD0 "UPDATE rooms SET id_slot='" & CStr(reservedSlot) & _
+        "',visitors_now=visitors_now+1 WHERE id='" & CStr(roomId) & "'", 0, 0
+
+    Proc_6_56_71E730 socketIndex, 0, 0
+    Proc_6_53_718E00 socketIndex, 0, 0
+
+    Proc_6_54_719050 = reservedSlot
+    Exit Function
+
+EnterFailed:
+    If reservedSlot > 0 Then ReleaseRepresentedRoomSlot reservedSlot
+    Proc_6_54_719050 = 0
 End Function
 
 ' Original declaration: Private Sub Proc_6_55_71A6E0
@@ -2344,6 +2397,7 @@ Public Function Proc_6_58_71FCA0(ParamArray args() As Variant) As Variant
     End If
     If Left$(packetPayload, 2) = "FG" Then packetPayload = Mid$(packetPayload, 3)
 
+    EnsureRepresentedRoomSlotPool
     If Len(global_0082930C) = 0 Then
         Proc_6_244_801E80 socketIndex, CStr(Proc_10_8_80A580(1, 0, 0)), 0
         Proc_6_58_71FCA0 = 0
@@ -7024,7 +7078,8 @@ Private Function RepresentedRoomUserIndex(ByVal socketIndex As Integer, ByVal us
 
     On Error GoTo LookupFailed
 
-    roomUserIndex = CLng(Val(CStr(Proc_5_2_6D4690("SELECT id FROM logs_visitedrooms WHERE id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_socket='" & CStr(socketIndex) & "' AND timestamp_left IS NULL ORDER BY timestamp_enter DESC LIMIT 1", 0, 0))))
+    roomUserIndex = CLng(Val(CStr(Proc_5_2_6D4690("SELECT id FROM logs_visitedrooms WHERE id_user='" & _
+        Proc_10_11_80A9C0(userId, 0, 0) & "' AND timestamp_left IS NULL ORDER BY timestamp_enter DESC LIMIT 1", 0, 0))))
     If roomUserIndex <= 0 Then roomUserIndex = CLng(socketIndex)
 
     RepresentedRoomUserIndex = roomUserIndex
@@ -7033,6 +7088,91 @@ Private Function RepresentedRoomUserIndex(ByVal socketIndex As Integer, ByVal us
 LookupFailed:
     RepresentedRoomUserIndex = CLng(socketIndex)
 End Function
+
+Private Sub EnsureRepresentedRoomSlotPool()
+    Static slotPoolInitialized As Boolean
+    Dim slotIndex As Long
+
+    If slotPoolInitialized Then Exit Sub
+    If Len(global_0082930C) > 0 Then
+        slotPoolInitialized = True
+        Exit Sub
+    End If
+
+    For slotIndex = 1 To 500
+        global_0082930C = global_0082930C & "[" & CStr(slotIndex) & "]"
+    Next slotIndex
+    slotPoolInitialized = True
+End Sub
+
+Private Function ReserveRepresentedRoomSlot(ByVal preferredSlot As Long) As Long
+    Dim marker As String
+    Dim parts() As String
+    Dim partIndex As Long
+    Dim candidateSlot As Long
+
+    On Error GoTo ReserveFailed
+
+    EnsureRepresentedRoomSlotPool
+
+    If preferredSlot > 0 Then
+        marker = "[" & CStr(preferredSlot) & "]"
+        If InStr(1, global_0082930C, marker, vbBinaryCompare) > 0 Then
+            global_0082930C = Replace(global_0082930C, marker, vbNullString, 1, 1, vbBinaryCompare)
+            ReserveRepresentedRoomSlot = preferredSlot
+            Exit Function
+        End If
+    End If
+
+    parts = Split(global_0082930C, "]")
+    For partIndex = LBound(parts) To UBound(parts)
+        candidateSlot = CLng(Val(Replace(CStr(parts(partIndex)), "[", vbNullString, 1, -1, vbBinaryCompare)))
+        If candidateSlot > 0 Then
+            marker = "[" & CStr(candidateSlot) & "]"
+            global_0082930C = Replace(global_0082930C, marker, vbNullString, 1, 1, vbBinaryCompare)
+            ReserveRepresentedRoomSlot = candidateSlot
+            Exit Function
+        End If
+    Next partIndex
+
+ReserveFailed:
+    ReserveRepresentedRoomSlot = 0
+End Function
+
+Private Sub ReleaseRepresentedRoomSlot(ByVal slotId As Long)
+    Dim marker As String
+
+    If slotId <= 0 Then Exit Sub
+    marker = "[" & CStr(slotId) & "]"
+    If InStr(1, global_0082930C, marker, vbBinaryCompare) = 0 Then
+        global_0082930C = global_0082930C & marker
+    End If
+End Sub
+
+Private Sub LoadRepresentedRoomBots(ByVal roomSlot As Long, ByVal roomId As Long)
+    Dim rowText As String
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+
+    On Error GoTo LoadDone
+    If roomSlot <= 0 Or roomId <= 0 Then GoTo LoadDone
+    If CLng(Val(CStr(Proc_10_0_809570("com.client.rooms.bots.enabled", "-1", 0)))) = 0 Then GoTo LoadDone
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT id,name,motto,speech,responses,position_x,position_y,position_z,position_r,figure,NULL,id_handle,id_handleaction,cache_action,speech_submit,allow_walk,max_fields_away FROM bots WHERE id_room='" & _
+        CStr(roomId) & "' LIMIT 255", 0, 0))
+    If Len(rowText) = 0 Then GoTo LoadDone
+
+    rows = Split(rowText, Chr$(13))
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(rows(rowIndex)) > 0 Then
+            fields = Split(rows(rowIndex), Chr$(9))
+            Proc_6_187_7CD700 roomSlot, fields, 0
+        End If
+    Next rowIndex
+
+LoadDone:
+End Sub
 
 Private Function AvatarNameValidationCode(ByVal candidateName As String, ByVal currentName As String) As Long
     Dim index As Long
