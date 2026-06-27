@@ -5015,7 +5015,131 @@ End Function
 
 ' Original declaration: Private  Proc_6_133_760400(arg_C, arg_10, arg_14) '760400
 Public Function Proc_6_133_760400(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim catalogProductId As Long
+    Dim catalogRow As String
+    Dim catalogFields() As String
+    Dim typeSecondary As String
+    Dim productId As Long
+    Dim amount As Long
+    Dim signText As String
+    Dim grantedIds As String
+    Dim dealRow As String
+    Dim dealFields() As String
+    Dim dealItems() As String
+    Dim itemIndex As Long
+    Dim grantedCount As Long
+    Dim defaultSign As String
+    Dim containsClubRow As String
+    Dim containsClubFields() As String
+    Dim hcMonths As Long
+    Dim hcLevel As Long
+    Dim badgeId As String
+    Dim existingBadge As String
+    Dim badgeRowId As Long
+    Dim firstGrantedId As Long
+    Dim newestIds As String
+
+    On Error GoTo GrantFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 1 Then catalogProductId = CLng(Val(CStr(args(1))))
+    If UBound(args) >= 2 Then signText = CStr(args(2))
+
+    If socketIndex <= 0 Or catalogProductId <= 0 Then
+        If UBound(args) >= 0 Then catalogProductId = CLng(Val(CStr(args(0))))
+        If UBound(args) >= 1 Then signText = CStr(args(1))
+        socketIndex = 0
+    End If
+
+    If socketIndex > 0 Then userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo GrantFailed
+
+    catalogRow = CStr(Proc_9_4_807B90(catalogProductId, 0, 0))
+    If Len(catalogRow) = 0 Then GoTo GrantFailed
+
+    catalogFields = Split(catalogRow, Chr$(9))
+    productId = CLng(Val(HandlingField(catalogFields, 2)))
+    typeSecondary = LCase$(HandlingField(catalogFields, 4))
+    amount = CLng(Val(HandlingField(catalogFields, 5)))
+    If amount <= 0 Then amount = 1
+
+    If typeSecondary = "products_deals" Then
+        dealRow = CStr(Proc_9_5_807DF0(productId, 0, 0))
+        If Len(dealRow) = 0 Then GoTo GrantFailed
+        dealFields = Split(dealRow, Chr$(9))
+        If UBound(dealFields) >= 1 Then dealRow = CStr(dealFields(1))
+        dealRow = Replace(dealRow, ",", ";", 1, -1, vbBinaryCompare)
+        dealItems = Split(dealRow, ";")
+
+        For itemIndex = LBound(dealItems) To UBound(dealItems)
+            productId = CLng(Val(CStr(dealItems(itemIndex))))
+            If productId > 0 Then
+                defaultSign = CStr(Proc_10_10_80A7F0(Proc_8_12_806C30(productId, 4, 0), 0, 0))
+                If Len(defaultSign) = 0 Then defaultSign = CStr(Proc_10_10_80A7F0(Proc_8_12_806C30(productId, 5, 0), 0, 0))
+                Proc_5_0_6D3CD0 "INSERT INTO furnitures(id_product,id_owner,sign,task_owner,task_time,id_ctlgproduct) VALUES('" & _
+                    CStr(productId) & "','" & Proc_10_11_80A9C0(userId, 0, 0) & "','" & Proc_10_11_80A9C0(defaultSign, 0, 0) & "','" & _
+                    Proc_10_11_80A9C0(userId, 0, 0) & "',UNIX_TIMESTAMP(),'" & CStr(catalogProductId) & "')", 0, 0
+                grantedCount = grantedCount + 1
+            End If
+        Next itemIndex
+    Else
+        containsClubRow = CStr(Proc_5_2_6D4690("SELECT months,level FROM products_containshc WHERE id_product='" & CStr(catalogProductId) & "' LIMIT 1", 0, 0))
+        If Len(containsClubRow) = 0 Then containsClubRow = CStr(Proc_5_2_6D4690("SELECT months,level FROM products_containshc WHERE id_product='" & CStr(productId) & "' LIMIT 1", 0, 0))
+        If Len(containsClubRow) > 0 Then
+            containsClubFields = Split(containsClubRow, Chr$(9))
+            hcMonths = CLng(Val(HandlingField(containsClubFields, 0)))
+            hcLevel = CLng(Val(HandlingField(containsClubFields, 1)))
+            If hcLevel <= 0 Then hcLevel = 1
+            Proc_10_23_80E110 userId, hcLevel, hcMonths, hcMonths * 31
+        End If
+
+        badgeId = UCase$(CStr(Proc_8_12_806C30(productId, 26, 0)))
+        If Len(badgeId) = 0 Then badgeId = UCase$(CStr(Proc_8_12_806C30(productId, 27, 0)))
+        If Len(badgeId) > 2 Then
+            existingBadge = UCase$(CStr(Proc_5_2_6D4690("SELECT id_badge FROM users_badges WHERE id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & _
+                "' AND id_badge='" & Proc_10_11_80A9C0(badgeId, 0, 0) & "' LIMIT 1", 0, 0)))
+            If existingBadge <> badgeId Then
+                Proc_5_0_6D3CD0 "INSERT INTO users_badges(id_user,id_slot,id_badge) VALUES('" & Proc_10_11_80A9C0(userId, 0, 0) & "','0','" & _
+                    Proc_10_11_80A9C0(badgeId, 0, 0) & "')", 0, 0
+                badgeRowId = CLng(Val(CStr(Proc_5_2_6D4690("SELECT id FROM users_badges WHERE id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & _
+                    "' AND id_badge='" & Proc_10_11_80A9C0(badgeId, 0, 0) & "' ORDER BY id DESC LIMIT 1", 0, 0))))
+                Proc_6_195_7D38D0 userId, 0, 0
+                Proc_6_193_7D2BB0 socketIndex, "Ce", vbNullString
+                If badgeRowId > 0 Then Proc_6_143_76BB80 socketIndex, 0, 0
+            End If
+        End If
+
+        defaultSign = signText
+        If Len(defaultSign) = 0 Then defaultSign = CStr(Proc_10_10_80A7F0(Proc_8_12_806C30(productId, 4, 0), 0, 0))
+        If Len(defaultSign) = 0 Then defaultSign = CStr(Proc_10_10_80A7F0(Proc_8_12_806C30(productId, 5, 0), 0, 0))
+
+        For itemIndex = 1 To amount
+            Proc_5_0_6D3CD0 "INSERT INTO furnitures(id_product,id_owner,sign,task_owner,task_time,id_ctlgproduct) VALUES('" & _
+                CStr(productId) & "','" & Proc_10_11_80A9C0(userId, 0, 0) & "','" & Proc_10_11_80A9C0(defaultSign, 0, 0) & "','" & _
+                Proc_10_11_80A9C0(userId, 0, 0) & "',UNIX_TIMESTAMP(),'" & CStr(catalogProductId) & "')", 0, 0
+            grantedCount = grantedCount + 1
+        Next itemIndex
+    End If
+
+    If grantedCount > 0 Then
+        newestIds = CStr(Proc_5_2_6D4690("SELECT id FROM furnitures WHERE id_owner='" & Proc_10_11_80A9C0(userId, 0, 0) & _
+            "' ORDER BY id DESC LIMIT " & CStr(grantedCount), 0, 0))
+        grantedIds = Replace(newestIds, Chr$(13), global_004092F0, 1, -1, vbBinaryCompare)
+        firstGrantedId = CLng(Val(grantedIds))
+
+        If typeSecondary <> "products_deals" And CLng(Val(CStr(Proc_8_12_806C30(productId, 0, 0)))) = 9 And firstGrantedId > 0 Then
+            Proc_5_0_6D3CD0 "INSERT INTO furnitures_dimmerpresets(id_furni,id_preset,id_state) VALUES('" & CStr(firstGrantedId) & "','1','2'),('" & _
+                CStr(firstGrantedId) & "','2','1'),('" & CStr(firstGrantedId) & "','3','1')", 0, 0
+            Proc_5_0_6D3CD0 "UPDATE furnitures SET sign='1,1,1,#000000,166' WHERE id='" & CStr(firstGrantedId) & "'", 0, 0
+        End If
+    End If
+
+    Proc_6_133_760400 = grantedIds
+    Exit Function
+
+GrantFailed:
     Proc_6_133_760400 = Empty
 End Function
 
