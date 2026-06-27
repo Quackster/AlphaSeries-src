@@ -6,6 +6,7 @@ Option Explicit
 ' Decompiled procedure bodies are intentionally not copied until they are understood and made valid VB6.
 
 Private representedActivityPointTicks As String
+Private representedInteractionPairs As String
 
 ' Original declaration: Private Sub Proc_6_0_6D7FF0
 Public Function Proc_6_0_6D7FF0(ParamArray args() As Variant) As Variant
@@ -3250,7 +3251,12 @@ Public Function Proc_6_90_742E80(ParamArray args() As Variant) As Variant
     ' interaction state from +160h. Until those slots are fully represented, accept
     ' the recovered pair/state as explicit arguments from callers that know them.
     If UBound(args) >= 1 Then targetSocketIndex = CInt(Val(CStr(args(1))))
-    If UBound(args) >= 2 Then interactionState = CLng(Val(CStr(args(2))))
+    If targetSocketIndex <= 0 Then targetSocketIndex = RepresentedInteractionPartner(socketIndex)
+    If UBound(args) >= 2 Then
+        interactionState = CLng(Val(CStr(args(2))))
+    Else
+        interactionState = RepresentedInteractionState(socketIndex)
+    End If
     If targetSocketIndex <= 0 Then GoTo InteractionStateFailed
 
     targetUserId = HandlingUserIdFromSocket(targetSocketIndex)
@@ -3287,7 +3293,72 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_93_745D90
 Public Function Proc_6_93_745D90(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim callerUserId As String
+    Dim targetUserId As String
+    Dim callerRoomId As Long
+    Dim requestedRoomUserIndex As Long
+    Dim targetRoomUserIndex As Long
+    Dim targetSocketIndex As Integer
+    Dim targetRow As String
+    Dim targetFields() As String
+    Dim offset As Long
+    Dim callerPayload As String
+    Dim targetPayload As String
+
+    On Error GoTo PairStartFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex <= 0 Then GoTo PairStartFailed
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "AG" Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    requestedRoomUserIndex = ReadWireLong(requestPayload, offset)
+    If requestedRoomUserIndex <= 0 Then requestedRoomUserIndex = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    If requestedRoomUserIndex <= 0 Then GoTo PairStartFailed
+
+    callerUserId = HandlingUserIdFromSocket(socketIndex)
+    If Len(callerUserId) = 0 Or callerUserId = "0" Then GoTo PairStartFailed
+
+    callerRoomId = HandlingCurrentRoomId(socketIndex, callerUserId)
+    If callerRoomId <= 0 Then GoTo PairStartFailed
+
+    targetRow = CStr(Proc_5_2_6D4690("SELECT logs_visitedrooms.id,logs_visitedrooms.id_user,users.id_socket FROM logs_visitedrooms,users WHERE logs_visitedrooms.id='" & _
+        CStr(requestedRoomUserIndex) & "' AND logs_visitedrooms.id_room='" & CStr(callerRoomId) & "' AND logs_visitedrooms.timestamp_left IS NULL AND users.id=logs_visitedrooms.id_user LIMIT 1", 0, 0))
+    If Len(targetRow) = 0 Then
+        targetRow = CStr(Proc_5_2_6D4690("SELECT logs_visitedrooms.id,logs_visitedrooms.id_user,users.id_socket FROM logs_visitedrooms,users WHERE logs_visitedrooms.id_user='" & _
+            CStr(requestedRoomUserIndex) & "' AND logs_visitedrooms.id_room='" & CStr(callerRoomId) & "' AND logs_visitedrooms.timestamp_left IS NULL AND users.id=logs_visitedrooms.id_user LIMIT 1", 0, 0))
+    End If
+    If Len(targetRow) = 0 Then GoTo PairStartFailed
+
+    targetFields = Split(targetRow, Chr$(9))
+    If UBound(targetFields) < 2 Then GoTo PairStartFailed
+
+    targetRoomUserIndex = CLng(Val(CStr(targetFields(0))))
+    targetUserId = CStr(CLng(Val(CStr(targetFields(1)))))
+    targetSocketIndex = CInt(Val(CStr(targetFields(2))))
+    If targetRoomUserIndex <= 0 Or Len(targetUserId) = 0 Or targetUserId = "0" Then GoTo PairStartFailed
+    If targetSocketIndex <= 0 Then targetSocketIndex = HandlingSocketFromUserId(targetUserId)
+    If targetSocketIndex <= 0 Or targetSocketIndex = socketIndex Then GoTo PairStartFailed
+    If RepresentedInteractionPartner(targetSocketIndex) > 0 Then GoTo PairStartFailed
+
+    StoreRepresentedInteractionPair socketIndex, targetSocketIndex, 1
+
+    callerPayload = CStr(Proc_3_0_6D2AF0(CLng(Val(targetUserId)), Empty, _
+        CStr(Proc_3_0_6D2AF0(CLng(Val(callerUserId)), Empty, "Ah")) & global_004096B0)) & global_004096B0
+    targetPayload = CStr(Proc_3_0_6D2AF0(CLng(Val(callerUserId)), Empty, _
+        CStr(Proc_3_0_6D2AF0(CLng(Val(targetUserId)), Empty, "Ah")) & global_004096B0)) & global_004096B0
+
+    Proc_6_244_801E80 socketIndex, callerPayload, 0
+    Proc_6_244_801E80 targetSocketIndex, targetPayload, 0
+
+PairStartFailed:
     Proc_6_93_745D90 = Empty
 End Function
 
@@ -3317,6 +3388,7 @@ Public Function Proc_6_94_746990(ParamArray args() As Variant) As Variant
     ' explicit second argument when the caller has recovered it; otherwise there is
     ' no represented pair to notify.
     If UBound(args) >= 1 Then targetSocketIndex = CInt(Val(CStr(args(1))))
+    If targetSocketIndex <= 0 Then targetSocketIndex = RepresentedInteractionPartner(socketIndex)
     If targetSocketIndex <= 0 Then GoTo InteractionFailed
 
     targetUserId = HandlingUserIdFromSocket(targetSocketIndex)
@@ -9387,6 +9459,98 @@ Private Function RepresentedRoomUserStatusPayload(ByVal roomUserIndex As Long, B
 
 BuildFailed:
     RepresentedRoomUserStatusPayload = vbNullString
+End Function
+
+Private Sub StoreRepresentedInteractionPair(ByVal sourceSocketIndex As Integer, ByVal targetSocketIndex As Integer, ByVal interactionState As Long)
+    On Error GoTo StoreDone
+    If sourceSocketIndex <= 0 Or targetSocketIndex <= 0 Then GoTo StoreDone
+
+    RemoveRepresentedInteractionPair sourceSocketIndex
+    RemoveRepresentedInteractionPair targetSocketIndex
+
+    If Len(representedInteractionPairs) > 0 Then representedInteractionPairs = representedInteractionPairs & Chr$(13)
+    representedInteractionPairs = representedInteractionPairs & CStr(sourceSocketIndex) & Chr$(9) & CStr(targetSocketIndex) & Chr$(9) & CStr(interactionState)
+
+    representedInteractionPairs = representedInteractionPairs & Chr$(13) & CStr(targetSocketIndex) & Chr$(9) & CStr(sourceSocketIndex) & Chr$(9) & CStr(interactionState)
+
+StoreDone:
+End Sub
+
+Private Sub RemoveRepresentedInteractionPair(ByVal socketIndex As Integer)
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim rebuiltText As String
+
+    On Error GoTo RemoveDone
+    If socketIndex <= 0 Or Len(representedInteractionPairs) = 0 Then GoTo RemoveDone
+
+    rows = Split(representedInteractionPairs, Chr$(13))
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(rows(rowIndex)) > 0 Then
+            fields = Split(rows(rowIndex), Chr$(9))
+            If UBound(fields) >= 0 Then
+                If CInt(Val(CStr(fields(0)))) <> socketIndex Then
+                    If Len(rebuiltText) > 0 Then rebuiltText = rebuiltText & Chr$(13)
+                    rebuiltText = rebuiltText & rows(rowIndex)
+                End If
+            End If
+        End If
+    Next rowIndex
+
+    representedInteractionPairs = rebuiltText
+
+RemoveDone:
+End Sub
+
+Private Function RepresentedInteractionPartner(ByVal socketIndex As Integer) As Integer
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+
+    On Error GoTo LookupFailed
+    If socketIndex <= 0 Or Len(representedInteractionPairs) = 0 Then GoTo LookupFailed
+
+    rows = Split(representedInteractionPairs, Chr$(13))
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(rows(rowIndex)) > 0 Then
+            fields = Split(rows(rowIndex), Chr$(9))
+            If UBound(fields) >= 1 Then
+                If CInt(Val(CStr(fields(0)))) = socketIndex Then
+                    RepresentedInteractionPartner = CInt(Val(CStr(fields(1))))
+                    Exit Function
+                End If
+            End If
+        End If
+    Next rowIndex
+
+LookupFailed:
+    RepresentedInteractionPartner = 0
+End Function
+
+Private Function RepresentedInteractionState(ByVal socketIndex As Integer) As Long
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+
+    On Error GoTo LookupFailed
+    If socketIndex <= 0 Or Len(representedInteractionPairs) = 0 Then GoTo LookupFailed
+
+    rows = Split(representedInteractionPairs, Chr$(13))
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(rows(rowIndex)) > 0 Then
+            fields = Split(rows(rowIndex), Chr$(9))
+            If UBound(fields) >= 2 Then
+                If CInt(Val(CStr(fields(0)))) = socketIndex Then
+                    RepresentedInteractionState = CLng(Val(CStr(fields(2))))
+                    Exit Function
+                End If
+            End If
+        End If
+    Next rowIndex
+
+LookupFailed:
+    RepresentedInteractionState = 0
 End Function
 
 Private Sub StoreRepresentedBotPosition(ByVal botEntityId As Long, ByVal positionX As Long, ByVal positionY As Long, ByVal positionZ As String, ByVal positionR As Long)
