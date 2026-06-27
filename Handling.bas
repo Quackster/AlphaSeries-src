@@ -616,7 +616,23 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_45_714B60
 Public Function Proc_6_45_714B60(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim roomId As Long
+
+    On Error GoTo DeleteFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo DeleteFailed
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId <= 0 Then GoTo DeleteFailed
+
+    Proc_5_0_6D3CD0 "DELETE FROM rooms_events WHERE id_room='" & CStr(roomId) & "'", 0, 0
+    Proc_6_244_801E80 socketIndex, "Er-1" & Chr$(2), 0
+
+DeleteFailed:
     Proc_6_45_714B60 = Empty
 End Function
 
@@ -2782,6 +2798,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_127_755D30 socketIndex, "Fu", packetPayload
         Case "E~"
             Proc_6_124_754D90 socketIndex, "E~", packetPayload
+        Case "E["
+            Proc_6_45_714B60 socketIndex, "E[", packetPayload
         Case "oL", "CD"
             ' Decompiled targets Proc_7F44D0 and Proc_7FA5A0 were not generated as valid symbols.
     End Select
