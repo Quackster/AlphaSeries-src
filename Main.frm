@@ -289,12 +289,16 @@ End Sub
 
 ' Original declaration: Private Sub gameServer_UnknownEvent_C '68F4C0
 Private Sub gameServer_UnknownEvent_C()
-    ' TODO: Reconstruct behavior from decompiled reference.
+    On Error Resume Next
+    gameServer.Close
+    gameServer.Accept 16387
 End Sub
 
 ' Original declaration: Private Sub gameServer_UnknownEvent_D '68EB20
 Private Sub gameServer_UnknownEvent_D()
-    ' TODO: Reconstruct behavior from decompiled reference.
+    On Error Resume Next
+    gameServer.Close
+    gameServer.Listen
 End Sub
 
 ' Original declaration: Private Sub tmrSigner_Timer() '695150
