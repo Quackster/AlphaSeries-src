@@ -49,7 +49,46 @@ End Function
 
 ' Original declaration: Private Sub Proc_5_5_6D64D0
 Public Function Proc_5_5_6D64D0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim userId As String
+    Dim roomId As Long
+    Dim roomRow As String
+    Dim roomFields() As String
+    Dim chatRows As String
+    Dim payload As String
+
+    On Error GoTo ChatLogFailed
+
+    socketIndex = MySqlSocketIndex(args)
+    packetPayload = MySqlPacketPayload(args)
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "GH" Then requestPayload = Mid$(requestPayload, 3)
+
+    userId = MySqlUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo ChatLogFailed
+    If Not MySqlUserHasPermission(userId, "fuse_mod") Then GoTo ChatLogFailed
+    If Not MySqlUserHasPermission(userId, "fuse_chatlog") Then GoTo ChatLogFailed
+
+    roomId = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    If roomId <= 0 Then GoTo ChatLogFailed
+
+    roomRow = CStr(Proc_5_2_6D4690("SELECT rooms.id,rooms.name,models.type FROM rooms,models WHERE rooms.id='" & _
+        CStr(roomId) & "' AND models.id=rooms.id_model LIMIT 1", 0, 0))
+    If Len(roomRow) = 0 Then GoTo ChatLogFailed
+
+    roomFields = Split(roomRow, Chr$(9))
+    chatRows = CStr(Proc_5_2_6D4690("SELECT DATE_FORMAT(FROM_UNIXTIME(logs_chat.timestamp), '" & Chr$(37) & _
+        "H'),DATE_FORMAT(FROM_UNIXTIME(logs_chat.timestamp), '" & Chr$(37) & _
+        "i'),users.id,users.name,logs_chat.description FROM logs_chat,rooms,users WHERE logs_chat.id_room='" & _
+        CStr(roomId) & "' AND logs_chat.timestamp > UNIX_TIMESTAMP()-600 AND users.id=logs_chat.id_user " & _
+        "GROUP BY logs_chat.id ORDER BY logs_chat.id DESC LIMIT 100", 0, 0))
+
+    payload = "HW" & MySqlRoomChatLogHeader(roomFields) & MySqlRoomChatLogRows(chatRows)
+    Proc_6_244_801E80 socketIndex, payload, 0
+
+ChatLogFailed:
     Proc_5_5_6D64D0 = Empty
 End Function
 
@@ -125,6 +164,99 @@ Private Function BuildSqlFromArgs(ByRef args() As Variant) As String
 
 BuildFailed:
     BuildSqlFromArgs = vbNullString
+End Function
+
+Private Function MySqlSocketIndex(ByRef args() As Variant) As Integer
+    On Error GoTo LookupFailed
+    If UBound(args) >= 0 Then MySqlSocketIndex = CInt(Val(CStr(args(0))))
+    Exit Function
+
+LookupFailed:
+    MySqlSocketIndex = 0
+End Function
+
+Private Function MySqlPacketPayload(ByRef args() As Variant) As String
+    On Error GoTo LookupFailed
+    If UBound(args) >= 2 Then MySqlPacketPayload = CStr(args(2))
+    If Len(MySqlPacketPayload) = 0 And UBound(args) >= 1 Then MySqlPacketPayload = CStr(args(1))
+    Exit Function
+
+LookupFailed:
+    MySqlPacketPayload = vbNullString
+End Function
+
+Private Function MySqlUserIdFromSocket(ByVal socketIndex As Integer) As String
+    On Error GoTo LookupFailed
+    MySqlUserIdFromSocket = CStr(Val(CStr(Proc_5_2_6D4690("SELECT id FROM users WHERE id_socket='" & _
+        CStr(socketIndex) & "' LIMIT 1", 0, 0))))
+    Exit Function
+
+LookupFailed:
+    MySqlUserIdFromSocket = vbNullString
+End Function
+
+Private Function MySqlUserHasPermission(ByVal userId As String, ByVal permissionName As String) As Boolean
+    Dim rankIndex As Long
+    Dim hcLevel As Long
+
+    On Error GoTo CheckFailed
+    rankIndex = CLng(Val(CStr(Proc_5_2_6D4690("SELECT level FROM users WHERE id='" & _
+        Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 1", 0, 0))))
+    hcLevel = CLng(Val(CStr(Proc_5_2_6D4690("SELECT level_hc FROM users WHERE id='" & _
+        Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 1", 0, 0))))
+    MySqlUserHasPermission = CBool(Proc_10_1_809790(rankIndex, vbNullString, permissionName, hcLevel))
+    Exit Function
+
+CheckFailed:
+    MySqlUserHasPermission = False
+End Function
+
+Private Function MySqlRoomChatLogHeader(ByRef roomFields() As String) As String
+    Dim roomId As Long
+    Dim roomName As String
+    Dim modelType As Long
+
+    On Error GoTo BuildFailed
+    roomId = CLng(Val(CStr(roomFields(0))))
+    roomName = CStr(roomFields(1))
+    modelType = CLng(Val(CStr(roomFields(2))))
+
+    MySqlRoomChatLogHeader = CStr(Proc_3_0_6D2AF0(roomId, Empty, vbNullString)) & _
+        CStr(Proc_3_0_6D2AF0(modelType, Empty, vbNullString)) & roomName & Chr$(2)
+    Exit Function
+
+BuildFailed:
+    MySqlRoomChatLogHeader = vbNullString
+End Function
+
+Private Function MySqlRoomChatLogRows(ByVal chatRows As String) As String
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim payload As String
+
+    On Error GoTo BuildFailed
+    If Len(chatRows) = 0 Then Exit Function
+
+    rows = Split(chatRows, Chr$(13))
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(rows(rowIndex)) > 0 Then
+            fields = Split(rows(rowIndex), Chr$(9))
+            If UBound(fields) >= 4 Then
+                payload = payload & CStr(Proc_3_0_6D2AF0(CLng(Val(CStr(fields(0)))), Empty, vbNullString))
+                payload = payload & CStr(Proc_3_0_6D2AF0(CLng(Val(CStr(fields(1)))), Empty, vbNullString))
+                payload = payload & CStr(Proc_3_0_6D2AF0(CLng(Val(CStr(fields(2)))), Empty, vbNullString))
+                payload = payload & CStr(fields(3)) & Chr$(2)
+                payload = payload & CStr(fields(4)) & Chr$(2)
+            End If
+        End If
+    Next rowIndex
+
+    MySqlRoomChatLogRows = payload
+    Exit Function
+
+BuildFailed:
+    MySqlRoomChatLogRows = payload
 End Function
 
 Private Function IsIgnorableSqlArg(ByVal value As String) As Boolean
