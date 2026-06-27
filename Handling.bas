@@ -3458,7 +3458,106 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_79_72A430
 Public Function Proc_6_79_72A430(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim roomId As Long
+    Dim roomRow As String
+    Dim fields() As String
+    Dim modelId As Long
+    Dim floorPattern As String
+    Dim wallpaperPattern As String
+    Dim landscapePattern As String
+    Dim roomRate As Long
+    Dim modelMap As String
+    Dim disableWalls As Long
+    Dim thicknessFloor As Long
+    Dim thicknessWallpaper As Long
+    Dim ownerUserId As String
+    Dim hasControl As Boolean
+    Dim hasVoted As Boolean
+    Dim ratingPayloadValue As Long
+    Dim pollRow As String
+    Dim pollFields() As String
+    Dim pollId As Long
+    Dim modelPayload As String
+
+    On Error GoTo BootstrapFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex <= 0 Then GoTo BootstrapFailed
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo BootstrapFailed
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId <= 0 Then GoTo BootstrapFailed
+
+    roomRow = CStr(Proc_5_2_6D4690("SELECT rooms.id,rooms.id_slot,users.id,models.name,models.id,rooms.id_floor,rooms.id_wallpaper,rooms.id_landscape,rooms.rate,models.map,models.position_x,models.position_y,NULL,rooms.name,rooms.disable_walls,rooms.allow_otherspets,rooms.allow_walkthrough,rooms.allow_feedpets,models.type,rooms.visitors_primaryid,rooms.is_staff_picked,thickness_floor,thickness_wallpaper FROM rooms,models,users WHERE rooms.id='" & CStr(roomId) & "' AND users.id=rooms.id_owner AND models.id=rooms.id_model LIMIT 1", 0, 0))
+    If Len(roomRow) = 0 Then GoTo BootstrapFailed
+
+    fields = Split(roomRow, Chr$(9))
+    modelId = CLng(Val(HandlingField(fields, 4)))
+    floorPattern = HandlingField(fields, 5)
+    wallpaperPattern = HandlingField(fields, 6)
+    landscapePattern = HandlingField(fields, 7)
+    roomRate = CLng(Val(HandlingField(fields, 8)))
+    modelMap = HandlingField(fields, 9)
+    ownerUserId = CStr(Val(HandlingField(fields, 2)))
+    disableWalls = CLng(Val(HandlingField(fields, 14)))
+    thicknessFloor = CLng(Val(HandlingField(fields, 21)))
+    thicknessWallpaper = CLng(Val(HandlingField(fields, 22)))
+
+    If roomRate < 0 Then roomRate = 0
+    hasControl = HandlingUserHasRoomRight(userId, roomId) Or HandlingUserHasPermission(userId, "fuse_any_room_controller")
+    hasVoted = (Len(CStr(Proc_5_2_6D4690("SELECT id_user FROM rooms_rates WHERE id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_room='" & CStr(roomId) & "' LIMIT 1", 0, 0))) > 0)
+    If hasVoted Then
+        ratingPayloadValue = -1
+    Else
+        ratingPayloadValue = roomRate
+    End If
+
+    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(roomId, Empty, "AE")) & Chr$(2), 0
+    Proc_6_244_801E80 socketIndex, "@nfloor" & Chr$(2) & floorPattern & Chr$(2), 0
+    Proc_6_244_801E80 socketIndex, "@nwallpaper" & Chr$(2) & wallpaperPattern & Chr$(2), 0
+    Proc_6_244_801E80 socketIndex, "@nlandscape" & Chr$(2) & landscapePattern & Chr$(2), 0
+    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(ratingPayloadValue, Empty, "EY")), 0
+    Proc_6_244_801E80 socketIndex, "Er" & CStr(Proc_6_51_716AC0(roomId, 0, 0)), 0
+
+    If hasControl Then Proc_6_244_801E80 socketIndex, "@j", 0
+    If ownerUserId = CStr(Val(userId)) Then Proc_6_244_801E80 socketIndex, "@o", 0
+
+    modelPayload = Replace(modelMap, vbLf, vbCr, 1, -1, vbBinaryCompare)
+    Do While InStr(1, modelPayload, vbCr & vbCr, vbBinaryCompare) > 0
+        modelPayload = Replace(modelPayload, vbCr & vbCr, vbCr, 1, -1, vbBinaryCompare)
+    Loop
+    If Len(modelPayload) > 0 Then
+        Proc_6_244_801E80 socketIndex, "@_" & modelPayload & Chr$(2), 0
+        Proc_6_244_801E80 socketIndex, "GV" & modelPayload & Chr$(2), 0
+    End If
+    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(thicknessWallpaper, Empty, CStr(Proc_3_0_6D2AF0(thicknessFloor, Empty, CStr(Proc_3_0_6D2AF0(disableWalls, Empty, "GX")))))), 0
+
+    Proc_6_81_730010 socketIndex, roomId, -1
+    Proc_6_82_731070 socketIndex, roomId, 0
+    Proc_6_83_732640 socketIndex, modelId
+    Proc_6_84_733600 socketIndex, roomId
+    Proc_6_85_73A8E0 socketIndex, roomId
+    Proc_6_235_7F77E0 socketIndex, 0, 0
+    Proc_6_244_801E80 socketIndex, "CP" & Chr$(2) & Chr$(2), 0
+
+    pollRow = CStr(Proc_5_2_6D4690("SELECT id,description_title FROM poll WHERE id_room='" & CStr(roomId) & "' AND timestamp_hide>UNIX_TIMESTAMP() LIMIT 1", 0, 0))
+    If Len(pollRow) > 0 Then
+        pollFields = Split(pollRow, Chr$(9))
+        pollId = CLng(Val(HandlingField(pollFields, 0)))
+        If pollId > 0 Then
+            If Len(CStr(Proc_5_2_6D4690("SELECT id_user FROM poll_exit WHERE id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_poll='" & CStr(pollId) & "' LIMIT 1", 0, 0))) = 0 Then
+                If Len(CStr(Proc_5_2_6D4690("SELECT id FROM poll_results WHERE id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_poll='" & CStr(pollId) & "' LIMIT 1", 0, 0))) = 0 Then
+                    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(pollId, Empty, "D|")) & HandlingField(pollFields, 1) & Chr$(2), 0
+                End If
+            End If
+        End If
+    End If
+
+BootstrapFailed:
     Proc_6_79_72A430 = Empty
 End Function
 
