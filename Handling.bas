@@ -1160,8 +1160,46 @@ End Function
 
 ' Original declaration: Private  Proc_6_166_7BE940(arg_C, arg_10, arg_14, arg_18, arg_1C, arg_20, arg_24, arg_28) '7BE940
 Public Function Proc_6_166_7BE940(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_166_7BE940 = Empty
+    Dim userId As Long
+    Dim userName As String
+    Dim motto As String
+    Dim figure As String
+    Dim rankValue As Long
+    Dim followCount As Long
+    Dim isOnline As Long
+    Dim lastOnlineText As String
+    Dim relationshipState As Long
+    Dim followEnabled As Long
+    Dim payload As String
+
+    On Error GoTo BuildFailed
+    If UBound(args) >= 0 Then userId = CLng(Val(CStr(args(0))))
+    If UBound(args) >= 1 Then userName = CStr(args(1))
+    If UBound(args) >= 2 Then motto = CStr(args(2))
+    If UBound(args) >= 3 Then figure = CStr(args(3))
+    If UBound(args) >= 4 Then rankValue = CLng(Val(CStr(args(4))))
+    If UBound(args) >= 5 Then followCount = CLng(Val(CStr(args(5))))
+    If UBound(args) >= 6 Then isOnline = CLng(Val(CStr(args(6))))
+    If UBound(args) >= 7 Then lastOnlineText = CStr(args(7))
+    If UBound(args) >= 8 Then relationshipState = CLng(Val(CStr(args(8))))
+
+    followEnabled = CLng(Val(CStr(Proc_10_0_809570("com.client.messenger.follow.enabled", 0, 0))))
+
+    payload = CStr(Proc_3_0_6D2AF0(userId, Empty, "0")) & userName & Chr$(2)
+    payload = CStr(Proc_3_0_6D2AF0(rankValue, Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(isOnline, Empty, payload))
+
+    If isOnline = 1 Then
+        payload = CStr(Proc_3_0_6D2AF0(IIf(followEnabled <> 0 And followCount > isOnline, 1, 0), Empty, payload)) & motto
+    ElseIf isOnline = 0 Then
+        payload = payload & Chr$(2) & "H" & figure & Chr$(2) & relationshipState
+    End If
+
+    Proc_6_166_7BE940 = payload & Chr$(2) & lastOnlineText & Chr$(2) & Chr$(2)
+    Exit Function
+
+BuildFailed:
+    Proc_6_166_7BE940 = vbNullString
 End Function
 
 ' Original declaration: Private Sub Proc_6_167_7BECA0
