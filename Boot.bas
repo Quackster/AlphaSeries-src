@@ -33,6 +33,7 @@ End Function
 Public Function Proc_1_4_6C4F00(ParamArray args() As Variant) As Variant
     On Error GoTo BootStepFailed
     Proc_1_8_6C6850 0, 0, 0
+    Proc_1_9_6C6DF0 0, 0, 0
     Proc_1_19_6CF190 0, 0, 0
     Proc_1_20_6CF830 0, 0, 0
     Proc_1_21_6D08C0 0, 0, 0
@@ -93,7 +94,44 @@ End Function
 
 ' Original declaration: Private Sub Proc_1_9_6C6DF0
 Public Function Proc_1_9_6C6DF0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim settingsRows() As String
+    Dim rowIndex As Long
+    Dim settingRecord As String
+    Dim clientDateFormat As String
+    Dim clientTimeFormat As String
+    Dim mysqlDateFormat As String
+    Dim mysqlTimeFormat As String
+
+    On Error GoTo BuildFailed
+
+    global_00829098 = "0" & CStr(Proc_5_2_6D4690("SELECT id_room,position_x,position_y,id_warp_room,warp_x,warp_y,is_special FROM rooms_warpspaces", Chr$(13), 0)) & Chr$(13)
+    global_0082909C = CStr(Proc_5_2_6D4690("SELECT  id_room,is_open FROM  rooms_specialgates", Chr$(13), 0)) & Chr$(13)
+    Proc_1_16_6CCA60 0, 0, 0
+
+    global_0082928C = vbNullString
+    settingsRows = Split(CStr(Proc_5_2_6D4690("SELECT variable,value FROM settings", 0, 0)), Chr$(13))
+    For rowIndex = LBound(settingsRows) To UBound(settingsRows)
+        If Len(settingsRows(rowIndex)) > 0 Then
+            settingRecord = Replace(CStr(settingsRows(rowIndex)), Chr$(9), "=", 1, -1, vbBinaryCompare)
+            global_0082928C = global_0082928C & "[" & settingRecord & "]"
+        End If
+    Next rowIndex
+
+    clientDateFormat = Replace(Replace(Replace(CStr(Proc_10_0_809570("com.system.format.date", vbNullString, 0)), "d", "dd", 1, -1, vbBinaryCompare), "Y", "yyyy", 1, -1, vbBinaryCompare), "m", "mm", 1, -1, vbBinaryCompare)
+    clientTimeFormat = Replace(Replace(Replace(CStr(Proc_10_0_809570("com.system.format.time", vbNullString, 0)), "i", "nn", 1, -1, vbBinaryCompare), "h", "hh", 1, -1, vbBinaryCompare), "s", "ss", 1, -1, vbBinaryCompare)
+    mysqlDateFormat = Replace(Replace(CStr(Proc_10_0_809570("com.system.format.date", vbNullString, 0)), "d", Chr$(37) & "d", 1, -1, vbBinaryCompare), "Y", Chr$(37) & "Y", 1, -1, vbBinaryCompare)
+    mysqlDateFormat = Replace(mysqlDateFormat, "m", Chr$(37) & "m", 1, -1, vbBinaryCompare)
+    mysqlTimeFormat = Replace(Replace(CStr(Proc_10_0_809570("com.system.format.time", vbNullString, 0)), "i", Chr$(37) & "i", 1, -1, vbBinaryCompare), "h", Chr$(37) & "H", 1, -1, vbBinaryCompare)
+    mysqlTimeFormat = Replace(mysqlTimeFormat, "s", Chr$(37) & "s", 1, -1, vbBinaryCompare)
+
+    global_0082928C = global_0082928C & "[com.client.format.date=" & clientDateFormat & "]"
+    global_0082928C = global_0082928C & "[com.client.format.time=" & clientTimeFormat & "]"
+    global_0082928C = global_0082928C & "[com.mysql.format.date=" & mysqlDateFormat & "]"
+    global_0082928C = global_0082928C & "[com.mysql.format.time=" & mysqlTimeFormat & "]"
+
+    global_00829080 = CStr(Proc_5_2_6D4690("SELECT id,level,name,NULL,reward,reward_type,require_action,id_additional,id_campaign,amount_activities,waitamount FROM quests ORDER BY id_campaign DESC,level ASC", 0, 0))
+
+BuildFailed:
     Proc_1_9_6C6DF0 = Empty
 End Function
 
