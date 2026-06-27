@@ -1453,9 +1453,142 @@ End Function
 
 ' Original declaration: Private  Proc_6_241_7FC380(arg_C) '7FC380
 Public Function Proc_6_241_7FC380(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Long
+    Dim packetBuffer As String
+    Dim packetLength As Long
+    Dim packetPayload As String
+    Dim packetCode As String
+
+    On Error GoTo DispatchDone
+    If UBound(args) < 1 Then GoTo DispatchDone
+
+    socketIndex = CLng(Val(CStr(args(0))))
+    packetBuffer = CStr(Proc_10_9_80A680(CStr(args(1)), 0, 0))
+    If Proc_11_2_821390(socketIndex, 0, 0) <> 1 Then GoTo DispatchDone
+
+    Do While Len(packetBuffer) > 2
+        packetBuffer = Mid$(packetBuffer, 2)
+        packetLength = CLng(Val(CStr(Proc_3_4_6D3620(Mid$(packetBuffer, 1, 2)))))
+        If packetLength <= 0 Or Len(packetBuffer) < packetLength + 2 Then Exit Do
+
+        packetPayload = Mid$(packetBuffer, 3, packetLength)
+        packetCode = Left$(packetPayload, 2)
+
+        If global_00829190 And Not global_00829034 Then
+            Proc_2_0_6D1510 "[" & CStr(socketIndex) & "] " & packetPayload, "GAME", CStr(16711680)
+        End If
+
+        DispatchPreReadyPacket socketIndex, packetCode, packetPayload
+        packetBuffer = Mid$(packetBuffer, packetLength + 3)
+    Loop
+
+DispatchDone:
     Proc_6_241_7FC380 = Empty
 End Function
+
+Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode As String, ByVal packetPayload As String)
+    Select Case packetCode
+        Case "oD"
+            Proc_6_231_7F4510 socketIndex, packetPayload, 0
+        Case "Gd"
+            Proc_6_230_7F3D20 socketIndex, packetPayload, 0
+        Case "C]"
+            Proc_6_223_7EEDD0 socketIndex, packetPayload, 0
+        Case "C" & Chr$(127)
+            Proc_6_225_7EFBD0 socketIndex, packetPayload, 0
+        Case "D@"
+            Proc_6_226_7F0B20 socketIndex, packetPayload, 0
+        Case "DC"
+            Proc_6_227_7F2400 socketIndex, packetPayload, 0
+            Proc_6_228_7F2AF0 socketIndex, packetPayload, 0
+        Case "pa"
+            Proc_6_244_801E80 socketIndex, "J|H", 0
+        Case "pb"
+            Proc_6_234_7F75C0 socketIndex, "pb", packetPayload
+        Case "p^"
+            Proc_6_232_7F45A0 socketIndex, "p^", packetPayload
+        Case "pc"
+            Proc_6_233_7F5D60 socketIndex, "pc", packetPayload
+        Case "p]"
+            Proc_6_236_7F8540 socketIndex, "p]", packetPayload
+        Case "GV"
+            Proc_6_38_70FD10 socketIndex, "GV", packetPayload
+        Case "GW"
+            Proc_6_39_711650 socketIndex, "GW", packetPayload
+        Case "F]"
+            Proc_6_203_7D7F80 socketIndex, "F]", packetPayload
+        Case "F^"
+            Proc_6_202_7D6760 socketIndex, "F^", packetPayload
+        Case "EW"
+            Proc_6_99_748460 socketIndex, "EW", packetPayload
+        Case "EV"
+            Proc_6_100_748C80 socketIndex, "EV", packetPayload
+        Case "EU"
+            Proc_6_98_747D80 socketIndex, "EU", packetPayload
+        Case "Er"
+            Proc_6_206_7DA450 socketIndex, "Er", packetPayload
+        Case "@G"
+            Proc_6_237_7F9ED0 socketIndex, "@G", packetPayload
+        Case "Cd"
+            Proc_6_101_749540 socketIndex, "EA", packetPayload
+        Case "@Z"
+            Proc_6_19_6E8040 socketIndex, global_0082912C, "Gz"
+        Case "oW"
+            Proc_6_18_6E7480 socketIndex, "GY", packetPayload
+        Case "GE"
+            Proc_6_32_70EAB0 socketIndex
+        Case "F`"
+            Proc_6_33_70F4F0 socketIndex
+        Case "Fa"
+            Proc_6_34_70F590 socketIndex
+        Case "Fb"
+            Proc_6_37_70FC20 socketIndex
+        Case "Fc"
+            Proc_6_36_70F7B0 socketIndex
+        Case "Fd"
+            Proc_6_35_70F630 socketIndex
+        Case "Af"
+            Proc_6_136_765F10 socketIndex, "Af", packetPayload
+        Case "oC"
+            Proc_6_135_765D80 socketIndex, "oC", packetPayload
+        Case "oV"
+            Proc_6_134_765B90 socketIndex, "oV", packetPayload
+        Case "Ad"
+            Proc_6_128_756190 socketIndex, "Ad", packetPayload
+        Case "GX"
+            Proc_6_132_75D4A0 socketIndex, "GX", packetPayload
+        Case "GZ"
+            Proc_6_131_75C700 socketIndex, "GZ", packetPayload
+        Case "G["
+            Proc_6_130_75B770 socketIndex, "G[", packetPayload
+        Case "Gc"
+            Proc_6_107_74B7E0 socketIndex, "Gc", packetPayload
+        Case "@H"
+            Proc_6_108_74D800 socketIndex, "@H", packetPayload
+        Case "BW"
+            Proc_6_111_74DF70 socketIndex, "BW", packetPayload
+        Case "Fw"
+            Proc_6_115_751220 socketIndex, "Fw", packetPayload
+        Case "Fn"
+            Proc_6_116_751550 socketIndex, "Fn", packetPayload
+        Case "Fr"
+            Proc_6_121_752080 socketIndex, "Fr", packetPayload
+        Case "Fq"
+            Proc_6_117_751880 socketIndex, "Fq", packetPayload
+        Case "Fp"
+            Proc_6_118_751A80 socketIndex, "Fp", packetPayload
+        Case "Ft"
+            Proc_6_120_751E80 socketIndex, "Ft", packetPayload
+        Case "E|"
+            Proc_6_123_754020 socketIndex, "E|", packetPayload
+        Case "Fu"
+            Proc_6_127_755D30 socketIndex, "Fu", packetPayload
+        Case "E~"
+            Proc_6_124_754D90 socketIndex, "E~", packetPayload
+        Case "oL", "CD"
+            ' Decompiled targets Proc_7F44D0 and Proc_7FA5A0 were not generated as valid symbols.
+    End Select
+End Sub
 
 ' Original declaration: Private Sub Proc_6_242_7FF0D0
 Public Function Proc_6_242_7FF0D0(ParamArray args() As Variant) As Variant
