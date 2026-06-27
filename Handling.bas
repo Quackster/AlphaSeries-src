@@ -10028,14 +10028,12 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_219_7EA390
 Public Function Proc_6_219_7EA390(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_219_7EA390 = Empty
+    Proc_6_219_7EA390 = HandlingRepresentedWiredEdit(args, "oj", 1, 500, "wired_trigger", False)
 End Function
 
 ' Original declaration: Private Sub Proc_6_220_7EBA50
 Public Function Proc_6_220_7EBA50(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_220_7EBA50 = Empty
+    Proc_6_220_7EBA50 = HandlingRepresentedWiredEdit(args, "ok", 501, 1000, "wired_action", True)
 End Function
 
 ' Original declaration: Private Sub Proc_6_221_7ED1E0
@@ -10096,8 +10094,7 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_222_7ED710
 Public Function Proc_6_222_7ED710(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_222_7ED710 = Empty
+    Proc_6_222_7ED710 = HandlingRepresentedWiredEdit(args, "ol", 1001, 1500, "wired_condition", False)
 End Function
 
 ' Original declaration: Private Sub Proc_6_223_7EEDD0
@@ -11401,6 +11398,12 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_111_74DF70 socketIndex, "BW", packetPayload
         Case "GI"
             Proc_5_4_6D55E0 socketIndex, "GI", packetPayload
+        Case "oj"
+            Proc_6_219_7EA390 socketIndex, "oj", packetPayload
+        Case "ok"
+            Proc_6_220_7EBA50 socketIndex, "ok", packetPayload
+        Case "ol"
+            Proc_6_222_7ED710 socketIndex, "ol", packetPayload
         Case "on"
             Proc_6_221_7ED1E0 socketIndex, "on", packetPayload
         Case "GH"
@@ -13423,6 +13426,147 @@ Private Function HandlingField(ByRef fields() As String, ByVal fieldIndex As Lon
 
 MissingField:
     HandlingField = vbNullString
+End Function
+
+Private Function HandlingRepresentedWiredEdit(ByRef args() As Variant, ByVal packetCode As String, ByVal minimumCode As Long, ByVal maximumCode As Long, ByVal cacheFolder As String, ByVal includeExtraValue As Boolean) As Variant
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim offset As Long
+    Dim furnitureId As Long
+    Dim userId As String
+    Dim roomId As Long
+    Dim rowText As String
+    Dim fields() As String
+    Dim productId As Long
+    Dim wiredCode As Long
+    Dim parameterCount As Long
+    Dim parameterIndex As Long
+    Dim parameterValue As Long
+    Dim parameterValues As String
+    Dim textValue As String
+    Dim selectedCount As Long
+    Dim selectedIndex As Long
+    Dim selectedFurnitureId As Long
+    Dim selectedIdsText As String
+    Dim extraValue As Long
+    Dim recordText As String
+    Dim cachePath As String
+    Dim cacheText As String
+    Dim markerText As String
+
+    On Error GoTo EditDone
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = packetCode Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    furnitureId = ReadWireLong(requestPayload, offset)
+    If furnitureId <= 0 Then furnitureId = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    If socketIndex <= 0 Or furnitureId <= 0 Then GoTo EditDone
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo EditDone
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId <= 0 Then GoTo EditDone
+    If Not HandlingUserHasRoomRight(userId, roomId) And Not HandlingUserOwnsRoom(userId, roomId) Then GoTo EditDone
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT id_product FROM furnitures WHERE id='" & CStr(furnitureId) & _
+        "' AND id_room='" & CStr(roomId) & "' LIMIT 1", 0, 0))
+    If Len(rowText) = 0 Then GoTo EditDone
+
+    fields = Split(rowText, Chr$(9))
+    productId = CLng(Val(HandlingField(fields, 0)))
+    If productId <= 0 Then GoTo EditDone
+
+    wiredCode = CLng(Val(CStr(Proc_8_12_806C30(productId, 27, 0))))
+    If wiredCode < minimumCode Or wiredCode > maximumCode Then GoTo EditDone
+
+    parameterCount = ReadWireLong(requestPayload, offset)
+    If parameterCount < 0 Or parameterCount > 100 Then GoTo EditDone
+    For parameterIndex = 1 To parameterCount
+        parameterValue = ReadWireLong(requestPayload, offset)
+        If Len(parameterValues) > 0 Then parameterValues = parameterValues & ";"
+        parameterValues = parameterValues & CStr(parameterValue)
+    Next parameterIndex
+
+    textValue = Left$(CStr(Proc_10_10_80A7F0(ReadWireString(requestPayload, offset), 0, 0)), 125)
+    If Len(textValue) = 0 Then textValue = Left$(CStr(Proc_10_10_80A7F0(Proc_10_7_80A190(requestPayload, 0, 0), 0, 0)), 125)
+
+    selectedCount = ReadWireLong(requestPayload, offset)
+    If selectedCount < 0 Or selectedCount > 100 Then GoTo EditDone
+    For selectedIndex = 1 To selectedCount
+        selectedFurnitureId = ReadWireLong(requestPayload, offset)
+        If selectedFurnitureId <= 0 Then GoTo EditDone
+        If CLng(Val(CStr(Proc_5_2_6D4690("SELECT COUNT(*) FROM furnitures WHERE id='" & CStr(selectedFurnitureId) & _
+            "' AND id_room='" & CStr(roomId) & "' LIMIT 1", 0, 0)))) <= 0 Then GoTo EditDone
+        If Len(selectedIdsText) > 0 Then selectedIdsText = selectedIdsText & ";"
+        selectedIdsText = selectedIdsText & CStr(selectedFurnitureId)
+    Next selectedIndex
+
+    If includeExtraValue Then extraValue = ReadWireLong(requestPayload, offset)
+
+    recordText = Chr$(1) & CStr(wiredCode) & Chr$(2) & CStr(furnitureId) & Chr$(3) & selectedIdsText & _
+        Chr$(4) & parameterValues & Chr$(5) & textValue & Chr$(6)
+    If includeExtraValue Then recordText = recordText & CStr(extraValue)
+
+    On Error Resume Next
+    MkDir App.Path & "\cache"
+    MkDir App.Path & "\cache\" & cacheFolder
+    On Error GoTo EditDone
+
+    cachePath = App.Path & "\cache\" & cacheFolder & "\" & CStr(roomId) & ".cache"
+    cacheText = CStr(Proc_6_239_7FC170(cachePath, 0, 0))
+    markerText = Chr$(1) & CStr(wiredCode) & Chr$(2) & CStr(furnitureId) & Chr$(3)
+    cacheText = RemoveRepresentedLineRecord(cacheText, markerText)
+    If Len(cacheText) > 0 Then
+        cacheText = recordText & Chr$(10) & cacheText
+    Else
+        cacheText = recordText
+    End If
+
+    Proc_8_10_8068E0 cachePath, cacheText, wiredCode
+    HandlingRepresentedWiredEdit = recordText
+    Exit Function
+
+EditDone:
+    HandlingRepresentedWiredEdit = Empty
+End Function
+
+Private Function RemoveRepresentedLineRecord(ByVal cacheText As String, ByVal markerText As String) As String
+    Dim rows() As String
+    Dim rowIndex As Long
+    Dim rowText As String
+    Dim rebuiltText As String
+
+    On Error GoTo RemoveFailed
+    If Len(cacheText) = 0 Or Len(markerText) = 0 Then
+        RemoveRepresentedLineRecord = cacheText
+        Exit Function
+    End If
+
+    cacheText = Replace(cacheText, Chr$(13), vbNullString, 1, -1, vbBinaryCompare)
+    rows = Split(cacheText, Chr$(10))
+    For rowIndex = LBound(rows) To UBound(rows)
+        rowText = CStr(rows(rowIndex))
+        If Len(rowText) > 0 Then
+            If InStr(1, rowText, markerText, vbBinaryCompare) = 0 Then
+                If Len(rebuiltText) > 0 Then rebuiltText = rebuiltText & Chr$(10)
+                rebuiltText = rebuiltText & rowText
+            End If
+        End If
+    Next rowIndex
+
+    RemoveRepresentedLineRecord = rebuiltText
+    Exit Function
+
+RemoveFailed:
+    RemoveRepresentedLineRecord = cacheText
 End Function
 
 Private Function RemoveRepresentedCacheRecord(ByVal cacheText As String, ByVal markerText As String) As String
