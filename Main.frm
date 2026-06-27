@@ -370,7 +370,38 @@ End Sub
 
 ' Original declaration: Private Sub tmrBots_Timer() '6923C0
 Private Sub tmrBots_Timer()
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim botMarkers As String
+    Dim markerIndex As Long
+    Dim entityId As Long
+    Dim currentX As Long
+    Dim currentY As Long
+    Dim targetX As Long
+    Dim targetY As Long
+    Dim allowWalk As Long
+
+    On Error GoTo BotsDone
+
+    tmrBots.Interval = CLng(Proc_10_4_809CA0(1500, 5000, 1))
+    tmrBots.Enabled = False
+
+    botMarkers = CStr(global_008292D4)
+    For markerIndex = 0 To UBound(Split(botMarkers, "]"))
+        entityId = MainRepresentedEntityIdAt(botMarkers, markerIndex)
+        If entityId > 0 Then
+            allowWalk = CLng(Val(MainRepresentedBotRecordField(entityId, 15)))
+            If allowWalk <> 0 Then
+                currentX = CLng(Val(MainRepresentedBotRecordField(entityId, 6)))
+                currentY = CLng(Val(MainRepresentedBotRecordField(entityId, 7)))
+                targetX = currentX + CLng(Proc_10_4_809CA0(-1, 1, 0))
+                targetY = currentY + CLng(Proc_10_4_809CA0(-1, 1, 0))
+                Proc_0_28_6AD850 entityId, currentX, currentY, targetX, targetY
+            End If
+        End If
+    Next markerIndex
+
+BotsDone:
+    On Error Resume Next
+    tmrBots.Enabled = True
 End Sub
 
 ' Original declaration: Private Sub Form_Resize() '68E3F0
@@ -743,16 +774,47 @@ LookupFailed:
 End Function
 
 Private Function MainRepresentedBotRoomSlot(ByVal entityIndex As Long) As Long
-    Dim fields() As String
-
     On Error GoTo LookupFailed
-
-    fields = Split(MainRepresentedRecordByKey(CStr(global_00829358), entityIndex), Chr$(9))
-    If UBound(fields) >= 0 Then MainRepresentedBotRoomSlot = CLng(Val(CStr(fields(0))))
+    MainRepresentedBotRoomSlot = CLng(Val(MainRepresentedBotRecordField(entityIndex, 0)))
     Exit Function
 
 LookupFailed:
     MainRepresentedBotRoomSlot = 0
+End Function
+
+Private Function MainRepresentedBotRecordText(ByVal entityIndex As Long) As String
+    Dim startMarker As String
+    Dim startAt As Long
+    Dim endAt As Long
+
+    On Error GoTo LookupFailed
+    If entityIndex <= 0 Or Len(global_00829358) = 0 Then GoTo LookupFailed
+
+    startMarker = "[" & CStr(entityIndex) & ":"
+    startAt = InStr(1, global_00829358, startMarker, vbBinaryCompare)
+    If startAt = 0 Then GoTo LookupFailed
+
+    startAt = startAt + Len(startMarker)
+    endAt = InStr(startAt, global_00829358, "]", vbBinaryCompare)
+    If endAt <= startAt Then GoTo LookupFailed
+
+    MainRepresentedBotRecordText = Mid$(global_00829358, startAt, endAt - startAt)
+    Exit Function
+
+LookupFailed:
+    MainRepresentedBotRecordText = vbNullString
+End Function
+
+Private Function MainRepresentedBotRecordField(ByVal entityIndex As Long, ByVal fieldIndex As Long) As String
+    Dim fields() As String
+
+    On Error GoTo LookupFailed
+    fields = Split(MainRepresentedBotRecordText(entityIndex), Chr$(2))
+    If fieldIndex <= UBound(fields) Then MainRepresentedBotRecordField = CStr(fields(fieldIndex))
+    Exit Function
+
+LookupFailed:
+    MainRepresentedBotRecordField = vbNullString
 End Function
 
 Private Sub MainRepresentedRoomOccupantAdd(ByVal roomSlot As Long, ByVal entityIndex As Long, ByVal occupantType As Long)
