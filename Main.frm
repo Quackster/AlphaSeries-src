@@ -703,14 +703,177 @@ NotReady:
     IsGameSessionReady = False
 End Function
 
+Private Function MainRepresentedSocketRoomSlot(ByVal socketIndex As Long) As Long
+    Dim fields() As String
+
+    On Error GoTo LookupFailed
+
+    MainRepresentedSocketRoomSlot = CLng(Val(CStr(Proc_9_10_808F30(CStr(socketIndex), 1, 0))))
+    If MainRepresentedSocketRoomSlot > 0 Then Exit Function
+
+    fields = Split(MainRepresentedRecordByBracket(CStr(global_0082934C), socketIndex), Chr$(2))
+    If UBound(fields) >= 1 Then MainRepresentedSocketRoomSlot = CLng(Val(CStr(fields(1))))
+    Exit Function
+
+LookupFailed:
+    MainRepresentedSocketRoomSlot = 0
+End Function
+
+Private Function MainRepresentedBotRoomSlot(ByVal entityIndex As Long) As Long
+    Dim fields() As String
+
+    On Error GoTo LookupFailed
+
+    fields = Split(MainRepresentedRecordByKey(CStr(global_00829358), entityIndex), Chr$(9))
+    If UBound(fields) >= 0 Then MainRepresentedBotRoomSlot = CLng(Val(CStr(fields(0))))
+    Exit Function
+
+LookupFailed:
+    MainRepresentedBotRoomSlot = 0
+End Function
+
+Private Sub MainRepresentedRoomOccupantAdd(ByVal roomSlot As Long, ByVal entityIndex As Long, ByVal occupantType As Long)
+    Dim roomRecord As String
+    Dim fields() As String
+    Dim markerText As String
+    Dim fieldIndex As Long
+    Dim countIndex As Long
+
+    If roomSlot <= 0 Or entityIndex <= 0 Then Exit Sub
+
+    markerText = Chr$(1) & CStr(entityIndex) & Chr$(2)
+    fieldIndex = IIf(occupantType = 2, 2, 1)
+    countIndex = 3
+
+    roomRecord = MainRepresentedRoomRecord(roomSlot)
+    If Len(roomRecord) = 0 Then roomRecord = CStr(roomSlot) & Chr$(9) & vbNullString & Chr$(9) & vbNullString & Chr$(9) & "0"
+    fields = Split(roomRecord, Chr$(9))
+    MainEnsureFieldCount fields, countIndex
+
+    If InStr(1, CStr(fields(fieldIndex)), markerText, vbBinaryCompare) = 0 Then
+        fields(fieldIndex) = CStr(fields(fieldIndex)) & markerText
+        fields(countIndex) = CStr(CLng(Val(CStr(fields(countIndex)))) + 1)
+    End If
+
+    MainRepresentedRoomRecordSet roomSlot, Join(fields, Chr$(9))
+End Sub
+
+Private Function MainRepresentedRecordByBracket(ByVal cacheText As String, ByVal recordId As Long) As String
+    Dim markerText As String
+    Dim startAt As Long
+    Dim endAt As Long
+
+    If recordId <= 0 Or Len(cacheText) = 0 Then Exit Function
+
+    markerText = "[" & CStr(recordId) & "]"
+    startAt = InStr(1, cacheText, markerText, vbBinaryCompare)
+    If startAt = 0 Then Exit Function
+
+    startAt = startAt + Len(markerText)
+    endAt = InStr(startAt, cacheText, "[", vbBinaryCompare)
+    If endAt = 0 Then endAt = Len(cacheText) + 1
+
+    MainRepresentedRecordByBracket = Mid$(cacheText, startAt, endAt - startAt)
+End Function
+
+Private Function MainRepresentedRecordByKey(ByVal cacheText As String, ByVal recordId As Long) As String
+    Dim markerText As String
+    Dim startAt As Long
+    Dim endAt As Long
+
+    If recordId <= 0 Or Len(cacheText) = 0 Then Exit Function
+
+    markerText = Chr$(1) & CStr(recordId) & Chr$(9)
+    startAt = InStr(1, cacheText, markerText, vbBinaryCompare)
+    If startAt = 0 Then
+        markerText = Chr$(1) & CStr(recordId) & Chr$(2)
+        startAt = InStr(1, cacheText, markerText, vbBinaryCompare)
+        If startAt = 0 Then Exit Function
+    End If
+
+    startAt = startAt + 1
+    endAt = InStr(startAt, cacheText, Chr$(2), vbBinaryCompare)
+    If endAt = 0 Then endAt = Len(cacheText) + 1
+
+    MainRepresentedRecordByKey = Mid$(cacheText, startAt, endAt - startAt)
+End Function
+
+Private Function MainRepresentedRoomRecord(ByVal roomSlot As Long) As String
+    MainRepresentedRoomRecord = MainRepresentedRecordByKey(CStr(global_00829310), roomSlot)
+End Function
+
+Private Sub MainRepresentedRoomRecordSet(ByVal roomSlot As Long, ByVal roomRecord As String)
+    Dim cacheText As String
+
+    If roomSlot <= 0 Then Exit Sub
+
+    cacheText = MainRepresentedCacheRemove(CStr(global_00829310), Chr$(1) & CStr(roomSlot) & Chr$(9))
+    cacheText = MainRepresentedCacheRemove(cacheText, Chr$(1) & CStr(roomSlot) & Chr$(2))
+    global_00829310 = cacheText & Chr$(1) & roomRecord & Chr$(2)
+End Sub
+
+Private Function MainRepresentedCacheRemove(ByVal cacheText As String, ByVal markerText As String) As String
+    Dim startAt As Long
+    Dim endAt As Long
+
+    MainRepresentedCacheRemove = cacheText
+    If Len(cacheText) = 0 Or Len(markerText) = 0 Then Exit Function
+
+    startAt = InStr(1, cacheText, markerText, vbBinaryCompare)
+    Do While startAt > 0
+        endAt = InStr(startAt + Len(markerText), cacheText, Chr$(2), vbBinaryCompare)
+        If endAt = 0 Then
+            cacheText = Left$(cacheText, startAt - 1)
+        Else
+            cacheText = Left$(cacheText, startAt - 1) & Mid$(cacheText, endAt + 1)
+        End If
+        startAt = InStr(1, cacheText, markerText, vbBinaryCompare)
+    Loop
+
+    MainRepresentedCacheRemove = cacheText
+End Function
+
+Private Sub MainEnsureFieldCount(ByRef fields() As String, ByVal requiredIndex As Long)
+    If UBound(fields) < requiredIndex Then ReDim Preserve fields(0 To requiredIndex)
+End Sub
+
 ' Original declaration: Private  Proc_0_26_6ACF30(arg_C, arg_10) '6ACF30
-Private Sub Proc_0_26_6ACF30()
-    ' TODO: Reconstruct behavior from decompiled reference.
+Private Sub Proc_0_26_6ACF30(ParamArray args() As Variant)
+    Dim socketIndex As Long
+    Dim roomSlot As Long
+
+    On Error GoTo AttachDone
+    If UBound(args) < 0 Then GoTo AttachDone
+
+    socketIndex = CLng(Val(CStr(args(0))))
+    If socketIndex <= 0 Then GoTo AttachDone
+    If Proc_11_2_821390(socketIndex, 0, 0) <> 1 Then GoTo AttachDone
+
+    roomSlot = MainRepresentedSocketRoomSlot(socketIndex)
+    If roomSlot <= 0 Then GoTo AttachDone
+
+    MainRepresentedRoomOccupantAdd roomSlot, socketIndex, 1
+
+AttachDone:
 End Sub
 
 ' Original declaration: Private  Proc_0_27_6AD400(arg_C, arg_10) '6AD400
-Private Sub Proc_0_27_6AD400()
-    ' TODO: Reconstruct behavior from decompiled reference.
+Private Sub Proc_0_27_6AD400(ParamArray args() As Variant)
+    Dim entityIndex As Long
+    Dim roomSlot As Long
+
+    On Error GoTo AttachDone
+    If UBound(args) < 0 Then GoTo AttachDone
+
+    entityIndex = CLng(Val(CStr(args(0))))
+    If entityIndex <= 0 Then GoTo AttachDone
+
+    roomSlot = MainRepresentedBotRoomSlot(entityIndex)
+    If roomSlot <= 0 Then GoTo AttachDone
+
+    MainRepresentedRoomOccupantAdd roomSlot, entityIndex, 2
+
+AttachDone:
 End Sub
 
 ' Original declaration: Private  Proc_0_28_6AD850(arg_C) '6AD850
