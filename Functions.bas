@@ -477,8 +477,50 @@ End Function
 
 ' Original declaration: Private  Proc_10_21_80D0A0(arg_C, arg_10) '80D0A0
 Public Function Proc_10_21_80D0A0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_10_21_80D0A0 = Empty
+    Dim roomId As Long
+    Dim alertType As String
+    Dim alertText As String
+    Dim payload As String
+    Dim rowText As String
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim socketIndex As Integer
+    Dim sentMarkers As String
+    Dim sentCount As Long
+
+    On Error GoTo BroadcastFailed
+    If UBound(args) < 2 Then GoTo BroadcastFailed
+
+    roomId = CLng(Val(CStr(args(0))))
+    alertType = CStr(args(1))
+    alertText = CStr(args(2))
+    If roomId <= 0 Then GoTo BroadcastFailed
+
+    payload = "Ba" & alertType & Chr$(2) & alertText & Chr$(2)
+    rowText = CStr(Proc_5_2_6D4690("SELECT users.id_socket FROM logs_visitedrooms,users WHERE logs_visitedrooms.id_room='" & CStr(roomId) & "' AND logs_visitedrooms.timestamp_left IS NULL AND users.id=logs_visitedrooms.id_user AND users.id_socket IS NOT NULL", 0, 0))
+    If Len(rowText) > 0 Then
+        rows = Split(rowText, Chr$(13))
+        For rowIndex = LBound(rows) To UBound(rows)
+            If Len(rows(rowIndex)) > 0 Then
+                fields = Split(rows(rowIndex), Chr$(9))
+                socketIndex = CInt(Val(CStr(fields(0))))
+                If socketIndex > 0 Then
+                    If InStr(1, sentMarkers, "[" & CStr(socketIndex) & "]", vbBinaryCompare) = 0 Then
+                        Proc_12_1_821AA0 socketIndex, payload
+                        sentMarkers = sentMarkers & "[" & CStr(socketIndex) & "]"
+                        sentCount = sentCount + 1
+                    End If
+                End If
+            End If
+        Next rowIndex
+    End If
+
+    Proc_10_21_80D0A0 = sentCount
+    Exit Function
+
+BroadcastFailed:
+    Proc_10_21_80D0A0 = 0
 End Function
 
 ' Original declaration: Private Sub Proc_10_22_80D460
