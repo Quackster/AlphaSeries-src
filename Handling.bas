@@ -1016,7 +1016,47 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_63_721050
 Public Function Proc_6_63_721050(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim userId As String
+    Dim roomId As Long
+    Dim voteValue As Long
+    Dim existingVoteUserId As String
+    Dim roomRate As Long
+    Dim offset As Long
+
+    On Error GoTo RateFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "DE" Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    voteValue = ReadWireLong(requestPayload, offset)
+    If voteValue <> 1 Then GoTo RateFailed
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo RateFailed
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId <= 0 Then GoTo RateFailed
+
+    existingVoteUserId = CStr(Proc_5_2_6D4690("SELECT id_user FROM rooms_rates WHERE id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_room='" & CStr(roomId) & "' LIMIT 1", 0, 0))
+    If Len(existingVoteUserId) > 0 Then GoTo RateFailed
+
+    Proc_5_0_6D3CD0 "INSERT INTO rooms_rates(id_user,id_room,timestamp) VALUES('" & Proc_10_11_80A9C0(userId, 0, 0) & "','" & CStr(roomId) & "',UNIX_TIMESTAMP())", 0, 0
+
+    roomRate = CLng(Val(CStr(Proc_5_2_6D4690("SELECT rate FROM rooms WHERE id='" & CStr(roomId) & "' LIMIT 1", 0, 0))))
+    If roomRate < 0 Then roomRate = 0
+    roomRate = roomRate + 1
+    Proc_5_0_6D3CD0 "UPDATE rooms SET rate='" & CStr(roomRate) & "' WHERE id='" & CStr(roomId) & "'", 0, 0
+    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(roomRate, Empty, "EY")), 0
+
+RateFailed:
     Proc_6_63_721050 = Empty
 End Function
 
@@ -2994,6 +3034,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_61_720490 socketIndex, "A_", packetPayload
         Case "E@"
             Proc_6_62_7209F0 socketIndex, "E@", packetPayload
+        Case "DE"
+            Proc_6_63_721050 socketIndex, "DE", packetPayload
         Case "FA"
             Proc_6_60_720060 socketIndex, "FA", packetPayload
         Case "oL", "CD"
