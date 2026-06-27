@@ -31,7 +31,14 @@ End Function
 
 ' Original declaration: Private Sub Proc_1_4_6C4F00
 Public Function Proc_1_4_6C4F00(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    On Error GoTo BootStepFailed
+    Proc_1_8_6C6850 0, 0, 0
+    Proc_1_22_6D0F00 0, 0, 0
+    Proc_1_11_6C8D10 0, 0, 0
+    Proc_1_12_6C8EF0 0, 0, 0
+    Proc_1_2_6BE280 0
+
+BootStepFailed:
     Proc_1_4_6C4F00 = Empty
 End Function
 
@@ -145,6 +152,14 @@ End Function
 
 ' Original declaration: Private  Proc_1_23_6D1480(arg_C) '6D1480
 Public Function Proc_1_23_6D1480(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim messageText As String
+    Dim logChannel As String
+
+    On Error GoTo LogFailed
+    If UBound(args) >= 0 Then messageText = CStr(args(0))
+    If UBound(args) >= 1 Then logChannel = CStr(args(1))
+    Proc_2_0_6D1510 messageText, logChannel, CStr(65280)
+
+LogFailed:
     Proc_1_23_6D1480 = Empty
 End Function
