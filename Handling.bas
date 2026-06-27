@@ -6588,7 +6588,75 @@ End Function
 
 ' Original declaration: Private  Proc_6_160_7A71A0(arg_C, arg_10, arg_14) '7A71A0
 Public Function Proc_6_160_7A71A0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim firstId As Long
+    Dim secondId As Long
+    Dim furnitureId As Long
+    Dim productId As Long
+    Dim roomId As Long
+    Dim signText As String
+    Dim rowText As String
+    Dim fields() As String
+    Dim productSprite As String
+    Dim stateValue As Long
+    Dim maxState As Long
+
+    On Error GoTo ScoreboardDone
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 1 Then firstId = CLng(Val(CStr(args(1))))
+    If UBound(args) >= 2 Then secondId = CLng(Val(CStr(args(2))))
+
+    If secondId > 0 Then
+        rowText = CStr(Proc_5_2_6D4690("SELECT id_room,id_product,sign FROM furnitures WHERE id='" & CStr(secondId) & "' LIMIT 1", 0, 0))
+        If Len(rowText) > 0 Then
+            furnitureId = secondId
+            productId = firstId
+        End If
+    End If
+
+    If Len(rowText) = 0 And firstId > 0 Then
+        rowText = CStr(Proc_5_2_6D4690("SELECT id_room,id_product,sign FROM furnitures WHERE id='" & CStr(firstId) & "' LIMIT 1", 0, 0))
+        If Len(rowText) > 0 Then furnitureId = firstId
+    End If
+
+    If Len(rowText) = 0 And secondId > 0 Then
+        rowText = CStr(Proc_5_2_6D4690("SELECT id_room,id_product,sign FROM furnitures WHERE id_product='" & CStr(secondId) & "' ORDER BY id DESC LIMIT 1", 0, 0))
+        If Len(rowText) > 0 Then productId = secondId
+    End If
+    If Len(rowText) = 0 Then GoTo ScoreboardDone
+
+    fields = Split(rowText, Chr$(9))
+    roomId = CLng(Val(HandlingField(fields, 0)))
+    If productId <= 0 Then productId = CLng(Val(HandlingField(fields, 1)))
+    signText = HandlingField(fields, 2)
+    If roomId <= 0 Or productId <= 0 Then GoTo ScoreboardDone
+
+    If furnitureId <= 0 Then
+        furnitureId = CLng(Val(CStr(Proc_5_2_6D4690("SELECT id FROM furnitures WHERE id_room='" & CStr(roomId) & _
+            "' AND id_product='" & CStr(productId) & "' ORDER BY id DESC LIMIT 1", 0, 0))))
+    End If
+    If furnitureId <= 0 Then GoTo ScoreboardDone
+
+    productSprite = LCase$(CStr(Proc_8_12_806C30(productId, 17, 0)))
+    If Len(productSprite) = 0 Then productSprite = LCase$(CStr(Proc_8_12_806C30(productId, 18, 0)))
+
+    If Left$(productSprite, 9) = "bb_score_" Or Left$(productSprite, 9) = "es_score_" Then
+        stateValue = CLng(Val(signText))
+        maxState = CLng(Val(CStr(Proc_8_12_806C30(productId, 12, 0))))
+        If maxState <= 0 Then maxState = 99
+        If stateValue < 0 Then stateValue = 0
+        If stateValue > maxState Then stateValue = maxState
+
+        If CStr(stateValue) <> signText Then
+            Proc_5_0_6D3CD0 "UPDATE furnitures SET sign='" & CStr(stateValue) & "' WHERE id='" & CStr(furnitureId) & "' LIMIT 1", 0, 0
+        End If
+    End If
+
+    Proc_6_160_7A71A0 = Proc_6_154_78F040(furnitureId, productId)
+    Exit Function
+
+ScoreboardDone:
     Proc_6_160_7A71A0 = Empty
 End Function
 
