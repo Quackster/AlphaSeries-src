@@ -4627,8 +4627,57 @@ End Function
 
 ' Original declaration: Private  Proc_6_122_752280(arg_C) '752280
 Public Function Proc_6_122_752280(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_122_752280 = Empty
+    Dim rowText As String
+    Dim includeCountPrefix As Boolean
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim fieldIndex As Long
+    Dim itemCount As Long
+    Dim rowPayload As String
+    Dim payload As String
+
+    On Error GoTo BuildFailed
+    If UBound(args) < 0 Then GoTo BuildFailed
+
+    rowText = CStr(args(0))
+    If UBound(args) >= 1 Then includeCountPrefix = CBool(args(1))
+    If Len(rowText) = 0 Then GoTo BuildDone
+
+    rows = Split(rowText, Chr$(13))
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(rows(rowIndex)) > 0 Then
+            fields = Split(rows(rowIndex), Chr$(9))
+            If UBound(fields) >= 26 Then
+                rowPayload = CStr(Proc_3_0_6D2AF0(CLng(Val(NavigatorField(fields, 0))), Empty, vbNullString))
+                rowPayload = rowPayload & CStr(Proc_3_0_6D2AF0(CLng(Val(NavigatorField(fields, 1))), Empty, vbNullString))
+                rowPayload = rowPayload & CStr(Proc_3_0_6D2AF0(CLng(Val(NavigatorField(fields, 2))), Empty, vbNullString))
+                For fieldIndex = 3 To 24
+                    rowPayload = rowPayload & NavigatorField(fields, fieldIndex) & Chr$(2)
+                Next fieldIndex
+                rowPayload = rowPayload & CStr(Proc_3_0_6D2AF0(CLng(Val(NavigatorField(fields, 25))), Empty, vbNullString))
+                rowPayload = rowPayload & CStr(Proc_3_0_6D2AF0(CLng(Val(NavigatorField(fields, 26))), Empty, vbNullString))
+                If UBound(fields) >= 27 Then
+                    rowPayload = rowPayload & CStr(Proc_3_0_6D2AF0(CLng(Val(NavigatorField(fields, 27))), Empty, vbNullString))
+                End If
+
+                payload = payload & rowPayload
+                itemCount = itemCount + 1
+            End If
+        End If
+    Next rowIndex
+
+BuildDone:
+    If includeCountPrefix Then payload = CStr(Proc_3_0_6D2AF0(itemCount, Empty, vbNullString)) & payload
+    Proc_6_122_752280 = payload
+    Exit Function
+
+BuildFailed:
+    If includeCountPrefix Then
+        Proc_6_122_752280 = CStr(Proc_3_0_6D2AF0(0, Empty, vbNullString))
+    Else
+        Proc_6_122_752280 = vbNullString
+    End If
 End Function
 
 ' Original declaration: Private Sub Proc_6_123_754020
@@ -11617,41 +11666,12 @@ Private Function OfficialNavigatorQuery() As String
 End Function
 
 Private Function OfficialNavigatorPayload(ByVal roomRows As String) As String
-    Dim rows() As String
-    Dim fields() As String
-    Dim rowIndex As Long
-    Dim fieldIndex As Long
-    Dim itemCount As Long
-    Dim rowPayload As String
-    Dim payload As String
-
     On Error GoTo BuildFailed
-
-    If Len(roomRows) = 0 Then GoTo BuildFailed
-    rows = Split(roomRows, Chr$(13))
-    For rowIndex = LBound(rows) To UBound(rows)
-        If Len(rows(rowIndex)) > 0 Then
-            fields = Split(rows(rowIndex), Chr$(9))
-            If UBound(fields) >= 26 Then
-                rowPayload = CStr(Proc_3_0_6D2AF0(CLng(Val(NavigatorField(fields, 0))), Empty, vbNullString))
-                rowPayload = rowPayload & CStr(Proc_3_0_6D2AF0(CLng(Val(NavigatorField(fields, 1))), Empty, vbNullString))
-                rowPayload = rowPayload & CStr(Proc_3_0_6D2AF0(CLng(Val(NavigatorField(fields, 2))), Empty, vbNullString))
-                For fieldIndex = 3 To 24
-                    rowPayload = rowPayload & NavigatorField(fields, fieldIndex) & Chr$(2)
-                Next fieldIndex
-                rowPayload = rowPayload & CStr(Proc_3_0_6D2AF0(CLng(Val(NavigatorField(fields, 25))), Empty, vbNullString))
-                rowPayload = rowPayload & CStr(Proc_3_0_6D2AF0(CLng(Val(NavigatorField(fields, 26))), Empty, vbNullString))
-                If UBound(fields) >= 27 Then
-                    rowPayload = rowPayload & CStr(Proc_3_0_6D2AF0(CLng(Val(NavigatorField(fields, 27))), Empty, vbNullString))
-                End If
-                payload = payload & rowPayload
-                itemCount = itemCount + 1
-            End If
-        End If
-    Next rowIndex
+    OfficialNavigatorPayload = CStr(Proc_6_122_752280(roomRows, True))
+    Exit Function
 
 BuildFailed:
-    OfficialNavigatorPayload = CStr(Proc_3_0_6D2AF0(itemCount, Empty, vbNullString)) & payload
+    OfficialNavigatorPayload = CStr(Proc_3_0_6D2AF0(0, Empty, vbNullString))
 End Function
 
 Private Function RecommendedRoomPayload(ByVal treeIndex As Long) As String
