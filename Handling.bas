@@ -6640,7 +6640,50 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_193_7D2BB0
 Public Function Proc_6_193_7D2BB0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim rowText As String
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim badgeId As String
+    Dim badgeRowId As Long
+    Dim inventoryPayload As String
+    Dim inventoryCount As Long
+    Dim payload As String
+
+    On Error GoTo BadgeListFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex <= 0 Then GoTo BadgeListFailed
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo BadgeListFailed
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT id_badge,id_slot,id FROM users_badges WHERE id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_slot='0' LIMIT 1000", 0, 0))
+    If Len(rowText) > 0 Then
+        rows = Split(rowText, Chr$(13))
+        For rowIndex = LBound(rows) To UBound(rows)
+            If Len(CStr(rows(rowIndex))) > 0 Then
+                fields = Split(CStr(rows(rowIndex)), Chr$(9))
+                If UBound(fields) >= 2 Then
+                    badgeId = CStr(fields(0))
+                    badgeRowId = CLng(Val(CStr(fields(2))))
+                    inventoryPayload = inventoryPayload & "0" & CStr(Proc_3_0_6D2AF0(badgeRowId, Empty, vbNullString)) & badgeId & Chr$(2)
+                    inventoryCount = inventoryCount + 1
+                End If
+            End If
+        Next rowIndex
+    End If
+
+    payload = CStr(Proc_3_0_6D2AF0(inventoryCount, Empty, "Ce")) & inventoryPayload & CStr(Proc_6_195_7D38D0(userId, 0, 0))
+    Proc_6_244_801E80 socketIndex, payload, 0
+    Proc_6_244_801E80 socketIndex, "Cd" & CStr(Proc_3_0_6D2AF0(CLng(Val(userId)), Empty, vbNullString)) & CStr(Proc_6_195_7D38D0(userId, 0, 0)), 0
+
+    Proc_6_193_7D2BB0 = payload
+    Exit Function
+
+BadgeListFailed:
     Proc_6_193_7D2BB0 = Empty
 End Function
 
@@ -6652,8 +6695,49 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_195_7D38D0
 Public Function Proc_6_195_7D38D0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_195_7D38D0 = Empty
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim rowText As String
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim badgeId As String
+    Dim badgeSlot As Long
+    Dim equippedPayload As String
+    Dim equippedCount As Long
+
+    On Error GoTo EquippedFailed
+
+    If UBound(args) >= 0 Then
+        If IsNumeric(CStr(args(0))) Then userId = CStr(CLng(Val(CStr(args(0)))))
+    End If
+    If Len(userId) = 0 Or userId = "0" Then
+        socketIndex = HandlingSocketIndex(args)
+        If socketIndex > 0 Then userId = HandlingUserIdFromSocket(socketIndex)
+    End If
+    If Len(userId) = 0 Or userId = "0" Then GoTo EquippedFailed
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT id_badge,id_slot,id FROM users_badges WHERE id_slot != '0' AND id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 5", 0, 0))
+    If Len(rowText) > 0 Then
+        rows = Split(rowText, Chr$(13))
+        For rowIndex = LBound(rows) To UBound(rows)
+            If Len(CStr(rows(rowIndex))) > 0 Then
+                fields = Split(CStr(rows(rowIndex)), Chr$(9))
+                If UBound(fields) >= 1 Then
+                    badgeId = CStr(fields(0))
+                    badgeSlot = CLng(Val(CStr(fields(1))))
+                    equippedPayload = equippedPayload & "0" & CStr(Proc_3_0_6D2AF0(badgeSlot, Empty, vbNullString)) & badgeId & Chr$(2)
+                    equippedCount = equippedCount + 1
+                End If
+            End If
+        Next rowIndex
+    End If
+
+    Proc_6_195_7D38D0 = CStr(Proc_3_0_6D2AF0(equippedCount, Empty, vbNullString)) & equippedPayload
+    Exit Function
+
+EquippedFailed:
+    Proc_6_195_7D38D0 = CStr(Proc_3_0_6D2AF0(0, Empty, vbNullString))
 End Function
 
 ' Original declaration: Private Sub Proc_6_196_7D3ED0
@@ -7590,6 +7674,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_190_7D11D0 socketIndex, "Cg", packetPayload
         Case "DG"
             Proc_6_191_7D18B0 socketIndex, "DG", packetPayload
+        Case "B]"
+            Proc_6_193_7D2BB0 socketIndex, "B]", packetPayload
         Case "n" & Chr$(127)
             Proc_6_177_7C6580 socketIndex, "n" & Chr$(127), packetPayload
         Case "ny"
