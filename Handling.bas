@@ -498,7 +498,23 @@ End Function
 
 ' Original declaration: Private  Proc_6_56_71E730(arg_10) '71E730
 Public Function Proc_6_56_71E730(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim roomMode As Long
+
+    On Error GoTo BootstrapFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 1 Then roomMode = CLng(Val(CStr(args(1))))
+
+    Proc_6_244_801E80 socketIndex, "@S", 0
+    Proc_6_244_801E80 socketIndex, "Bf" & "/client.php" & Chr$(2), 0
+    If roomMode = 0 Then
+        Proc_6_244_801E80 socketIndex, "@i", 0
+    Else
+        Proc_6_79_72A430 socketIndex, "@{", 0
+    End If
+
+BootstrapFailed:
     Proc_6_56_71E730 = Empty
 End Function
 
