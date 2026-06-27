@@ -7351,7 +7351,78 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_223_7EEDD0
 Public Function Proc_6_223_7EEDD0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim offset As Long
+    Dim requestedCount As Long
+    Dim requestIndex As Long
+    Dim cdId As Long
+    Dim whereClause As String
+    Dim rowText As String
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim rowValue As String
+    Dim responseCount As Long
+    Dim cdPayload As String
+    Dim rowPayload As String
+
+    On Error GoTo SongInfoFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex <= 0 Then GoTo SongInfoFailed
+
+    If UBound(args) >= 1 Then packetPayload = CStr(args(1))
+    If Left$(packetPayload, 2) = "C]" Then
+        requestPayload = Mid$(packetPayload, 3)
+    Else
+        requestPayload = packetPayload
+    End If
+
+    offset = 1
+    requestedCount = ReadWireLong(requestPayload, offset)
+    If requestedCount <= 0 Then
+        requestedCount = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+        offset = offset + CLng(Proc_3_2_6D30A0(requestPayload, 0, 0))
+    End If
+    If requestedCount > 60 Then requestedCount = 60
+
+    For requestIndex = 1 To requestedCount
+        cdId = ReadWireLong(requestPayload, offset)
+        If cdId > 0 Then
+            If Len(whereClause) > 0 Then whereClause = whereClause & " OR "
+            whereClause = whereClause & "id='" & CStr(cdId) & "'"
+        End If
+    Next requestIndex
+
+    If Len(whereClause) > 0 Then
+        rowText = CStr(Proc_5_2_6D4690("SELECT title,sequence,author,sound,id FROM soundmachine_cds WHERE " & _
+            whereClause & " LIMIT " & CStr(requestedCount), 0, 0))
+    End If
+
+    If Len(rowText) > 0 Then
+        rows = Split(rowText, Chr$(13))
+        For rowIndex = LBound(rows) To UBound(rows)
+            rowValue = Trim$(CStr(rows(rowIndex)))
+            If Len(rowValue) > 0 Then
+                fields = Split(rowValue, Chr$(9))
+                If UBound(fields) >= 4 Then
+                    rowPayload = CStr(Proc_3_0_6D2AF0(CLng(Val(HandlingField(fields, 4))), Empty, vbNullString))
+                    rowPayload = CStr(Proc_3_0_6D2AF0(CLng(Val(HandlingField(fields, 1))), Empty, rowPayload))
+                    rowPayload = rowPayload & HandlingField(fields, 0) & Chr$(2)
+                    rowPayload = rowPayload & HandlingField(fields, 2) & Chr$(2)
+                    rowPayload = rowPayload & HandlingField(fields, 3) & Chr$(2)
+                    cdPayload = cdPayload & rowPayload
+                    responseCount = responseCount + 1
+                End If
+            End If
+        Next rowIndex
+    End If
+
+    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(responseCount, Empty, "Dl")) & cdPayload, 0
+
+SongInfoFailed:
     Proc_6_223_7EEDD0 = Empty
 End Function
 
