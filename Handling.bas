@@ -788,7 +788,24 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_104_74AB60
 Public Function Proc_6_104_74AB60(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim maxOwnedRooms As Long
+    Dim ownedRoomCount As Long
+    Dim payload As String
+
+    On Error GoTo RoomLimitFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    userId = HandlingUserIdFromSocket(socketIndex)
+    maxOwnedRooms = CLng(Val(CStr(Proc_10_0_809570("com.server.socket.game.rooms.own.max", 0, 0))))
+    ownedRoomCount = CLng(Val(CStr(Proc_5_2_6D4690("SELECT COUNT(id) FROM rooms WHERE id_owner='" & Proc_10_11_80A9C0(userId, 0, 0) & "'", 0, 0))))
+
+    payload = CStr(Proc_3_0_6D2AF0(maxOwnedRooms, Empty, "H@"))
+    payload = CStr(Proc_3_0_6D2AF0(ownedRoomCount, Empty, payload))
+    Proc_6_244_801E80 socketIndex, payload, 0
+
+RoomLimitFailed:
     Proc_6_104_74AB60 = Empty
 End Function
 
@@ -2368,6 +2385,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_36_70F7B0 socketIndex, "Fc", packetPayload
         Case "Fd"
             Proc_6_35_70F630 socketIndex, "Fd", packetPayload
+        Case "FC"
+            Proc_6_104_74AB60 socketIndex, "FC", packetPayload
         Case "Af"
             Proc_6_136_765F10 socketIndex, "Af", packetPayload
         Case "oC"
