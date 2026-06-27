@@ -756,8 +756,66 @@ End Function
 
 ' Original declaration: Private Sub Proc_10_24_80E790
 Public Function Proc_10_24_80E790(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_10_24_80E790 = Empty
+    Dim currentX As Long
+    Dim currentY As Long
+    Dim targetX As Long
+    Dim targetY As Long
+    Dim nextX As Long
+    Dim nextY As Long
+    Dim deltaX As Long
+    Dim deltaY As Long
+    Dim directionValue As Long
+    Dim isMoving As Long
+
+    On Error GoTo StepFailed
+
+    If UBound(args) >= 4 Then
+        currentX = CLng(Val(CStr(args(1))))
+        currentY = CLng(Val(CStr(args(2))))
+        targetX = CLng(Val(CStr(args(3))))
+        targetY = CLng(Val(CStr(args(4))))
+    ElseIf UBound(args) >= 2 Then
+        targetX = CLng(Val(CStr(args(1))))
+        targetY = CLng(Val(CStr(args(2))))
+    Else
+        GoTo StepFailed
+    End If
+
+    deltaX = Sgn(targetX - currentX)
+    deltaY = Sgn(targetY - currentY)
+    nextX = currentX + deltaX
+    nextY = currentY + deltaY
+    If nextX <> currentX Or nextY <> currentY Then isMoving = 1
+    directionValue = MovementDirectionCode(deltaX, deltaY)
+
+    Proc_10_24_80E790 = CStr(nextX) & Chr$(0) & CStr(nextY) & Chr$(0) & _
+        CStr(directionValue) & Chr$(0) & CStr(isMoving) & Chr$(0)
+    Exit Function
+
+StepFailed:
+    Proc_10_24_80E790 = "0" & Chr$(0) & "0" & Chr$(0) & "0" & Chr$(0) & "0" & Chr$(0)
+End Function
+
+Private Function MovementDirectionCode(ByVal deltaX As Long, ByVal deltaY As Long) As Long
+    If deltaX = 0 And deltaY < 0 Then
+        MovementDirectionCode = 0
+    ElseIf deltaX > 0 And deltaY < 0 Then
+        MovementDirectionCode = 1
+    ElseIf deltaX > 0 And deltaY = 0 Then
+        MovementDirectionCode = 2
+    ElseIf deltaX > 0 And deltaY > 0 Then
+        MovementDirectionCode = 3
+    ElseIf deltaX = 0 And deltaY > 0 Then
+        MovementDirectionCode = 4
+    ElseIf deltaX < 0 And deltaY > 0 Then
+        MovementDirectionCode = 5
+    ElseIf deltaX < 0 And deltaY = 0 Then
+        MovementDirectionCode = 6
+    ElseIf deltaX < 0 And deltaY < 0 Then
+        MovementDirectionCode = 7
+    Else
+        MovementDirectionCode = 0
+    End If
 End Function
 
 ' Original declaration: Private  Proc_10_25_80F5D0(arg_C, arg_10) '80F5D0
