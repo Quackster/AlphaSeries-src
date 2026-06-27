@@ -3482,7 +3482,70 @@ End Function
 
 ' Original declaration: Private  Proc_6_83_732640(arg_C) '732640
 Public Function Proc_6_83_732640(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim roomId As Long
+    Dim modelId As Long
+    Dim rowText As String
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim productId As Long
+    Dim sourceId As Long
+    Dim positionX As Long
+    Dim positionY As Long
+    Dim positionZ As Long
+    Dim rotation As Long
+    Dim itemData As String
+    Dim itemPayload As String
+    Dim itemCount As Long
+    Dim payload As String
+
+    On Error GoTo ModelFurnitureDone
+
+    If UBound(args) >= 1 Then
+        socketIndex = HandlingSocketIndex(args)
+        modelId = CLng(Val(CStr(args(1))))
+    ElseIf UBound(args) >= 0 Then
+        modelId = CLng(Val(CStr(args(0))))
+    End If
+
+    If modelId <= 0 And socketIndex > 0 Then
+        userId = HandlingUserIdFromSocket(socketIndex)
+        If Len(userId) > 0 And userId <> "0" Then
+            roomId = HandlingCurrentRoomId(socketIndex, userId)
+            If roomId > 0 Then modelId = CLng(Val(CStr(Proc_5_2_6D4690("SELECT id_model FROM rooms WHERE id='" & CStr(roomId) & "' LIMIT 1", 0, 0))))
+        End If
+    End If
+    If modelId <= 0 Then GoTo ModelFurnitureDone
+
+    rows = Split(CStr(Proc_5_2_6D4690("SELECT id_type,id_source,id_sprite,position_x,position_y,position_z,action,action_rotation,action_height FROM models_furnitures WHERE id_model='" & CStr(modelId) & "' LIMIT 500", 0, 0)), Chr$(13))
+    For rowIndex = LBound(rows) To UBound(rows)
+        rowText = Trim$(CStr(rows(rowIndex)))
+        If Len(rowText) > 0 Then
+            fields = Split(rowText, Chr$(9))
+            productId = CLng(Val(HandlingField(fields, 0)))
+            sourceId = CLng(Val(HandlingField(fields, 1)))
+            If sourceId <= 0 Then sourceId = itemCount + 1
+            If productId <= 0 Then productId = sourceId
+
+            positionX = CLng(Val(HandlingField(fields, 3)))
+            positionY = CLng(Val(HandlingField(fields, 4)))
+            positionZ = CLng(Val(HandlingField(fields, 5)))
+            itemData = HandlingField(fields, 6)
+            rotation = CLng(Val(HandlingField(fields, 7)))
+
+            itemPayload = itemPayload & CStr(Proc_6_161_7B2EE0(sourceId, positionX, positionY, rotation, positionZ, vbNullString, itemData, 0, productId))
+            itemCount = itemCount + 1
+        End If
+    Next rowIndex
+
+    payload = CStr(Proc_3_0_6D2AF0(itemCount, Empty, "@^")) & itemPayload
+    If socketIndex > 0 Then Proc_6_244_801E80 socketIndex, payload, 0
+    Proc_6_83_732640 = payload
+    Exit Function
+
+ModelFurnitureDone:
     Proc_6_83_732640 = Empty
 End Function
 
