@@ -877,7 +877,17 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_53_718E00
 Public Function Proc_6_53_718E00(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+
+    On Error GoTo ReadyFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex <= 0 Then GoTo ReadyFailed
+
+    Proc_6_244_801E80 socketIndex, "@R", 0
+    Proc_6_165_7BE0B0 socketIndex, 0, 0
+
+ReadyFailed:
     Proc_6_53_718E00 = Empty
 End Function
 
