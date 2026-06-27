@@ -968,7 +968,81 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_18_6E7480
 Public Function Proc_6_18_6E7480(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim offerRows() As String
+    Dim offerFields() As String
+    Dim offerIndex As Long
+    Dim offerCount As Long
+    Dim offerPayload As String
+    Dim rowText As String
+    Dim userFields() As String
+    Dim hcLevel As Long
+    Dim hcDays As Long
+    Dim vipDays As Long
+    Dim hcPeriods As Long
+    Dim vipPeriods As Long
+    Dim presentsAvailable As Long
+    Dim daysSinceStart As Long
+    Dim activeDays As Long
+    Dim daysLeft As Long
+    Dim periodsLeft As Long
+    Dim payload As String
+
+    On Error GoTo ClubStatusFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If socketIndex <= 0 Or Len(userId) = 0 Or userId = "0" Then GoTo ClubStatusFailed
+
+    offerRows = Split(CStr(Proc_5_2_6D4690("SELECT id,sprite_name,months,level,price_credits FROM products_club ORDER BY id ASC", 0, 0)), Chr$(13))
+    For offerIndex = LBound(offerRows) To UBound(offerRows)
+        If Len(offerRows(offerIndex)) > 0 Then
+            offerFields = Split(CStr(offerRows(offerIndex)), Chr$(9))
+            If UBound(offerFields) >= 4 Then
+                offerPayload = offerPayload & CStr(Proc_3_0_6D2AF0(CLng(Val(CStr(offerFields(0)))), Empty, vbNullString))
+                offerPayload = offerPayload & CStr(offerFields(1)) & Chr$(2)
+                offerPayload = offerPayload & CStr(Proc_3_0_6D2AF0(CLng(Val(CStr(offerFields(2)))), Empty, vbNullString))
+                offerPayload = offerPayload & CStr(Proc_3_0_6D2AF0(CLng(Val(CStr(offerFields(2)))) * 31, Empty, vbNullString))
+                offerPayload = offerPayload & CStr(Proc_3_0_6D2AF0(CLng(Val(CStr(offerFields(3)))), Empty, vbNullString))
+                offerPayload = offerPayload & CStr(Proc_3_0_6D2AF0(CLng(Val(CStr(offerFields(4)))), Empty, vbNullString))
+                offerPayload = offerPayload & CStr(Proc_3_0_6D2AF0(0, Empty, vbNullString))
+                offerCount = offerCount + 1
+            End If
+        End If
+    Next offerIndex
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT level_hc,hc_days,hc2_days,hc_periods,hc2_periods,hc_presents,ROUND((UNIX_TIMESTAMP()-hc_startperiod)/60/60/24,0) FROM users WHERE id='" & Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 1", 0, 0))
+    If Len(rowText) > 0 Then
+        userFields = Split(rowText, Chr$(9))
+        hcLevel = CLng(Val(NavigatorField(userFields, 0)))
+        hcDays = CLng(Val(NavigatorField(userFields, 1)))
+        vipDays = CLng(Val(NavigatorField(userFields, 2)))
+        hcPeriods = CLng(Val(NavigatorField(userFields, 3)))
+        vipPeriods = CLng(Val(NavigatorField(userFields, 4)))
+        presentsAvailable = CLng(Val(NavigatorField(userFields, 5)))
+        daysSinceStart = CLng(Val(NavigatorField(userFields, 6)))
+    End If
+
+    If hcLevel > 1 Then
+        activeDays = vipDays
+        periodsLeft = vipPeriods
+    Else
+        activeDays = hcDays
+        periodsLeft = hcPeriods
+    End If
+    daysLeft = activeDays - daysSinceStart
+    If daysLeft < 0 Then daysLeft = 0
+    If periodsLeft < 1 And daysLeft > 0 Then periodsLeft = CLng(Int((daysLeft + 30) / 31))
+
+    payload = CStr(Proc_3_0_6D2AF0(offerCount, Empty, "Iq")) & offerPayload
+    payload = payload & CStr(Proc_3_0_6D2AF0(hcLevel, Empty, vbNullString))
+    payload = payload & CStr(Proc_3_0_6D2AF0(daysLeft, Empty, vbNullString))
+    payload = payload & CStr(Proc_3_0_6D2AF0(periodsLeft, Empty, vbNullString))
+    payload = payload & CStr(Proc_3_0_6D2AF0(presentsAvailable, Empty, vbNullString))
+    Proc_6_244_801E80 socketIndex, payload, 0
+
+ClubStatusFailed:
     Proc_6_18_6E7480 = Empty
 End Function
 
