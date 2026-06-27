@@ -941,8 +941,17 @@ End Function
 
 ' Original declaration: Private  Proc_6_114_750550(arg_C) '750550
 Public Function Proc_6_114_750550(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_114_750550 = Empty
+    Dim queryTail As String
+
+    On Error GoTo BuildFailed
+    If UBound(args) < 0 Then GoTo BuildFailed
+
+    queryTail = CStr(args(0))
+    Proc_6_114_750550 = NavigatorEventListPayload(queryTail)
+    Exit Function
+
+BuildFailed:
+    Proc_6_114_750550 = vbNullString
 End Function
 
 ' Original declaration: Private Sub Proc_6_115_751220
@@ -2481,6 +2490,79 @@ BuildDone:
 
 BuildFailed:
     NavigatorRoomListPayload = CStr(Proc_3_0_6D2AF0(0, Empty, vbNullString))
+End Function
+
+Private Function NavigatorEventListPayload(ByVal queryTail As String) As String
+    Dim queryText As String
+    Dim rowText As String
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim eventCount As Long
+    Dim payload As String
+
+    On Error GoTo BuildFailed
+
+    If Len(queryTail) = 0 Then GoTo BuildDone
+    queryText = "SELECT rooms.id,rooms_events.name,users.name,rooms.status_door,rooms.visitors_now,rooms.visitors_max,rooms_events.description,rooms_categories.has_trading,NULL,rooms.rate,rooms_events.id_category,rooms.icon,rooms_events.tag_1,rooms_events.tag_2,DATE_FORMAT(FROM_UNIXTIME(rooms_events.timestamp), '" & CStr(Proc_10_0_809570("com.mysql.format.time", "%H:%i", 0)) & "') FROM " & queryTail
+    rowText = CStr(Proc_5_2_6D4690(queryText, 0, 0))
+    If Len(rowText) = 0 Then GoTo BuildDone
+
+    rows = Split(rowText, Chr$(13))
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(rows(rowIndex)) > 0 Then
+            fields = Split(rows(rowIndex), Chr$(9))
+            payload = payload & NavigatorEventFragment(fields)
+            eventCount = eventCount + 1
+        End If
+    Next rowIndex
+
+BuildDone:
+    NavigatorEventListPayload = CStr(Proc_3_0_6D2AF0(eventCount, Empty, payload))
+    Exit Function
+
+BuildFailed:
+    NavigatorEventListPayload = CStr(Proc_3_0_6D2AF0(0, Empty, vbNullString))
+End Function
+
+Private Function NavigatorEventFragment(ByRef fields() As String) As String
+    Dim roomId As Long
+    Dim visitorsNow As Long
+    Dim visitorsMax As Long
+    Dim ratingValue As Long
+    Dim categoryId As Long
+    Dim hasTrading As Long
+    Dim payload As String
+
+    On Error GoTo BuildFailed
+
+    roomId = CLng(Val(NavigatorField(fields, 0)))
+    visitorsNow = CLng(Val(NavigatorField(fields, 4)))
+    visitorsMax = CLng(Val(NavigatorField(fields, 5)))
+    hasTrading = CLng(Val(NavigatorField(fields, 7)))
+    ratingValue = CLng(Val(NavigatorField(fields, 9)))
+    categoryId = CLng(Val(NavigatorField(fields, 10)))
+
+    payload = CStr(Proc_3_0_6D2AF0(roomId, Empty, vbNullString))
+    payload = CStr(Proc_3_0_6D2AF0(visitorsNow, Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(visitorsMax, Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(ratingValue, Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(categoryId, Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(hasTrading, Empty, payload))
+    payload = payload & Chr$(32)
+    payload = payload & NavigatorField(fields, 1) & Chr$(2)
+    payload = payload & NavigatorField(fields, 2) & Chr$(2)
+    payload = payload & NavigatorField(fields, 3) & Chr$(2)
+    payload = payload & NavigatorField(fields, 6) & Chr$(2)
+    payload = payload & NavigatorField(fields, 11) & Chr$(2)
+    payload = payload & NavigatorField(fields, 12) & Chr$(2)
+    payload = payload & NavigatorField(fields, 13) & Chr$(2)
+    payload = payload & NavigatorField(fields, 14) & Chr$(2)
+    NavigatorEventFragment = payload & "H"
+    Exit Function
+
+BuildFailed:
+    NavigatorEventFragment = vbNullString
 End Function
 
 Private Function NavigatorRoomFragment(ByRef fields() As String) As String
