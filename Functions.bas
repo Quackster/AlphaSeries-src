@@ -826,8 +826,44 @@ End Function
 
 ' Original declaration: Private Sub Proc_10_26_81E4E0
 Public Function Proc_10_26_81E4E0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_10_26_81E4E0 = Empty
+    Dim currentX As Long
+    Dim currentY As Long
+    Dim targetX As Long
+    Dim targetY As Long
+    Dim nextX As Long
+    Dim nextY As Long
+    Dim deltaX As Long
+    Dim deltaY As Long
+    Dim directionValue As Long
+    Dim isMoving As Long
+
+    On Error GoTo StepFailed
+
+    If UBound(args) >= 4 Then
+        currentX = CLng(Val(CStr(args(1))))
+        currentY = CLng(Val(CStr(args(2))))
+        targetX = CLng(Val(CStr(args(3))))
+        targetY = CLng(Val(CStr(args(4))))
+    ElseIf UBound(args) >= 2 Then
+        targetX = CLng(Val(CStr(args(1))))
+        targetY = CLng(Val(CStr(args(2))))
+    Else
+        GoTo StepFailed
+    End If
+
+    deltaX = Sgn(targetX - currentX)
+    deltaY = Sgn(targetY - currentY)
+    nextX = currentX + deltaX
+    nextY = currentY + deltaY
+    If nextX <> currentX Or nextY <> currentY Then isMoving = 1
+    directionValue = MovementDirectionCode(deltaX, deltaY)
+
+    Proc_10_26_81E4E0 = CStr(nextX) & Chr$(0) & CStr(nextY) & Chr$(0) & _
+        CStr(directionValue) & Chr$(0) & CStr(isMoving) & Chr$(0)
+    Exit Function
+
+StepFailed:
+    Proc_10_26_81E4E0 = "0" & Chr$(0) & "0" & Chr$(0) & "0" & Chr$(0) & "0" & Chr$(0)
 End Function
 
 ' Original declaration: Private  Proc_10_27_81F1A0(arg_C, arg_10) '81F1A0
