@@ -282,7 +282,10 @@ Private Sub DataProcess_Timer(Index As Integer)
     ' TODO: Reconstruct behavior from decompiled reference.
 End Sub
 
-' Skipped invalid decompiler procedure declaration: Private Sub gameServer_C_q]<lkamWk&_uo_lLfj`j=nEge]( '68F5C0
+' Original declaration contained invalid VB6 identifier text: Private Sub gameServer_C_q]<lkamWk&_uo_lLfj`j=nEge]( '68F5C0
+Private Sub gameServer_C_q()
+    ' TODO: Reconstruct behavior from decompiled reference.
+End Sub
 
 ' Original declaration: Private Sub gameServer_UnknownEvent_C '68F4C0
 Private Sub gameServer_UnknownEvent_C()
