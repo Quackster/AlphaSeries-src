@@ -1576,8 +1576,70 @@ End Function
 
 ' Original declaration: Private  Proc_6_41_712730(arg_C) '712730
 Public Function Proc_6_41_712730(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_41_712730 = Empty
+    Dim fields() As String
+    Dim recordText As String
+    Dim userId As Long
+    Dim userName As String
+    Dim figureText As String
+    Dim mottoText As String
+    Dim genderText As String
+    Dim roomUserIndex As Long
+    Dim xValue As Long
+    Dim yValue As Long
+    Dim zValue As String
+    Dim firstState As Long
+    Dim secondState As Long
+    Dim payload As String
+
+    On Error GoTo BuildFailed
+    If UBound(args) < 0 Then GoTo BuildFailed
+
+    If UBound(args) = 0 Then
+        recordText = CStr(args(0))
+        If InStr(1, recordText, Chr$(9), vbBinaryCompare) > 0 Then
+            fields = Split(recordText, Chr$(9))
+            userId = CLng(Val(HandlingField(fields, 0)))
+            userName = HandlingField(fields, 1)
+            figureText = HandlingField(fields, 2)
+            mottoText = HandlingField(fields, 3)
+            genderText = HandlingField(fields, 4)
+            roomUserIndex = CLng(Val(HandlingField(fields, 5)))
+            xValue = CLng(Val(HandlingField(fields, 6)))
+            yValue = CLng(Val(HandlingField(fields, 7)))
+            zValue = HandlingField(fields, 8)
+            firstState = CLng(Val(HandlingField(fields, 9)))
+            secondState = CLng(Val(HandlingField(fields, 10)))
+        Else
+            userId = CLng(Val(recordText))
+            roomUserIndex = userId
+        End If
+    Else
+        userId = CLng(Val(CStr(args(0))))
+        userName = CStr(args(1))
+        If UBound(args) >= 2 Then figureText = CStr(args(2))
+        If UBound(args) >= 3 Then mottoText = CStr(args(3))
+        If UBound(args) >= 4 Then genderText = CStr(args(4))
+        If UBound(args) >= 5 Then roomUserIndex = CLng(Val(CStr(args(5))))
+        If UBound(args) >= 6 Then xValue = CLng(Val(CStr(args(6))))
+        If UBound(args) >= 7 Then yValue = CLng(Val(CStr(args(7))))
+        If UBound(args) >= 8 Then zValue = CStr(args(8))
+        If UBound(args) >= 9 Then firstState = CLng(Val(CStr(args(9))))
+        If UBound(args) >= 10 Then secondState = CLng(Val(CStr(args(10))))
+    End If
+
+    If roomUserIndex <= 0 Then roomUserIndex = userId
+
+    payload = CStr(Proc_3_0_6D2AF0(userId, Empty, vbNullString)) & userName & Chr$(2) & figureText
+    payload = CStr(Proc_3_0_6D2AF0(roomUserIndex, Empty, payload & Chr$(2) & mottoText & Chr$(2)))
+    payload = CStr(Proc_3_0_6D2AF0(xValue, Empty, "0" & payload))
+    payload = CStr(Proc_3_0_6D2AF0(yValue, Empty, "0" & payload)) & zValue & Chr$(2) & "JI"
+    payload = payload & genderText & Chr$(2) & "M"
+    payload = CStr(Proc_3_0_6D2AF0(firstState, Empty, payload))
+    Proc_6_41_712730 = CStr(Proc_3_0_6D2AF0(secondState, Empty, payload & "M" & Chr$(2)))
+    Exit Function
+
+BuildFailed:
+    Proc_6_41_712730 = vbNullString
 End Function
 
 ' Original declaration: Private  Proc_6_42_712FB0(arg_C) '712FB0
