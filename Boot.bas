@@ -166,7 +166,52 @@ End Function
 
 ' Original declaration: Private Sub Proc_1_12_6C8EF0
 Public Function Proc_1_12_6C8EF0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim categoryRows() As String
+    Dim fields() As String
+    Dim rankIndex As Long
+    Dim hcLevel As Long
+    Dim rowIndex As Long
+    Dim categoryCount As Long
+    Dim categoryId As Long
+    Dim hasTrading As Long
+    Dim minRank As Long
+    Dim minHcLevel As Long
+    Dim categoryPayload As String
+
+    On Error GoTo BuildFailed
+
+    ReDim global_00829244(0 To 20, 0 To 2)
+    categoryRows = Split(CStr(global_00829230), Chr$(13))
+
+    For rankIndex = 0 To 20
+        For hcLevel = 0 To 2
+            categoryPayload = vbNullString
+            categoryCount = 0
+
+            For rowIndex = LBound(categoryRows) To UBound(categoryRows)
+                If Len(categoryRows(rowIndex)) > 0 Then
+                    fields = Split(categoryRows(rowIndex), Chr$(9))
+                    If UBound(fields) >= 4 Then
+                        categoryId = CLng(Val(CStr(fields(0))))
+                        hasTrading = CLng(Val(CStr(fields(2))))
+                        minRank = CLng(Val(CStr(fields(3))))
+                        minHcLevel = CLng(Val(CStr(fields(4))))
+
+                        If rankIndex >= minRank And hcLevel >= minHcLevel Then
+                            categoryPayload = categoryPayload & CStr(Proc_3_0_6D2AF0(categoryId, Empty, vbNullString))
+                            categoryPayload = categoryPayload & CStr(fields(1)) & Chr$(2)
+                            categoryPayload = categoryPayload & CStr(Proc_3_0_6D2AF0(hasTrading, Empty, vbNullString))
+                            categoryCount = categoryCount + 1
+                        End If
+                    End If
+                End If
+            Next rowIndex
+
+            global_00829244(rankIndex, hcLevel) = CStr(Proc_3_0_6D2AF0(categoryCount, Empty, vbNullString)) & categoryPayload
+        Next hcLevel
+    Next rankIndex
+
+BuildFailed:
     Proc_1_12_6C8EF0 = Empty
 End Function
 
