@@ -1349,7 +1349,60 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_43_713680
 Public Function Proc_6_43_713680(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim callerUserId As String
+    Dim roomId As Long
+    Dim requestedRoomId As Long
+    Dim roomRow As String
+    Dim roomFields() As String
+    Dim rightsRow As String
+    Dim payload As String
+    Dim offset As Long
+
+    On Error GoTo SettingsReadFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then
+        packetPayload = CStr(args(2))
+    ElseIf UBound(args) >= 1 Then
+        packetPayload = CStr(args(1))
+    End If
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "FF" Then requestPayload = Mid$(requestPayload, 3)
+
+    requestedRoomId = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    If requestedRoomId <= 0 Then
+        offset = 1
+        requestedRoomId = ReadWireLong(requestPayload, offset)
+    End If
+
+    callerUserId = HandlingUserIdFromSocket(socketIndex)
+    If Len(callerUserId) = 0 Or callerUserId = "0" Then GoTo SettingsReadFailed
+
+    roomId = requestedRoomId
+    If roomId <= 0 Then roomId = HandlingCurrentRoomId(socketIndex, callerUserId)
+    If roomId <= 0 Then GoTo SettingsReadFailed
+
+    If Not HandlingUserOwnsRoom(callerUserId, roomId) Then
+        If Not HandlingUserHasPermission(callerUserId, "fuse_any_room_controller") Then GoTo SettingsReadFailed
+    End If
+
+    roomRow = CStr(Proc_5_2_6D4690("SELECT rooms.id,rooms.name,rooms.description,rooms.status_door,rooms.id_category,rooms.visitors_max,models.visitors_max,rooms.tag_1,rooms.tag_2,NULL,rooms.allow_otherspets,rooms.allow_feedpets,rooms.allow_walkthrough,rooms.disable_walls FROM rooms,models WHERE rooms.id='" & CStr(roomId) & "' AND models.id=rooms.id_model LIMIT 1", 0, 0))
+    If Len(roomRow) = 0 Then GoTo SettingsReadFailed
+
+    roomFields = Split(roomRow, Chr$(9))
+    If UBound(roomFields) < 13 Then GoTo SettingsReadFailed
+
+    rightsRow = CStr(Proc_5_2_6D4690("SELECT users.id,users.name FROM rooms_rights,users WHERE rooms_rights.id_room='" & CStr(roomId) & "' AND users.id=rooms_rights.id_user LIMIT 250", 0, 0))
+    payload = RoomSettingsReadPayload(roomFields, rightsRow)
+    If Len(payload) = 0 Then GoTo SettingsReadFailed
+
+    Proc_6_244_801E80 socketIndex, payload, 0
+
+SettingsReadFailed:
     Proc_6_43_713680 = Empty
 End Function
 
@@ -4250,6 +4303,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_48_7151E0 socketIndex, "EZ", packetPayload
         Case "E\"
             Proc_6_49_715D30 socketIndex, "E\", packetPayload
+        Case "FF"
+            Proc_6_43_713680 socketIndex, "FF", packetPayload
         Case "FQ"
             Proc_6_52_7172B0 socketIndex, "FQ", packetPayload
         Case "@H"
@@ -5367,6 +5422,59 @@ Private Function RoomSettingsFromWire(ByVal packetPayload As String, ByRef roomN
 
 ParseFailed:
     RoomSettingsFromWire = False
+End Function
+
+Private Function RoomSettingsReadPayload(ByRef roomFields() As String, ByVal rightsRow As String) As String
+    Dim tagPayload As String
+    Dim tagCount As Long
+    Dim rightsPayload As String
+    Dim rightsCount As Long
+    Dim rightsRows() As String
+    Dim rightsFields() As String
+    Dim rowIndex As Long
+    Dim payload As String
+
+    On Error GoTo BuildFailed
+
+    If Len(HandlingField(roomFields, 7)) > 0 Then
+        tagPayload = tagPayload & HandlingField(roomFields, 7) & Chr$(2)
+        tagCount = tagCount + 1
+    End If
+    If Len(HandlingField(roomFields, 8)) > 0 Then
+        tagPayload = tagPayload & HandlingField(roomFields, 8) & Chr$(2)
+        tagCount = tagCount + 1
+    End If
+
+    If Len(rightsRow) > 0 Then
+        rightsRows = Split(rightsRow, Chr$(13))
+        For rowIndex = LBound(rightsRows) To UBound(rightsRows)
+            If Len(rightsRows(rowIndex)) > 0 Then
+                rightsFields = Split(rightsRows(rowIndex), Chr$(9))
+                If UBound(rightsFields) >= 1 Then
+                    rightsPayload = CStr(Proc_3_0_6D2AF0(CLng(Val(HandlingField(rightsFields, 0))), Empty, rightsPayload)) & HandlingField(rightsFields, 1) & Chr$(2)
+                    rightsCount = rightsCount + 1
+                End If
+            End If
+        Next rowIndex
+    End If
+
+    payload = CStr(Proc_3_0_6D2AF0(CLng(Val(HandlingField(roomFields, 0))), Empty, "GQ"))
+    payload = payload & HandlingField(roomFields, 1) & Chr$(2)
+    payload = payload & HandlingField(roomFields, 2) & Chr$(2)
+    payload = CStr(Proc_3_0_6D2AF0(CLng(Val(HandlingField(roomFields, 3))), Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(CLng(Val(HandlingField(roomFields, 4))), Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(CLng(Val(HandlingField(roomFields, 5))), Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(CLng(Val(HandlingField(roomFields, 6))), Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(tagCount, Empty, payload)) & tagPayload
+    payload = CStr(Proc_3_0_6D2AF0(rightsCount, Empty, payload)) & rightsPayload & "H"
+    payload = CStr(Proc_3_0_6D2AF0(CLng(Val(HandlingField(roomFields, 10))), Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(CLng(Val(HandlingField(roomFields, 11))), Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(CLng(Val(HandlingField(roomFields, 12))), Empty, payload))
+    RoomSettingsReadPayload = CStr(Proc_3_0_6D2AF0(CLng(Val(HandlingField(roomFields, 13))), Empty, payload))
+    Exit Function
+
+BuildFailed:
+    RoomSettingsReadPayload = vbNullString
 End Function
 
 Private Function RoomSettingsFlag(ByVal flagValue As Long) As Long
