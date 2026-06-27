@@ -589,8 +589,39 @@ End Sub
 
 ' Original declaration: Private  Proc_0_25_68FBC0(arg_C, arg_10) '68FBC0
 Private Sub Proc_0_25_68FBC0(Optional ByVal arg_C As Variant, Optional ByVal arg_10 As Variant)
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Long
+    Dim packetData As String
+
+    On Error GoTo DispatchFailed
+
+    socketIndex = CLng(Val(CStr(arg_C)))
+    packetData = CStr(arg_10)
+
+    If Proc_11_2_821390(socketIndex, 1, 0) <> 1 Then Exit Sub
+
+    If IsGameSessionReady(socketIndex) Then
+        Proc_7_2_803D60 socketIndex, packetData, 0
+    Else
+        Proc_6_241_7FC380 socketIndex, packetData, 0
+    End If
+    Exit Sub
+
+DispatchFailed:
+    If global_00829034 Then
+        Proc_2_0_6D1510 "[" & CStr(socketIndex) & "] " & Err.Description & " -> " & packetData, "ERROR " & CStr(Err.Number), CStr(255)
+        Proc_8_9_806810 App.Path & "\ERR.log", CStr(Now & " - ERROR" & CStr(Err.Number) & "] " & packetData & " (" & Err.Description & ")" & vbCrLf & "0" & vbCrLf & vbCrLf & vbCrLf)
+        Proc_10_8_80A580 socketIndex, &H60, 0
+    End If
 End Sub
+
+Private Function IsGameSessionReady(ByVal socketIndex As Long) As Boolean
+    On Error GoTo NotReady
+    IsGameSessionReady = (InStr(1, global_00829354, "[" & CStr(socketIndex) & "]", vbBinaryCompare) > 0)
+    Exit Function
+
+NotReady:
+    IsGameSessionReady = False
+End Function
 
 ' Original declaration: Private  Proc_0_26_6ACF30(arg_C, arg_10) '6ACF30
 Private Sub Proc_0_26_6ACF30()
