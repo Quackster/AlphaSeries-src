@@ -1038,7 +1038,32 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_136_765F10
 Public Function Proc_6_136_765F10(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim pageId As Long
+    Dim pagePayload As String
+    Dim responsePayload As String
+
+    On Error GoTo CatalogPageFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) >= 3 Then requestPayload = CStr(Proc_10_5_809D80(packetPayload, 3, 0))
+    pageId = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+
+    If IsArray(global_00829308) Then
+        If pageId >= LBound(global_00829308) And pageId <= UBound(global_00829308) Then
+            pagePayload = CStr(global_00829308(pageId))
+        End If
+    End If
+
+    If Len(pagePayload) > 0 Then
+        responsePayload = "A" & Chr$(127) & CStr(Proc_3_0_6D2AF0(pageId, Empty, vbNullString)) & pagePayload
+        Proc_6_244_801E80 socketIndex, responsePayload, 0
+    End If
+
+CatalogPageFailed:
     Proc_6_136_765F10 = Empty
 End Function
 
