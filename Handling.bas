@@ -210,8 +210,46 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_23_6E9A90
 Public Function Proc_6_23_6E9A90(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_23_6E9A90 = Empty
+    Dim messageText As String
+    Dim gestureEnabled As Boolean
+    Dim words() As String
+    Dim rows() As String
+    Dim fields() As String
+    Dim wordIndex As Long
+    Dim rowIndex As Long
+    Dim token As String
+    Dim smiley As String
+
+    On Error GoTo GestureFailed
+    If UBound(args) < 0 Then GoTo GestureFailed
+
+    messageText = CStr(args(0))
+    gestureEnabled = (CLng(Val(CStr(Proc_10_0_809570("com.client.chat.gesture.enabled", 0, 0)))) <> 0)
+    If Not gestureEnabled Or Len(global_00829294) = 0 Then GoTo GestureFailed
+
+    words = Split(messageText, " ")
+    rows = Split(global_00829294, Chr$(13))
+
+    For wordIndex = LBound(words) To UBound(words)
+        token = Trim$(CStr(words(wordIndex)))
+        If Len(token) > 0 Then
+            For rowIndex = LBound(rows) To UBound(rows)
+                If Len(rows(rowIndex)) > 0 Then
+                    fields = Split(CStr(rows(rowIndex)), Chr$(9))
+                    If UBound(fields) >= 1 Then
+                        smiley = CStr(fields(0))
+                        If StrComp(token, smiley, vbTextCompare) = 0 Then
+                            Proc_6_23_6E9A90 = CInt(Val(CStr(fields(1))))
+                            Exit Function
+                        End If
+                    End If
+                End If
+            Next rowIndex
+        End If
+    Next wordIndex
+
+GestureFailed:
+    Proc_6_23_6E9A90 = 0
 End Function
 
 ' Original declaration: Private  Proc_6_24_6EA010(arg_C) '6EA010
