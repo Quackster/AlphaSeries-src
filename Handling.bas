@@ -7222,7 +7222,87 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_149_775C10
 Public Function Proc_6_149_775C10(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim offset As Long
+    Dim userId As String
+    Dim roomId As Long
+    Dim furnitureId As Long
+    Dim rowText As String
+    Dim fields() As String
+    Dim productId As Long
+    Dim signText As String
+    Dim currentState As Long
+    Dim nextState As Long
+    Dim maxState As Long
+    Dim productType As Long
+    Dim productSprite As String
+    Dim payload As String
+
+    On Error GoTo UseDone
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex <= 0 Then GoTo UseDone
+
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "Ch" Then requestPayload = Mid$(requestPayload, 3)
+
+    furnitureId = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    If furnitureId <= 0 Then
+        offset = 1
+        furnitureId = ReadWireLong(requestPayload, offset)
+    End If
+    If furnitureId <= 0 Then GoTo UseDone
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo UseDone
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId <= 0 Then GoTo UseDone
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT id_product,sign FROM furnitures WHERE id='" & CStr(furnitureId) & "' AND id_room='" & CStr(roomId) & "' AND position_wall IS NULL LIMIT 1", 0, 0))
+    If Len(rowText) = 0 Then GoTo UseDone
+
+    fields = Split(rowText, Chr$(9))
+    productId = CLng(Val(HandlingField(fields, 0)))
+    signText = HandlingField(fields, 1)
+    If productId <= 0 Then GoTo UseDone
+
+    productType = CLng(Val(CStr(Proc_8_12_806C30(productId, 0, 0))))
+    If productType = 9 Then GoTo UseDone
+
+    productSprite = LCase$(CStr(Proc_8_12_806C30(productId, 17, 0)))
+    If Len(productSprite) = 0 Then productSprite = LCase$(CStr(Proc_8_12_806C30(productId, 18, 0)))
+
+    currentState = CLng(Val(signText))
+    maxState = CLng(Val(CStr(Proc_8_12_806C30(productId, 12, 0))))
+
+    If InStr(1, productSprite, "dice", vbTextCompare) > 0 Then
+        nextState = CLng(Val(CStr(Proc_10_4_809CA0(1, 6, 0))))
+    ElseIf Left$(productSprite, 9) = "bb_score_" Or Left$(productSprite, 9) = "es_score_" Or InStr(1, productSprite, "score", vbTextCompare) > 0 Then
+        If maxState <= 0 Then maxState = 99
+        nextState = currentState + 1
+        If nextState > maxState Then nextState = 0
+    Else
+        If maxState <= 0 Then maxState = 1
+        nextState = currentState + 1
+        If nextState > maxState Then nextState = 0
+    End If
+
+    Proc_5_0_6D3CD0 "UPDATE furnitures SET sign='" & CStr(nextState) & "',task_owner='" & Proc_10_11_80A9C0(userId, 0, 0) & "',task_time=UNIX_TIMESTAMP() WHERE id='" & CStr(furnitureId) & "' AND id_room='" & CStr(roomId) & "' LIMIT 1", 0, 0
+    Proc_6_151_78AC20 roomId, furnitureId, nextState
+
+    payload = "AX" & CStr(furnitureId) & Chr$(2) & CStr(nextState) & Chr$(2)
+    Proc_6_247_8027E0 socketIndex, payload, 0
+
+    If CLng(Val(CStr(Proc_8_12_806C30(productId, 34, 0)))) <> 0 Then
+        Proc_6_148_7756D0 socketIndex, productId, furnitureId
+    End If
+
+UseDone:
     Proc_6_149_775C10 = Empty
 End Function
 
@@ -11803,6 +11883,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_141_76A670 socketIndex, "A[", packetPayload
         Case "AI"
             Proc_6_159_79FCD0 socketIndex, "AI", packetPayload
+        Case "Ch"
+            Proc_6_149_775C10 socketIndex, "Ch", packetPayload
         Case "@B"
             Proc_6_78_7279A0 socketIndex, "@B", packetPayload
         Case "rv"
