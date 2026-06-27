@@ -88,7 +88,24 @@ End Function
 
 ' Original declaration: Private Sub Proc_1_5_6C4F80
 Public Function Proc_1_5_6C4F80(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    On Error GoTo BuildFailed
+
+    BuildAchievementSettingsCache
+    Proc_1_9_6C6DF0 0, 0, 0
+    Proc_1_4_6C4F00 0, 0, 0
+    Proc_1_7_6C5E10 0, 0, 0
+    Proc_1_18_6CE9C0 0, 0, 0
+    Proc_1_16_6CCA60 0, 0, 0
+    Proc_1_6_6C5830 0, 0, 0
+    Proc_1_10_6C7690 0, 0, 0
+    Proc_1_19_6CF190 0, 0, 0
+    Proc_1_20_6CF830 0, 0, 0
+    Proc_1_21_6D08C0 0, 0, 0
+    Proc_1_13_6C9820 0, 0, 0
+    Proc_1_22_6D0F00 0, 0, 0
+    BuildMessengerFriendLimitCache
+
+BuildFailed:
     Proc_1_5_6C4F80 = Empty
 End Function
 
@@ -662,6 +679,48 @@ Private Sub BuildCampaignReplacementCache()
     Next rowIndex
 
     global_00829094 = CStr(Proc_3_0_6D2AF0(replacementCount, Empty, vbNullString)) & payload
+
+CacheFailed:
+End Sub
+
+Private Sub BuildAchievementSettingsCache()
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim achievementIndex As Long
+
+    On Error GoTo CacheFailed
+    global_008291E4 = vbNullString
+    ReDim global_008291E8(0 To 100, 0 To 6)
+
+    rows = Split(CStr(Proc_5_2_6D4690("SELECT id_quest,id_badge,progress,reward_increase,level_total,score_increase,type_reward FROM settings_achievements WHERE is_enabled='1' LIMIT 100", 0, 0)), Chr$(13))
+    For rowIndex = LBound(rows) To UBound(rows)
+        If achievementIndex > 100 Then Exit For
+        If Len(rows(rowIndex)) > 0 Then
+            fields = Split(rows(rowIndex), Chr$(9))
+            If UBound(fields) >= 6 Then
+                global_008291E4 = global_008291E4 & CStr(Val(CStr(fields(0)))) & Chr$(2)
+                global_008291E8(achievementIndex, 0) = CLng(Val(CStr(fields(0))))
+                global_008291E8(achievementIndex, 1) = CStr(fields(1))
+                global_008291E8(achievementIndex, 2) = CLng(Val(CStr(fields(2))))
+                global_008291E8(achievementIndex, 3) = CLng(Val(CStr(fields(3))))
+                global_008291E8(achievementIndex, 4) = CLng(Val(CStr(fields(4))))
+                global_008291E8(achievementIndex, 5) = CLng(Val(CStr(fields(5))))
+                global_008291E8(achievementIndex, 6) = CInt(Val(CStr(fields(6))))
+                achievementIndex = achievementIndex + 1
+            End If
+        End If
+    Next rowIndex
+
+CacheFailed:
+End Sub
+
+Private Sub BuildMessengerFriendLimitCache()
+    On Error GoTo CacheFailed
+    ReDim global_0082927C(0 To 4)
+    global_0082927C(0) = CInt(Val(CStr(Proc_10_0_809570("com.client.messenger.maxfriends.hclevel0", 0, 0))))
+    global_0082927C(2) = CInt(Val(CStr(Proc_10_0_809570("com.client.messenger.maxfriends.hclevel1", 0, 0))))
+    global_0082927C(4) = CInt(Val(CStr(Proc_10_0_809570("com.client.messenger.maxfriends.hclevel2", 0, 0))))
 
 CacheFailed:
 End Sub
