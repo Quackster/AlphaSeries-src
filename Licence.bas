@@ -26,6 +26,7 @@ Public global_0082917C As String
 Public global_00829258 As String
 Public global_0082916C As Long
 Public global_008291EC As String
+Public global_008291FC As String
 Public global_00829078 As String
 Public global_0082907C As String
 Public global_00829084 As String

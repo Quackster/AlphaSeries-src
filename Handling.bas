@@ -7,6 +7,7 @@ Option Explicit
 
 Private representedActivityPointTicks As String
 Private representedInteractionPairs As String
+Private representedSoundMachineStoppedAt As Date
 
 ' Original declaration: Private Sub Proc_6_0_6D7FF0
 Public Function Proc_6_0_6D7FF0(ParamArray args() As Variant) As Variant
@@ -8484,7 +8485,56 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_224_7EF5A0
 Public Function Proc_6_224_7EF5A0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim roomId As Long
+    Dim jukeboxId As Long
+    Dim jukeboxRow As String
+    Dim jukeboxFields() As String
+    Dim activeDestinationId As Long
+    Dim markerText As String
+
+    On Error GoTo ClearDone
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 1 Then roomId = CLng(Val(CStr(args(1))))
+    If UBound(args) >= 2 Then jukeboxId = CLng(Val(CStr(args(2))))
+
+    If socketIndex > 0 Then
+        userId = HandlingUserIdFromSocket(socketIndex)
+        If Len(userId) > 0 And userId <> "0" Then
+            If roomId <= 0 Then roomId = HandlingCurrentRoomId(socketIndex, userId)
+        End If
+    End If
+
+    If jukeboxId <= 0 And roomId > 0 Then
+        jukeboxRow = CStr(Proc_5_2_6D4690("SELECT furnitures.id,furnitures.id_product FROM furnitures,soundmachine_jb_playlist WHERE furnitures.id_room='" & _
+            CStr(roomId) & "' AND soundmachine_jb_playlist.id_jukebox=furnitures.id GROUP BY furnitures.id ORDER BY furnitures.id DESC LIMIT 1", 0, 0))
+        If Len(jukeboxRow) = 0 Then
+            jukeboxRow = CStr(Proc_5_2_6D4690("SELECT furnitures.id,furnitures.id_product FROM furnitures,products WHERE furnitures.id_room='" & _
+                CStr(roomId) & "' AND furnitures.id_product=products.id AND (products.action LIKE '%soundmachine%' OR products.action LIKE '%jukebox%' OR products.name LIKE '%jukebox%' OR products.sprite LIKE '%jukebox%') ORDER BY furnitures.id DESC LIMIT 1", 0, 0))
+        End If
+        If Len(jukeboxRow) > 0 Then
+            jukeboxFields = Split(jukeboxRow, Chr$(9))
+            jukeboxId = CLng(Val(HandlingField(jukeboxFields, 0)))
+        End If
+    End If
+
+    If jukeboxId > 0 Then
+        activeDestinationId = CLng(Val(CStr(Proc_5_2_6D4690("SELECT id_destination FROM soundmachine_jb_playlist WHERE id_jukebox='" & _
+            CStr(jukeboxId) & "' AND id_order='0' LIMIT 1", 0, 0))))
+        If activeDestinationId > 0 Then
+            markerText = Chr$(1) & CStr(activeDestinationId) & Chr$(2)
+            global_008291FC = Replace(global_008291FC, markerText, vbNullString, 1, 1, vbBinaryCompare)
+        End If
+
+        markerText = Chr$(1) & CStr(jukeboxId) & Chr$(2)
+        global_008291FC = Replace(global_008291FC, markerText, vbNullString, 1, 1, vbBinaryCompare)
+    End If
+
+    representedSoundMachineStoppedAt = Now
+
+ClearDone:
     Proc_6_224_7EF5A0 = Empty
 End Function
 
