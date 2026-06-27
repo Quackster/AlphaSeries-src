@@ -3026,7 +3026,46 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_95_746CD0
 Public Function Proc_6_95_746CD0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim userId As String
+    Dim roomId As Long
+    Dim furnitureId As Long
+    Dim rowText As String
+    Dim fields() As String
+    Dim productId As Long
+    Dim productAction As String
+
+    On Error GoTo WheelCheckFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+    If Left$(packetPayload, 2) = "Cw" Then
+        requestPayload = Mid$(packetPayload, 3)
+    Else
+        requestPayload = packetPayload
+    End If
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If Len(userId) = 0 Or userId = "0" Or roomId <= 0 Then GoTo WheelCheckFailed
+
+    furnitureId = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    If furnitureId <= 0 Then GoTo WheelCheckFailed
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT id,position_x,position_y,id_product FROM furnitures WHERE id='" & CStr(furnitureId) & "' AND id_room='" & CStr(roomId) & "' LIMIT 1", 0, 0))
+    If Len(rowText) = 0 Then GoTo WheelCheckFailed
+
+    fields = Split(rowText, Chr$(9))
+    productId = CLng(Val(HandlingField(fields, 3)))
+    If productId <= 0 Then GoTo WheelCheckFailed
+
+    productAction = CStr(Proc_8_12_806C30(productId, 17, 0))
+    If StrComp(productAction, "habbowheel", vbBinaryCompare) <> 0 Then GoTo WheelCheckFailed
+
+WheelCheckFailed:
     Proc_6_95_746CD0 = Empty
 End Function
 
@@ -5594,6 +5633,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_200_7D5770 socketIndex, "Cl", packetPayload
         Case "EW"
             Proc_6_99_748460 socketIndex, "EW", packetPayload
+        Case "Cw"
+            Proc_6_95_746CD0 socketIndex, "Cw", packetPayload
         Case "EV"
             Proc_6_100_748C80 socketIndex, "EV", packetPayload
         Case "EU"
