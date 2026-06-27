@@ -2242,8 +2242,42 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_58_71FCA0
 Public Function Proc_6_58_71FCA0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_58_71FCA0 = Empty
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim roomIdText As String
+    Dim passwordStart As Long
+    Dim roomId As Long
+    Dim roomPassword As String
+
+    On Error GoTo EnterFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then
+        packetPayload = CStr(args(2))
+    ElseIf UBound(args) >= 1 Then
+        packetPayload = CStr(args(1))
+    End If
+    If Left$(packetPayload, 2) = "FG" Then packetPayload = Mid$(packetPayload, 3)
+
+    If Len(global_0082930C) = 0 Then
+        Proc_6_244_801E80 socketIndex, CStr(Proc_10_8_80A580(1, 0, 0)), 0
+        Proc_6_58_71FCA0 = 0
+        Exit Function
+    End If
+
+    roomIdText = CStr(Proc_10_7_80A190(packetPayload, 0, 0))
+    roomId = CLng(Val(roomIdText))
+    passwordStart = 3 + Len(roomIdText)
+    If passwordStart <= Len(packetPayload) Then
+        roomPassword = CStr(Proc_10_6_809F10(Mid$(packetPayload, passwordStart), 0, 0))
+    End If
+    Proc_6_57_71E8F0 socketIndex, roomId, roomPassword
+
+    Proc_6_58_71FCA0 = roomId
+    Exit Function
+
+EnterFailed:
+    Proc_6_58_71FCA0 = 0
 End Function
 
 ' Original declaration: Private Sub Proc_6_59_71FEE0
