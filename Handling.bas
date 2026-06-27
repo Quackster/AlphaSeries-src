@@ -133,8 +133,38 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_21_6E8BA0
 Public Function Proc_6_21_6E8BA0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_21_6E8BA0 = Empty
+    Dim messageText As String
+    Dim words() As String
+    Dim wordIndex As Long
+    Dim candidate As String
+    Dim lowered As String
+    Dim urlList As String
+
+    On Error GoTo ExtractFailed
+    If UBound(args) < 0 Then GoTo ExtractFailed
+
+    messageText = CStr(args(0))
+    words = Split(messageText, " ")
+
+    For wordIndex = LBound(words) To UBound(words)
+        candidate = Trim$(CStr(words(wordIndex)))
+        lowered = LCase$(candidate)
+        If Len(candidate) > 0 Then
+            If Left$(lowered, 4) = "www." And InStr(5, lowered, ".", vbBinaryCompare) > 0 Then
+                urlList = urlList & candidate & ";"
+            ElseIf Left$(lowered, 7) = "http://" Then
+                urlList = urlList & candidate & ";"
+            ElseIf Left$(lowered, 8) = "https://" Then
+                urlList = urlList & candidate & ";"
+            End If
+        End If
+    Next wordIndex
+
+    Proc_6_21_6E8BA0 = urlList
+    Exit Function
+
+ExtractFailed:
+    Proc_6_21_6E8BA0 = vbNullString
 End Function
 
 ' Original declaration: Private Sub Proc_6_22_6E9300
