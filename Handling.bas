@@ -2066,8 +2066,52 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_50_7166B0
 Public Function Proc_6_50_7166B0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim targetName As String
+    Dim targetRow As String
+    Dim targetFields() As String
+    Dim targetUserId As String
+    Dim targetSocketIndex As Long
+    Dim targetRoomId As Long
+
+    On Error GoTo FollowFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then
+        packetPayload = CStr(args(2))
+    ElseIf UBound(args) >= 1 Then
+        packetPayload = CStr(args(1))
+    End If
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "Ab" Then requestPayload = Mid$(requestPayload, 3)
+
+    targetName = CStr(Proc_10_7_80A190(requestPayload, 0, 0))
+    targetName = Trim$(targetName)
+    If Len(targetName) = 0 Then GoTo TargetUnavailable
+
+    targetRow = CStr(Proc_5_2_6D4690("SELECT users.id,users.id_socket,logs_visitedrooms.id_room FROM users,logs_visitedrooms WHERE users.name='" & Proc_10_11_80A9C0(targetName, 0, 0) & "' AND users.id=logs_visitedrooms.id_user AND logs_visitedrooms.timestamp_left IS NULL LIMIT 1", 0, 0))
+    If Len(targetRow) = 0 Then GoTo TargetUnavailable
+
+    targetFields = Split(targetRow, Chr$(9))
+    If UBound(targetFields) < 2 Then GoTo TargetUnavailable
+
+    targetUserId = CStr(Val(CStr(targetFields(0))))
+    targetSocketIndex = CLng(Val(CStr(targetFields(1))))
+    targetRoomId = CLng(Val(CStr(targetFields(2))))
+    If targetUserId = "0" Or targetSocketIndex <= 0 Or targetRoomId <= 0 Then GoTo TargetUnavailable
+
+    Proc_6_57_71E8F0 socketIndex, targetRoomId, vbNullString
+
+FollowFailed:
     Proc_6_50_7166B0 = Empty
+    Exit Function
+
+TargetUnavailable:
+    Proc_6_244_801E80 socketIndex, "BC", 0
+    GoTo FollowFailed
 End Function
 
 ' Original declaration: Private Sub Proc_6_51_716AC0
@@ -9348,6 +9392,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_47_714F60 socketIndex, "GG", packetPayload
         Case "FB"
             Proc_6_44_7145E0 socketIndex, "FB", packetPayload
+        Case "Ab"
+            Proc_6_50_7166B0 socketIndex, "Ab", packetPayload
         Case "EZ"
             Proc_6_48_7151E0 socketIndex, "EZ", packetPayload
         Case "E\"
