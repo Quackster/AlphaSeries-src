@@ -425,7 +425,63 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_10_6DE1D0
 Public Function Proc_6_10_6DE1D0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim callerUserId As String
+    Dim targetUserId As String
+    Dim targetRow As String
+    Dim targetFields() As String
+    Dim visitRows As String
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim roomCount As Long
+    Dim roomPayload As String
+    Dim responsePayload As String
+
+    On Error GoTo ChatHistoryFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "GG" Then requestPayload = Mid$(requestPayload, 3)
+
+    callerUserId = HandlingUserIdFromSocket(socketIndex)
+    If Len(callerUserId) = 0 Or callerUserId = "0" Then GoTo ChatHistoryFailed
+    If Not HandlingUserHasPermission(callerUserId, "fuse_mod") Then GoTo ChatHistoryFailed
+    If Not HandlingUserHasPermission(callerUserId, "fuse_chatlog") Then GoTo ChatHistoryFailed
+
+    targetUserId = StaffNestedUserIdFromWire(requestPayload)
+    If Len(targetUserId) = 0 Or targetUserId = "0" Then GoTo ChatHistoryFailed
+
+    targetRow = CStr(Proc_5_2_6D4690("SELECT users.id,users.name FROM users WHERE users.id='" & Proc_10_11_80A9C0(targetUserId, 0, 0) & "' LIMIT 1", 0, 0))
+    If Len(targetRow) = 0 Then GoTo ChatHistoryFailed
+    targetFields = Split(targetRow, Chr$(9))
+    targetUserId = CStr(Val(HandlingField(targetFields, 0)))
+    If Len(targetUserId) = 0 Or targetUserId = "0" Then GoTo ChatHistoryFailed
+
+    visitRows = CStr(Proc_5_2_6D4690("SELECT models.type,rooms.id,rooms.name,logs_visitedrooms.timestamp_enter,logs_visitedrooms.timestamp_left FROM rooms,logs_visitedrooms,models WHERE logs_visitedrooms.id_user='" & _
+        Proc_10_11_80A9C0(targetUserId, 0, 0) & "' AND rooms.id=logs_visitedrooms.id_room AND logs_visitedrooms.timestamp_enter > UNIX_TIMESTAMP()-21600 AND models.id=rooms.id_model GROUP BY logs_visitedrooms.id ORDER BY logs_visitedrooms.id DESC LIMIT 10", 0, 0))
+
+    If Len(visitRows) > 0 Then
+        rows = Split(visitRows, Chr$(13))
+        For rowIndex = LBound(rows) To UBound(rows)
+            If Len(rows(rowIndex)) > 0 Then
+                fields = Split(rows(rowIndex), Chr$(9))
+                roomPayload = roomPayload & StaffRoomChatHistoryPayload(fields, CLng(Val(targetUserId)))
+                roomCount = roomCount + 1
+            End If
+        Next rowIndex
+    End If
+
+    responsePayload = CStr(Proc_3_0_6D2AF0(CLng(Val(targetUserId)), Empty, "HX")) & HandlingField(targetFields, 1) & Chr$(2)
+    responsePayload = CStr(Proc_3_0_6D2AF0(roomCount, Empty, responsePayload)) & roomPayload
+    Proc_6_244_801E80 socketIndex, responsePayload, 0
+
+ChatHistoryFailed:
     Proc_6_10_6DE1D0 = Empty
 End Function
 
@@ -4380,6 +4436,119 @@ Private Function StaffRoomVisitPayload(ByRef fields() As String) As String
 
 BuildFailed:
     StaffRoomVisitPayload = vbNullString
+End Function
+
+Private Function StaffNestedUserIdFromWire(ByVal packetPayload As String) As String
+    Dim offset As Long
+    Dim nestedPayload As String
+    Dim userId As String
+
+    On Error GoTo ParseFailed
+
+    userId = CStr(Val(CStr(Proc_10_6_809F10(packetPayload, 0, 0))))
+    If Len(userId) > 0 And userId <> "0" Then
+        StaffNestedUserIdFromWire = userId
+        Exit Function
+    End If
+
+    offset = 1
+    nestedPayload = ReadWireString(packetPayload, offset)
+    userId = CStr(Val(CStr(Proc_10_6_809F10(nestedPayload, 0, 0))))
+    If Len(userId) = 0 Or userId = "0" Then userId = CStr(ReadWireLong(packetPayload, offset))
+
+    StaffNestedUserIdFromWire = userId
+    Exit Function
+
+ParseFailed:
+    StaffNestedUserIdFromWire = vbNullString
+End Function
+
+Private Function StaffRoomChatHistoryPayload(ByRef visitFields() As String, ByVal targetUserId As Long) As String
+    Dim modelType As Long
+    Dim roomId As Long
+    Dim roomName As String
+    Dim timestampEnter As Long
+    Dim timestampLeft As Long
+    Dim chatRows As String
+    Dim chatPayload As String
+    Dim chatCount As Long
+    Dim payload As String
+
+    On Error GoTo BuildFailed
+
+    modelType = CLng(Val(HandlingField(visitFields, 0)))
+    roomId = CLng(Val(HandlingField(visitFields, 1)))
+    roomName = HandlingField(visitFields, 2)
+    timestampEnter = CLng(Val(HandlingField(visitFields, 3)))
+    timestampLeft = CLng(Val(HandlingField(visitFields, 4)))
+
+    chatRows = StaffRoomChatRows(roomId, targetUserId, timestampEnter, timestampLeft)
+    chatPayload = StaffRoomChatRowsPayload(chatRows, chatCount)
+
+    payload = CStr(Proc_3_0_6D2AF0(modelType, Empty, vbNullString))
+    payload = CStr(Proc_3_0_6D2AF0(roomId, Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(chatCount, Empty, payload))
+    StaffRoomChatHistoryPayload = payload & roomName & Chr$(2) & chatPayload
+    Exit Function
+
+BuildFailed:
+    StaffRoomChatHistoryPayload = vbNullString
+End Function
+
+Private Function StaffRoomChatRows(ByVal roomId As Long, ByVal targetUserId As Long, ByVal timestampEnter As Long, ByVal timestampLeft As Long) As String
+    Dim upperBound As String
+    Dim lowerBound As String
+
+    On Error GoTo QueryFailed
+
+    If timestampLeft > 0 Then
+        upperBound = " AND logs_chat.timestamp < " & CStr(timestampLeft)
+        lowerBound = " AND logs_chat.timestamp > " & CStr(timestampEnter)
+    Else
+        lowerBound = " AND logs_chat.timestamp > UNIX_TIMESTAMP()-600"
+    End If
+
+    StaffRoomChatRows = CStr(Proc_5_2_6D4690("SELECT DATE_FORMAT(FROM_UNIXTIME(logs_chat.timestamp), '" & Chr$(37) & _
+        "H'),DATE_FORMAT(FROM_UNIXTIME(logs_chat.timestamp), '" & Chr$(37) & _
+        "i'),users.id,users.name,logs_chat.description FROM logs_chat,rooms,users WHERE logs_chat.id_room='" & _
+        CStr(roomId) & "'" & upperBound & lowerBound & " AND (users.id=logs_chat.id_user OR logs_chat.id_partner='" & _
+        Proc_10_11_80A9C0(CStr(targetUserId), 0, 0) & "') AND users.id=logs_chat.id_user GROUP BY logs_chat.id ORDER BY logs_chat.id DESC LIMIT 50", 0, 0))
+    Exit Function
+
+QueryFailed:
+    StaffRoomChatRows = vbNullString
+End Function
+
+Private Function StaffRoomChatRowsPayload(ByVal chatRows As String, ByRef chatCount As Long) As String
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim payload As String
+
+    On Error GoTo BuildFailed
+    chatCount = 0
+    If Len(chatRows) = 0 Then Exit Function
+
+    rows = Split(chatRows, Chr$(13))
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(rows(rowIndex)) > 0 Then
+            fields = Split(rows(rowIndex), Chr$(9))
+            If UBound(fields) >= 4 Then
+                payload = payload & CStr(Proc_3_0_6D2AF0(CLng(Val(HandlingField(fields, 0))), Empty, vbNullString))
+                payload = payload & CStr(Proc_3_0_6D2AF0(CLng(Val(HandlingField(fields, 1))), Empty, vbNullString))
+                payload = payload & CStr(Proc_3_0_6D2AF0(CLng(Val(HandlingField(fields, 2))), Empty, vbNullString))
+                payload = payload & HandlingField(fields, 3) & Chr$(2)
+                payload = payload & HandlingField(fields, 4) & Chr$(2)
+                chatCount = chatCount + 1
+            End If
+        End If
+    Next rowIndex
+
+    StaffRoomChatRowsPayload = payload
+    Exit Function
+
+BuildFailed:
+    StaffRoomChatRowsPayload = payload
 End Function
 
 Private Function ContainsUnsafeStaffAlert(ByVal messageText As String) As Boolean
