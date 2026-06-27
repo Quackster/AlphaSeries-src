@@ -795,8 +795,47 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_17_6E48D0
 Public Function Proc_6_17_6E48D0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim userId As String
+    Dim mottoText As String
+    Dim figureText As String
+    Dim genderText As String
+    Dim payload As String
+    Dim offset As Long
+
+    On Error GoTo FigureFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "@l" Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    genderText = UCase$(Left$(CStr(ReadWireString(requestPayload, offset)), 1))
+    figureText = CStr(Proc_10_10_80A7F0(ReadWireString(requestPayload, offset), 0, 0))
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo FigureFailed
+    If genderText <> "M" And genderText <> "F" Then GoTo FigureFailed
+    If Not IsValidWardrobeFigure(figureText, genderText) Then GoTo FigureFailed
+
+    Proc_5_0_6D3CD0 "UPDATE users SET tutorial_clothes='1',gender='" & Proc_10_11_80A9C0(genderText, 0, 0) & "',figure='" & Proc_10_11_80A9C0(figureText, 0, 0) & "' WHERE id='" & Proc_10_11_80A9C0(userId, 0, 0) & "'", 0, 0
+
+    mottoText = CStr(Proc_5_2_6D4690("SELECT motto FROM users WHERE id='" & Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 1", 0, 0))
+    payload = UserIdentityPayload(CLng(Val(userId)), mottoText, genderText, figureText)
+    Proc_6_244_801E80 socketIndex, payload, 0
+    Proc_6_247_8027E0 socketIndex, payload, 0
+
+FigureFailed:
     Proc_6_17_6E48D0 = Empty
+End Function
+
+Private Function UserIdentityPayload(ByVal userId As Long, ByVal mottoText As String, ByVal genderText As String, ByVal figureText As String) As String
+    UserIdentityPayload = CStr(Proc_3_0_6D2AF0(userId, Empty, "DJ")) & mottoText & Chr$(2) & genderText & Chr$(2) & figureText & Chr$(2)
 End Function
 
 ' Original declaration: Private Sub Proc_6_18_6E7480
@@ -3917,6 +3956,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_15_6E1900 socketIndex, "Ew", packetPayload
         Case "Ex"
             Proc_6_16_6E2320 socketIndex, "Ex", packetPayload
+        Case "@l"
+            Proc_6_17_6E48D0 socketIndex, "@l", packetPayload
         Case "oC"
             Proc_6_135_765D80 socketIndex, "oC", packetPayload
         Case "oV"
