@@ -6730,7 +6730,55 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_165_7BE0B0
 Public Function Proc_6_165_7BE0B0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim targetSocketIndex As Integer
+    Dim rowText As String
+    Dim rows As Variant
+    Dim fields As Variant
+    Dim rowIndex As Long
+    Dim summaryPayload As String
+    Dim notifyPayload As String
+
+    On Error GoTo NotifyFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 1 Then targetSocketIndex = CInt(Val(CStr(args(1))))
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo NotifyFailed
+
+    summaryPayload = MessengerFriendSummaryPayload(userId, 1)
+    If Len(summaryPayload) = 0 Then GoTo NotifyFailed
+    notifyPayload = "@MHIH" & summaryPayload
+
+    If targetSocketIndex > 0 Then
+        If Proc_11_2_821390(targetSocketIndex, 0, 0) = 1 Then
+            Proc_6_244_801E80 targetSocketIndex, notifyPayload, 0
+        End If
+    Else
+        rowText = CStr(Proc_5_2_6D4690("SELECT users.id_socket FROM friendships,users WHERE friendships.has_accept='1' AND friendships.id_user='" & _
+            Proc_10_11_80A9C0(userId, 0, 0) & "' AND users.id=friendships.id_friend AND users.id_socket>'0'", 0, 0))
+        rows = Split(rowText, Chr$(13))
+        For rowIndex = LBound(rows) To UBound(rows)
+            If Len(CStr(rows(rowIndex))) > 0 Then
+                fields = Split(CStr(rows(rowIndex)), Chr$(9))
+                If UBound(fields) >= 0 Then
+                    targetSocketIndex = CInt(Val(CStr(fields(0))))
+                    If targetSocketIndex > 0 Then
+                        If Proc_11_2_821390(targetSocketIndex, 0, 0) = 1 Then
+                            Proc_6_244_801E80 targetSocketIndex, notifyPayload, 0
+                        End If
+                    End If
+                End If
+            End If
+        Next rowIndex
+    End If
+
+    Proc_6_165_7BE0B0 = notifyPayload
+    Exit Function
+
+NotifyFailed:
     Proc_6_165_7BE0B0 = Empty
 End Function
 
