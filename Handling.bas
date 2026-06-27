@@ -1174,7 +1174,36 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_71_724CF0
 Public Function Proc_6_71_724CF0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim callerUserId As String
+    Dim roomId As Long
+    Dim socketRows As String
+    Dim socketValues() As String
+    Dim socketIndexText As Variant
+    Dim targetSocketIndex As Integer
+
+    On Error GoTo ClearFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    callerUserId = HandlingUserIdFromSocket(socketIndex)
+    If Len(callerUserId) = 0 Or callerUserId = "0" Then GoTo ClearFailed
+
+    roomId = HandlingCurrentRoomId(socketIndex, callerUserId)
+    If roomId <= 0 Then GoTo ClearFailed
+    If Not HandlingUserOwnsRoom(callerUserId, roomId) Then GoTo ClearFailed
+
+    socketRows = CStr(Proc_5_2_6D4690("SELECT users.id_socket FROM rooms_rights,users WHERE rooms_rights.id_room='" & CStr(roomId) & "' AND users.id=rooms_rights.id_user AND users.id_socket IS NOT NULL", 0, 0))
+    Proc_5_0_6D3CD0 "DELETE FROM rooms_rights WHERE id_room='" & CStr(roomId) & "'", 0, 0
+
+    If Len(socketRows) > 0 Then
+        socketValues = Split(socketRows, Chr$(13))
+        For Each socketIndexText In socketValues
+            targetSocketIndex = CInt(Val(CStr(socketIndexText)))
+            If targetSocketIndex > 0 Then Proc_6_244_801E80 targetSocketIndex, "@k", 0
+        Next socketIndexText
+    End If
+
+ClearFailed:
     Proc_6_71_724CF0 = Empty
 End Function
 
@@ -3266,6 +3295,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_75_7269D0 socketIndex, "EB", packetPayload
         Case "Aa"
             Proc_6_74_7265B0 socketIndex, "Aa", packetPayload
+        Case "B["
+            Proc_6_71_724CF0 socketIndex, "B[", packetPayload
         Case "Es"
             Proc_6_76_726CE0 socketIndex, "Es", packetPayload
         Case "FD"
@@ -3502,6 +3533,20 @@ Private Function HandlingUserHasRoomRight(ByVal userId As String, ByVal roomId A
 
 CheckFailed:
     HandlingUserHasRoomRight = False
+End Function
+
+Private Function HandlingUserOwnsRoom(ByVal userId As String, ByVal roomId As Long) As Boolean
+    Dim ownerUserId As String
+
+    On Error GoTo CheckFailed
+    If Len(userId) = 0 Or userId = "0" Or roomId <= 0 Then GoTo CheckFailed
+
+    ownerUserId = CStr(Proc_5_2_6D4690("SELECT id_owner FROM rooms WHERE id='" & CStr(roomId) & "' AND id_owner='" & Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 1", 0, 0))
+    HandlingUserOwnsRoom = (Len(ownerUserId) > 0)
+    Exit Function
+
+CheckFailed:
+    HandlingUserOwnsRoom = False
 End Function
 
 Private Function HandlingUserRank(ByVal userId As String) As Long
