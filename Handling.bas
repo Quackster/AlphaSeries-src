@@ -3676,7 +3676,46 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_82_731070
 Public Function Proc_6_82_731070(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim roomId As Long
+    Dim rowText As String
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim roomUserIndex As Long
+    Dim effectId As Long
+    Dim effectPayload As String
+    Dim effectCount As Long
+
+    On Error GoTo StatusDone
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 1 Then roomId = CLng(Val(CStr(args(1))))
+    If roomId <= 0 And socketIndex > 0 Then
+        userId = HandlingUserIdFromSocket(socketIndex)
+        If Len(userId) > 0 And userId <> "0" Then roomId = HandlingCurrentRoomId(socketIndex, userId)
+    End If
+    If socketIndex <= 0 Or roomId <= 0 Then GoTo StatusDone
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT logs_visitedrooms.id,users_effects.id_effect FROM logs_visitedrooms,users_effects WHERE logs_visitedrooms.id_room='" & CStr(roomId) & "' AND logs_visitedrooms.timestamp_left IS NULL AND users_effects.id_user=logs_visitedrooms.id_user AND users_effects.timestamp_expire IS NOT NULL AND users_effects.timestamp_expire>UNIX_TIMESTAMP() ORDER BY logs_visitedrooms.timestamp_enter ASC LIMIT 250", 0, 0))
+    If Len(rowText) > 0 Then
+        rows = Split(rowText, Chr$(13))
+        For rowIndex = LBound(rows) To UBound(rows)
+            If Len(Trim$(CStr(rows(rowIndex)))) > 0 Then
+                fields = Split(CStr(rows(rowIndex)), Chr$(9))
+                roomUserIndex = CLng(Val(HandlingField(fields, 0)))
+                effectId = CLng(Val(HandlingField(fields, 1)))
+                If roomUserIndex > 0 And effectId > 0 Then
+                    effectPayload = CStr(Proc_3_0_6D2AF0(effectId, Empty, CStr(Proc_3_0_6D2AF0(roomUserIndex, Empty, "Ge"))))
+                    Proc_6_244_801E80 socketIndex, effectPayload, 0
+                    effectCount = effectCount + 1
+                End If
+            End If
+        Next rowIndex
+    End If
+
+StatusDone:
     Proc_6_82_731070 = Empty
 End Function
 
