@@ -354,7 +354,43 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_31_70DE80
 Public Function Proc_6_31_70DE80(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim rankIndex As Long
+    Dim hcLevel As Long
+    Dim staffPayload As String
+    Dim rowText As String
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim queryText As String
+
+    On Error GoTo ListFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo ListFailed
+
+    rankIndex = HandlingUserRank(userId)
+    hcLevel = HandlingUserHcLevel(userId)
+    If Not CBool(Proc_10_1_809790(rankIndex, vbNullString, "fuse_mod", hcLevel)) Then GoTo ListFailed
+
+    staffPayload = StaffModerationPayload(rankIndex, hcLevel)
+    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(0, Empty, "HS")) & CStr(Proc_3_0_6D2AF0(0, Empty, vbNullString)) & staffPayload, 0
+
+    queryText = "SELECT staff_cfh.id,staff_cfh.id_tab,users.id,users.name,staff_cfh.id_partner,staff_cfh.id_room,staff_cfh.id_category,staff_cfh.description,rooms.id,rooms.name,staff_cfh.id_picker FROM staff_cfh,users,rooms WHERE staff_cfh.id_closed!='3' AND staff_cfh.timestamp_sent > UNIX_TIMESTAMP()-43200 AND users.id=staff_cfh.id_user AND users.id_socket IS NOT NULL AND rooms.id=staff_cfh.id_room LIMIT 1000"
+    rowText = CStr(Proc_5_2_6D4690(queryText, 0, 0))
+    If Len(rowText) > 0 Then
+        rows = Split(rowText, Chr$(13))
+        For rowIndex = LBound(rows) To UBound(rows)
+            If Len(rows(rowIndex)) > 0 Then
+                fields = Split(rows(rowIndex), Chr$(9))
+                Proc_6_244_801E80 socketIndex, "HR" & CallForHelpRowPayload(fields), 0
+            End If
+        Next rowIndex
+    End If
+
+ListFailed:
     Proc_6_31_70DE80 = Empty
 End Function
 
@@ -2887,6 +2923,86 @@ Private Function HandlingCurrentRoomId(ByVal socketIndex As Integer, ByVal userI
 
 LookupFailed:
     HandlingCurrentRoomId = 0
+End Function
+
+Private Function HandlingUserRank(ByVal userId As String) As Long
+    On Error GoTo LookupFailed
+    HandlingUserRank = CLng(Val(CStr(Proc_5_2_6D4690("SELECT level FROM users WHERE id='" & Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 1", 0, 0))))
+    If HandlingUserRank < 0 Then HandlingUserRank = 0
+    If HandlingUserRank > 20 Then HandlingUserRank = 20
+    Exit Function
+
+LookupFailed:
+    HandlingUserRank = 0
+End Function
+
+Private Function HandlingUserHcLevel(ByVal userId As String) As Long
+    On Error GoTo LookupFailed
+    HandlingUserHcLevel = CLng(Val(CStr(Proc_5_2_6D4690("SELECT level_hc FROM users WHERE id='" & Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 1", 0, 0))))
+    If HandlingUserHcLevel < 0 Then HandlingUserHcLevel = 0
+    If HandlingUserHcLevel > 2 Then HandlingUserHcLevel = 2
+    Exit Function
+
+LookupFailed:
+    HandlingUserHcLevel = 0
+End Function
+
+Private Function StaffModerationPayload(ByVal rankIndex As Long, ByVal hcLevel As Long) As String
+    On Error GoTo MissingPayload
+    If rankIndex < 0 Then rankIndex = 0
+    If rankIndex > 20 Then rankIndex = 20
+    If hcLevel < 0 Then hcLevel = 0
+    If hcLevel > 2 Then hcLevel = 2
+    If IsArray(global_008292D8) Then StaffModerationPayload = CStr(global_008292D8(rankIndex, hcLevel))
+    Exit Function
+
+MissingPayload:
+    StaffModerationPayload = vbNullString
+End Function
+
+Private Function CallForHelpRowPayload(ByRef fields() As String) As String
+    Dim cfhId As Long
+    Dim callerId As Long
+    Dim partnerId As Long
+    Dim roomId As Long
+    Dim categoryId As Long
+    Dim pickerId As Long
+    Dim callerName As String
+    Dim partnerName As String
+    Dim roomName As String
+    Dim descriptionText As String
+    Dim pickerName As String
+
+    On Error GoTo BuildFailed
+
+    cfhId = CLng(Val(HandlingField(fields, 0)))
+    callerId = CLng(Val(HandlingField(fields, 2)))
+    callerName = HandlingField(fields, 3)
+    partnerId = CLng(Val(HandlingField(fields, 4)))
+    roomId = CLng(Val(HandlingField(fields, 5)))
+    categoryId = CLng(Val(HandlingField(fields, 6)))
+    descriptionText = HandlingField(fields, 7)
+    roomName = HandlingField(fields, 9)
+    pickerId = CLng(Val(HandlingField(fields, 10)))
+
+    If partnerId > 0 Then partnerName = CStr(Proc_5_2_6D4690("SELECT name FROM users WHERE id='" & CStr(partnerId) & "' LIMIT 1", 0, 0))
+    If pickerId > 0 Then pickerName = CStr(Proc_5_2_6D4690("SELECT name FROM users WHERE id='" & CStr(pickerId) & "' LIMIT 1", 0, 0))
+
+    CallForHelpRowPayload = CStr(Proc_6_29_70D800(0, 0, categoryId, callerId, callerName, partnerId, partnerName, descriptionText, roomId, roomName, cfhId, pickerName))
+    Exit Function
+
+BuildFailed:
+    CallForHelpRowPayload = vbNullString
+End Function
+
+Private Function HandlingField(ByRef fields() As String, ByVal fieldIndex As Long) As String
+    On Error GoTo MissingField
+    If fieldIndex < LBound(fields) Or fieldIndex > UBound(fields) Then GoTo MissingField
+    HandlingField = CStr(fields(fieldIndex))
+    Exit Function
+
+MissingField:
+    HandlingField = vbNullString
 End Function
 
 Private Function ReadWireString(ByVal packetPayload As String, ByRef offset As Long) As String
