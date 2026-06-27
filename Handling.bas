@@ -6470,8 +6470,69 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_189_7D0630
 Public Function Proc_6_189_7D0630(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_189_7D0630 = Empty
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim userId As String
+    Dim roomId As Long
+    Dim roomSlot As Long
+    Dim requestedEntityId As Long
+    Dim guideBotId As Long
+    Dim entityList As String
+    Dim entityIds() As String
+    Dim entityIndex As Long
+    Dim botEntityId As Long
+    Dim removedCount As Long
+    Dim offset As Long
+
+    On Error GoTo RemoveFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex <= 0 Then GoTo RemoveFailed
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "Fy" Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    requestedEntityId = ReadWireLong(requestPayload, offset)
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo RemoveFailed
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId <= 0 Then GoTo RemoveFailed
+
+    roomSlot = CLng(Val(CStr(Proc_5_2_6D4690("SELECT id_slot FROM rooms WHERE id='" & CStr(roomId) & "' LIMIT 1", 0, 0))))
+    If roomSlot <= 0 Then GoTo RemoveFailed
+
+    If requestedEntityId > 0 Then
+        If RepresentedBotRecordLong(requestedEntityId, 0) = roomSlot Then
+            entityList = CStr(requestedEntityId)
+        End If
+    Else
+        guideBotId = CLng(Val(CStr(Proc_10_0_809570("com.client.bot.guide.id", "0", 0))))
+        entityList = RepresentedBotEntitiesForRoom(roomSlot, guideBotId)
+    End If
+
+    If Len(entityList) = 0 Then GoTo RemoveDone
+    entityIds = Split(entityList, Chr$(13))
+    For entityIndex = LBound(entityIds) To UBound(entityIds)
+        botEntityId = CLng(Val(CStr(entityIds(entityIndex))))
+        If botEntityId > 0 Then
+            Proc_6_248_802B80 roomId, "@]" & CStr(botEntityId) & Chr$(2), 0
+            RemoveRepresentedBotRecord botEntityId
+            removedCount = removedCount + 1
+        End If
+    Next entityIndex
+
+RemoveDone:
+    Proc_6_189_7D0630 = removedCount
+    Exit Function
+
+RemoveFailed:
+    Proc_6_189_7D0630 = 0
 End Function
 
 ' Original declaration: Private Sub Proc_6_190_7D11D0
@@ -7400,6 +7461,10 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_174_7C3BC0 socketIndex, "@g", packetPayload
         Case "@h"
             Proc_6_171_7C1520 socketIndex, "@h", packetPayload
+        Case "Fy"
+            Proc_6_189_7D0630 socketIndex, "Fy", packetPayload
+        Case "Fx"
+            Proc_6_188_7CF3C0 socketIndex, "Fx", packetPayload
         Case "n" & Chr$(127)
             Proc_6_177_7C6580 socketIndex, "n" & Chr$(127), packetPayload
         Case "ny"
@@ -7978,6 +8043,40 @@ Private Function RepresentedBotEntityFromBotId(ByVal botId As Long) As Long
 
 MissingEntity:
     RepresentedBotEntityFromBotId = 0
+End Function
+
+Private Function RepresentedBotEntitiesForRoom(ByVal roomSlot As Long, ByVal onlyBotId As Long) As String
+    Dim records() As String
+    Dim recordIndex As Long
+    Dim recordText As String
+    Dim payloadAt As Long
+    Dim endAt As Long
+    Dim entityId As Long
+    Dim fields() As String
+
+    On Error GoTo LookupDone
+    If roomSlot <= 0 Or Len(global_00829358) = 0 Then GoTo LookupDone
+
+    records = Split(global_00829358, "[")
+    For recordIndex = LBound(records) To UBound(records)
+        recordText = CStr(records(recordIndex))
+        payloadAt = InStr(1, recordText, ":", vbBinaryCompare)
+        endAt = InStr(1, recordText, "]", vbBinaryCompare)
+        If payloadAt > 1 And endAt > payloadAt Then
+            entityId = CLng(Val(Left$(recordText, payloadAt - 1)))
+            fields = Split(Mid$(recordText, payloadAt + 1, endAt - payloadAt - 1), Chr$(2))
+            If UBound(fields) >= 1 Then
+                If CLng(Val(CStr(fields(0)))) = roomSlot Then
+                    If onlyBotId <= 0 Or CLng(Val(CStr(fields(1)))) = onlyBotId Then
+                        If Len(RepresentedBotEntitiesForRoom) > 0 Then RepresentedBotEntitiesForRoom = RepresentedBotEntitiesForRoom & Chr$(13)
+                        RepresentedBotEntitiesForRoom = RepresentedBotEntitiesForRoom & CStr(entityId)
+                    End If
+                End If
+            End If
+        End If
+    Next recordIndex
+
+LookupDone:
 End Function
 
 Private Sub StoreRepresentedBotPosition(ByVal botEntityId As Long, ByVal positionX As Long, ByVal positionY As Long, ByVal positionZ As String, ByVal positionR As Long)
