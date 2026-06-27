@@ -2846,7 +2846,80 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_69_723630
 Public Function Proc_6_69_723630(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim callerUserId As String
+    Dim roomId As Long
+    Dim furnitureId As Long
+    Dim rowText As String
+    Dim fields() As String
+    Dim boxProductId As Long
+    Dim openedProductId As Long
+    Dim openedProductType As Long
+    Dim boxAction As String
+    Dim openedSign As String
+    Dim offset As Long
+    Dim previousOffset As Long
+    Dim responseClass As String
+    Dim responsePayload As String
+
+    On Error GoTo PresentOpenFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "AN" Then requestPayload = Mid$(requestPayload, 3)
+
+    furnitureId = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    If furnitureId <= 0 Then
+        offset = 1
+        previousOffset = offset
+        furnitureId = ReadWireLong(requestPayload, offset)
+        If offset <= previousOffset Then GoTo PresentOpenFailed
+    End If
+    If furnitureId <= 0 Then GoTo PresentOpenFailed
+
+    callerUserId = HandlingUserIdFromSocket(socketIndex)
+    If Len(callerUserId) = 0 Or callerUserId = "0" Then GoTo PresentOpenFailed
+
+    roomId = HandlingCurrentRoomId(socketIndex, callerUserId)
+    If roomId <= 0 Then GoTo PresentOpenFailed
+    If Not HandlingUserHasRoomRight(callerUserId, roomId) Then GoTo PresentOpenFailed
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT id,id_product,id_destination,sign_extra FROM furnitures WHERE id='" & CStr(furnitureId) & "' AND id_room='" & CStr(roomId) & "' LIMIT 1", 0, 0))
+    If Len(rowText) = 0 Then GoTo PresentOpenFailed
+
+    fields = Split(rowText, Chr$(9))
+    If UBound(fields) < 2 Then GoTo PresentOpenFailed
+
+    boxProductId = CLng(Val(CStr(fields(1))))
+    openedProductId = CLng(Val(CStr(fields(2))))
+    If UBound(fields) >= 3 Then openedSign = CStr(fields(3))
+    If boxProductId <= 0 Or openedProductId <= 0 Then GoTo PresentOpenFailed
+
+    boxAction = LCase$(CStr(Proc_8_12_806C30(boxProductId, 17, 0)))
+    If InStr(1, boxAction, "present_", vbTextCompare) = 0 Then GoTo PresentOpenFailed
+    If StrComp(boxAction, "ecotron_box", vbTextCompare) = 0 Then GoTo PresentOpenFailed
+
+    Proc_6_247_8027E0 socketIndex, "A^" & CStr(furnitureId) & Chr$(2) & "H" & Chr$(2), 0
+    Proc_5_0_6D3CD0 "DELETE FROM furnitures WHERE id='" & CStr(furnitureId) & "' LIMIT 1", 0, 0
+    Proc_5_0_6D3CD0 "INSERT INTO furnitures(id_product,id_owner,sign,task_owner,task_time) VALUES('" & _
+        CStr(openedProductId) & "','" & Proc_10_11_80A9C0(callerUserId, 0, 0) & "','" & _
+        Proc_10_11_80A9C0(openedSign, 0, 0) & "','" & Proc_10_11_80A9C0(callerUserId, 0, 0) & "',UNIX_TIMESTAMP())", 0, 0
+
+    openedProductType = CLng(Val(CStr(Proc_8_12_806C30(openedProductId, 0, 0))))
+    responseClass = "i"
+    If openedProductType = 2 Then responseClass = "s"
+    If openedProductType = 3 Then responseClass = "e"
+
+    responsePayload = CStr(Proc_3_0_6D2AF0(openedProductId, Empty, "BA" & responseClass & Chr$(2)))
+    responsePayload = responsePayload & CStr(Proc_8_12_806C30(openedProductId, 24, 0)) & Chr$(2)
+    Proc_6_244_801E80 socketIndex, responsePayload, 0
+
+PresentOpenFailed:
     Proc_6_69_723630 = Empty
 End Function
 
@@ -9013,6 +9086,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_60_720060 socketIndex, "FA", packetPayload
         Case "FI"
             Proc_6_70_724190 socketIndex, "FI", packetPayload
+        Case "AN"
+            Proc_6_69_723630 socketIndex, "AN", packetPayload
         Case "oL", "CD"
             ' Decompiled targets Proc_7F44D0 and Proc_7FA5A0 were not generated as valid symbols.
     End Select
