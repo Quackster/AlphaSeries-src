@@ -2626,7 +2626,69 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_105_74AD50
 Public Function Proc_6_105_74AD50(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim userId As String
+    Dim roomName As String
+    Dim modelName As String
+    Dim maxOwnedRooms As Long
+    Dim ownedRoomCount As Long
+    Dim modelRow As String
+    Dim modelFields() As String
+    Dim modelId As Long
+    Dim visitorsMax As Long
+    Dim roomId As Long
+    Dim offset As Long
+
+    On Error GoTo CreateFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then
+        packetPayload = CStr(args(2))
+    ElseIf UBound(args) >= 1 Then
+        packetPayload = CStr(args(1))
+    End If
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "@]" Then requestPayload = Mid$(requestPayload, 3)
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo CreateFailed
+
+    maxOwnedRooms = CLng(Val(CStr(Proc_10_0_809570("com.server.socket.game.rooms.own.max", 0, 0))))
+    ownedRoomCount = CLng(Val(CStr(Proc_5_2_6D4690("SELECT COUNT(id) FROM rooms WHERE id_owner='" & Proc_10_11_80A9C0(userId, 0, 0) & "'", 0, 0))))
+    If maxOwnedRooms > 0 And ownedRoomCount >= maxOwnedRooms Then GoTo CreateFailed
+
+    offset = 1
+    roomName = CStr(Proc_10_10_80A7F0(ReadWireString(requestPayload, offset), 0, 0))
+    If Len(roomName) = 0 Then roomName = CStr(Proc_10_10_80A7F0(Proc_10_7_80A190(requestPayload, 0, 0), 0, 0))
+    roomName = Left$(roomName, 25)
+    If Len(roomName) = 0 Then GoTo CreateFailed
+
+    modelName = CStr(Proc_10_11_80A9C0(ReadWireString(requestPayload, offset), 0, 0))
+    If Len(modelName) = 0 Then modelName = CStr(Proc_10_11_80A9C0(Proc_10_7_80A190(requestPayload, 0, 0), 0, 0))
+    modelName = Left$(modelName, 10)
+    If Len(modelName) = 0 Then GoTo CreateFailed
+
+    modelRow = CStr(Proc_5_2_6D4690("SELECT id,visitors_max FROM models WHERE create_min_level_hc <= '" & CStr(HandlingUserHcLevel(userId)) & "' AND type='0' AND name='" & modelName & "' LIMIT 1", 0, 0))
+    If Len(modelRow) = 0 Then GoTo CreateFailed
+
+    modelFields = Split(modelRow, Chr$(9))
+    modelId = CLng(Val(HandlingField(modelFields, 0)))
+    visitorsMax = CLng(Val(HandlingField(modelFields, 1)))
+    If modelId <= 0 Then GoTo CreateFailed
+    If visitorsMax <= 0 Then visitorsMax = 25
+
+    Proc_5_0_6D3CD0 "INSERT INTO rooms(id_owner,name,visitors_max,id_model,timestamp_created) VALUES('" & Proc_10_11_80A9C0(userId, 0, 0) & "','" & Proc_10_11_80A9C0(roomName, 0, 0) & "','" & CStr(visitorsMax) & "','" & CStr(modelId) & "',UNIX_TIMESTAMP())", 0, 0
+    roomId = CLng(Val(CStr(Proc_5_2_6D4690("SELECT MAX(id) FROM rooms", 0, 0))))
+    If roomId <= 0 Then GoTo CreateFailed
+
+    Proc_6_106_74B750 App.Path & "\CACHE\ROOMS\" & CStr(roomId) & ".cache", 0, 0
+    Proc_6_106_74B750 App.Path & "\CACHE\PATHFINDER\" & CStr(roomId) & ".cache", 0, 0
+    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(roomId, Empty, "@{")) & roomName & Chr$(2), 0
+
+CreateFailed:
     Proc_6_105_74AD50 = Empty
 End Function
 
@@ -4273,6 +4335,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_35_70F630 socketIndex, "Fd", packetPayload
         Case "FC"
             Proc_6_104_74AB60 socketIndex, "FC", packetPayload
+        Case "@]"
+            Proc_6_105_74AD50 socketIndex, "@]", packetPayload
         Case "Af"
             Proc_6_136_765F10 socketIndex, "Af", packetPayload
         Case "Ew"
