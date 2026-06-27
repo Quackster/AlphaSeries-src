@@ -8778,7 +8778,71 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_229_7F3070
 Public Function Proc_6_229_7F3070(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim roomId As Long
+    Dim jukeboxId As Long
+    Dim jukeboxRow As String
+    Dim jukeboxFields() As String
+    Dim rowText As String
+    Dim fields() As String
+    Dim destinationId As Long
+    Dim diskFurnitureId As Long
+    Dim sequenceId As Long
+    Dim startedAt As Long
+    Dim payload As String
+
+    On Error GoTo PlaybackFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex <= 0 Then GoTo PlaybackFailed
+
+    If UBound(args) >= 1 Then roomId = CLng(Val(CStr(args(1))))
+    If UBound(args) >= 2 Then jukeboxId = CLng(Val(CStr(args(2))))
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) > 0 And userId <> "0" Then
+        If roomId <= 0 Then roomId = HandlingCurrentRoomId(socketIndex, userId)
+    End If
+
+    If jukeboxId <= 0 And roomId > 0 Then
+        jukeboxRow = CStr(Proc_5_2_6D4690("SELECT furnitures.id,furnitures.id_product FROM furnitures,soundmachine_jb_playlist WHERE furnitures.id_room='" & _
+            CStr(roomId) & "' AND soundmachine_jb_playlist.id_jukebox=furnitures.id GROUP BY furnitures.id ORDER BY furnitures.id DESC LIMIT 1", 0, 0))
+        If Len(jukeboxRow) = 0 Then
+            jukeboxRow = CStr(Proc_5_2_6D4690("SELECT furnitures.id,furnitures.id_product FROM furnitures,products WHERE furnitures.id_room='" & _
+                CStr(roomId) & "' AND furnitures.id_product=products.id AND (products.action LIKE '%soundmachine%' OR products.action LIKE '%jukebox%' OR products.name LIKE '%jukebox%' OR products.sprite LIKE '%jukebox%') ORDER BY furnitures.id DESC LIMIT 1", 0, 0))
+        End If
+        If Len(jukeboxRow) > 0 Then
+            jukeboxFields = Split(jukeboxRow, Chr$(9))
+            jukeboxId = CLng(Val(HandlingField(jukeboxFields, 0)))
+        End If
+    End If
+    If jukeboxId <= 0 Then GoTo PlaybackFailed
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT soundmachine_jb_playlist.id_destination,soundmachine_jb_playlist.id_cd,soundmachine_cds.sequence FROM soundmachine_jb_playlist,soundmachine_cds WHERE soundmachine_jb_playlist.id_jukebox='" & _
+        CStr(jukeboxId) & "' AND soundmachine_jb_playlist.id_order='0' AND soundmachine_cds.id=soundmachine_jb_playlist.id_destination GROUP BY soundmachine_cds.id LIMIT 1", 0, 0))
+    If Len(rowText) = 0 Then GoTo PlaybackFailed
+
+    fields = Split(rowText, Chr$(9))
+    destinationId = CLng(Val(HandlingField(fields, 0)))
+    diskFurnitureId = CLng(Val(HandlingField(fields, 1)))
+    sequenceId = CLng(Val(HandlingField(fields, 2)))
+    If destinationId <= 0 Or sequenceId <= 0 Then GoTo PlaybackFailed
+
+    startedAt = CLng(DateDiff("s", DateSerial(1970, 1, 1), Now))
+    payload = CStr(Proc_3_0_6D2AF0(startedAt, Empty, "EG"))
+    payload = CStr(Proc_3_0_6D2AF0(sequenceId, Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(destinationId, Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(diskFurnitureId, Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(0, Empty, CStr(Proc_3_0_6D2AF0(0, Empty, payload))))
+
+    If roomId > 0 Then
+        Proc_6_246_8024C0 roomId, payload, 0
+    Else
+        Proc_6_247_8027E0 socketIndex, payload, 0
+    End If
+
+PlaybackFailed:
     Proc_6_229_7F3070 = Empty
 End Function
 
