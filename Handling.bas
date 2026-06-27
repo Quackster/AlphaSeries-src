@@ -5930,8 +5930,58 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_188_7CF3C0
 Public Function Proc_6_188_7CF3C0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_188_7CF3C0 = Empty
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim roomId As Long
+    Dim roomSlot As Long
+    Dim guideBotId As Long
+    Dim botRow As String
+    Dim botFields() As String
+    Dim botEntityId As Long
+    Dim tutorialGuide As Long
+
+    On Error GoTo GuideFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex <= 0 Then GoTo GuideFailed
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo GuideFailed
+
+    tutorialGuide = CLng(Val(CStr(Proc_5_2_6D4690("SELECT tutorial_guide FROM users WHERE id='" & _
+        Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 1", 0, 0))))
+    If tutorialGuide = 0 Then
+        Proc_5_0_6D3CD0 "UPDATE users SET tutorial_guide='1' WHERE id='" & Proc_10_11_80A9C0(userId, 0, 0) & "'", 0, 0
+    End If
+
+    If CLng(Val(CStr(Proc_10_0_809570("com.client.rooms.bots.guide.enabled", "0", 0)))) = 0 Then GoTo GuideDone
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId <= 0 Then GoTo GuideDone
+
+    roomSlot = CLng(Val(CStr(Proc_5_2_6D4690("SELECT id_slot FROM rooms WHERE id='" & CStr(roomId) & "' LIMIT 1", 0, 0))))
+    If roomSlot <= 0 Then GoTo GuideDone
+
+    guideBotId = CLng(Val(CStr(Proc_10_0_809570("com.client.bot.guide.id", "0", 0))))
+    If guideBotId <= 0 Then GoTo GuideDone
+    If IsRepresentedBotAllocated(roomSlot, guideBotId) Then GoTo GuideDone
+
+    botRow = CStr(Proc_5_2_6D4690("SELECT id,name,motto,speech,responses,position_x,position_y,position_z,position_r,figure,NULL,id_handle,id_handleaction,cache_action,speech_submit,allow_walk,max_fields_away FROM bots WHERE id='" & _
+        CStr(guideBotId) & "' LIMIT 1", 0, 0))
+    If Len(botRow) = 0 Then GoTo GuideDone
+
+    botFields = Split(botRow, Chr$(9))
+    botEntityId = CLng(Val(CStr(Proc_6_187_7CD700(roomSlot, botFields, 0))))
+    If botEntityId > 0 Then
+        Proc_6_244_801E80 socketIndex, "@a" & "YjO", 0
+    End If
+
+GuideDone:
+    Proc_6_188_7CF3C0 = botEntityId
+    Exit Function
+
+GuideFailed:
+    Proc_6_188_7CF3C0 = 0
 End Function
 
 ' Original declaration: Private Sub Proc_6_189_7D0630
@@ -7343,6 +7393,39 @@ Private Sub StoreRepresentedBotRecord(ByVal botEntityId As Long, ByVal recordTex
 
 StoreDone:
 End Sub
+
+Private Function IsRepresentedBotAllocated(ByVal roomSlot As Long, ByVal botId As Long) As Boolean
+    Dim records() As String
+    Dim recordIndex As Long
+    Dim recordText As String
+    Dim payloadAt As Long
+    Dim endAt As Long
+    Dim fields() As String
+
+    On Error GoTo NotAllocated
+    If roomSlot <= 0 Or botId <= 0 Or Len(global_00829358) = 0 Then GoTo NotAllocated
+
+    records = Split(global_00829358, "[")
+    For recordIndex = LBound(records) To UBound(records)
+        recordText = CStr(records(recordIndex))
+        If Len(recordText) > 0 Then
+            endAt = InStr(1, recordText, "]", vbBinaryCompare)
+            payloadAt = InStr(1, recordText, ":", vbBinaryCompare)
+            If endAt > payloadAt And payloadAt > 0 Then
+                fields = Split(Mid$(recordText, payloadAt + 1, endAt - payloadAt - 1), Chr$(2))
+                If UBound(fields) >= 1 Then
+                    If CLng(Val(CStr(fields(0)))) = roomSlot And CLng(Val(CStr(fields(1)))) = botId Then
+                        IsRepresentedBotAllocated = True
+                        Exit Function
+                    End If
+                End If
+            End If
+        End If
+    Next recordIndex
+
+NotAllocated:
+    IsRepresentedBotAllocated = False
+End Function
 
 Private Function AvatarNameValidationCode(ByVal candidateName As String, ByVal currentName As String) As Long
     Dim index As Long
