@@ -1441,13 +1441,49 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_239_7FC170
 Public Function Proc_6_239_7FC170(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_239_7FC170 = Empty
+    Dim filePath As String
+    Dim fileNumber As Integer
+
+    On Error GoTo ReadFailed
+    If UBound(args) < 0 Then GoTo ReadFailed
+
+    filePath = CStr(args(0))
+    If Len(filePath) = 0 Or Len(Dir$(filePath)) = 0 Then GoTo ReadFailed
+
+    fileNumber = FreeFile
+    Open filePath For Binary As #fileNumber
+    Proc_6_239_7FC170 = Space$(LOF(fileNumber))
+    Get #fileNumber, , Proc_6_239_7FC170
+    Close #fileNumber
+    Exit Function
+
+ReadFailed:
+    On Error Resume Next
+    If fileNumber <> 0 Then Close #fileNumber
+    Proc_6_239_7FC170 = vbNullString
 End Function
 
 ' Original declaration: Private  Proc_6_240_7FC2B0(arg_C) '7FC2B0
 Public Function Proc_6_240_7FC2B0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim filePath As String
+    Dim fileText As String
+    Dim fileNumber As Integer
+
+    On Error GoTo WriteFailed
+    If UBound(args) < 1 Then GoTo WriteFailed
+
+    filePath = CStr(args(0))
+    fileText = CStr(args(1))
+    fileNumber = FreeFile
+    Open filePath For Output As #fileNumber
+    Print #fileNumber, fileText
+    Close #fileNumber
+    Proc_6_240_7FC2B0 = Empty
+    Exit Function
+
+WriteFailed:
+    On Error Resume Next
+    If fileNumber <> 0 Then Close #fileNumber
     Proc_6_240_7FC2B0 = Empty
 End Function
 
