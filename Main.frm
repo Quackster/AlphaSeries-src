@@ -450,14 +450,32 @@ ShiftFailed:
 End Function
 
 ' Original declaration: Private  Proc_0_22_68C1A0(arg_C) '68C1A0
-Private Sub Proc_0_22_68C1A0()
-    ' TODO: Reconstruct behavior from decompiled reference.
-End Sub
+Private Function Proc_0_22_68C1A0(Optional ByVal arg_C As Variant) As Variant
+    Dim sourceText As String
+    Dim seedValue As Long
+    Dim index As Long
+    Dim outputText As String
+
+    On Error GoTo EncodeFailed
+    sourceText = CStr(arg_C)
+    seedValue = CLng(Proc_10_3_809B90(&H41, &H5A))
+    outputText = Chr$(seedValue)
+
+    For index = 1 To Len(sourceText)
+        outputText = outputText & Chr$((Asc(Mid$(sourceText, index, 1)) + index + seedValue) And &HFF&)
+    Next index
+
+    Proc_0_22_68C1A0 = outputText
+    Exit Function
+
+EncodeFailed:
+    Proc_0_22_68C1A0 = vbNullString
+End Function
 
 ' Original declaration: Private  Proc_0_23_68C430(arg_C) '68C430
-Private Sub Proc_0_23_68C430()
-    ' TODO: Reconstruct behavior from decompiled reference.
-End Sub
+Private Function Proc_0_23_68C430(Optional ByVal arg_C As Variant) As Variant
+    Proc_0_23_68C430 = ShiftIdentityText(CStr(arg_C), 7)
+End Function
 
 ' Original declaration: Private Sub Proc_0_24_68EEF0
 Private Sub Proc_0_24_68EEF0()
