@@ -184,6 +184,7 @@ Public Function Proc_1_5_6C4F80(ParamArray args() As Variant) As Variant
     Proc_1_21_6D08C0 0, 0, 0
     Proc_1_13_6C9820 0, 0, 0
     Proc_1_22_6D0F00 0, 0, 0
+    BuildChatSettingsCache
     BuildMessengerFriendLimitCache
 
 BuildFailed:
@@ -915,6 +916,14 @@ Private Sub BuildAchievementSettingsCache()
             End If
         End If
     Next rowIndex
+
+CacheFailed:
+End Sub
+
+Private Sub BuildChatSettingsCache()
+    On Error GoTo CacheFailed
+    global_00829294 = CStr(Proc_5_2_6D4690("SELECT smiley,gesture FROM settings_gesture LIMIT 100", 0, 0))
+    global_00829290 = CStr(Proc_5_2_6D4690("SELECT word FROM settings_filter LIMIT 100", 0, 0))
 
 CacheFailed:
 End Sub
