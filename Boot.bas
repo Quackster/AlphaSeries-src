@@ -168,7 +168,36 @@ End Function
 
 ' Original declaration: Private Sub Proc_1_22_6D0F00
 Public Function Proc_1_22_6D0F00(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim maxId As Long
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim visitRoomId As Long
+    Dim assetPath As String
+
+    On Error GoTo BuildFailed
+
+    maxId = CLng(Val(CStr(Proc_5_2_6D4690("SELECT MAX(id) FROM advertisement_visitrooms", 0, 0))))
+    If maxId < 0 Then maxId = 0
+    ReDim global_008291D4(0 To maxId)
+    global_008291D8 = 0
+
+    assetPath = CStr(Proc_10_0_809570("com.server.socket.game.advertisement.visitrooms.path", vbNullString, 0))
+    rows = Split(CStr(Proc_5_2_6D4690("SELECT id,address FROM advertisement_visitrooms", 0, 0)), Chr$(13))
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(rows(rowIndex)) > 0 Then
+            fields = Split(rows(rowIndex), Chr$(9))
+            If UBound(fields) >= 1 Then
+                visitRoomId = CLng(Val(CStr(fields(0))))
+                If visitRoomId >= LBound(global_008291D4) And visitRoomId <= UBound(global_008291D4) Then
+                    global_008291D8 = global_008291D8 + 1
+                    global_008291D4(visitRoomId) = assetPath & CStr(visitRoomId) & Chr$(2) & CStr(fields(1)) & Chr$(2)
+                End If
+            End If
+        End If
+    Next rowIndex
+
+BuildFailed:
     Proc_1_22_6D0F00 = Empty
 End Function
 

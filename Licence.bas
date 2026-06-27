@@ -12,6 +12,8 @@ Public global_00829260 As String
 Public global_00829268 As String
 Public global_00829204 As String
 Public global_00829208 As String
+Public global_008291D4 As Variant
+Public global_008291D8 As Long
 Public global_0082919C As Long
 Public global_008291A0 As String
 Public global_00829190 As Boolean
