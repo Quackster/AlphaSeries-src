@@ -508,7 +508,56 @@ End Function
 
 ' Original declaration: Private Sub Proc_1_18_6CE9C0
 Public Function Proc_1_18_6CE9C0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim giftCount As Long
+    Dim catalogProductId As Long
+    Dim productId As Long
+    Dim isVip As Long
+    Dim requiredDays As Long
+    Dim giftClass As String
+    Dim giftName As String
+    Dim giftDescription As String
+    Dim giftPayload As String
+
+    On Error GoTo BuildFailed
+
+    global_00829178 = vbNullString
+    global_0082917C = vbNullString
+
+    rows = Split(CStr(Proc_5_2_6D4690("SELECT id_product,is_vip,required_days FROM club_gifts ORDER by id ASC", 0, 0)), Chr$(13))
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(rows(rowIndex)) > 0 Then
+            fields = Split(rows(rowIndex), Chr$(9))
+            If UBound(fields) >= 2 Then
+                catalogProductId = CLng(Val(CStr(fields(0))))
+                productId = CLng(Val(CStr(Proc_9_2_8075F0(catalogProductId, 2, 0))))
+                If productId = 0 Then productId = catalogProductId
+                isVip = CLng(Val(CStr(fields(1))))
+                requiredDays = CLng(Val(CStr(fields(2))))
+                giftClass = "s"
+                If CLng(Val(CStr(Proc_9_0_806F70(productId, 1, 0)))) = 9 Then giftClass = "i"
+                giftName = CStr(Proc_8_12_806C30(productId, 14, 0))
+                giftDescription = CStr(Proc_8_12_806C30(productId, 15, 0))
+
+                giftPayload = CStr(Proc_3_0_6D2AF0(catalogProductId, Empty, vbNullString))
+                giftPayload = giftPayload & CStr(Proc_3_0_6D2AF0(productId, Empty, vbNullString))
+                giftPayload = giftPayload & giftName & Chr$(2) & giftDescription & Chr$(2)
+                giftPayload = giftPayload & "IHHI" & giftClass & Chr$(2)
+                giftPayload = giftPayload & CStr(Proc_3_0_6D2AF0(isVip, Empty, vbNullString))
+                giftPayload = giftPayload & CStr(Proc_3_0_6D2AF0(requiredDays, Empty, vbNullString))
+
+                global_00829178 = global_00829178 & giftPayload
+                global_0082917C = global_0082917C & "[" & CStr(catalogProductId) & Chr$(0) & CStr(productId) & Chr$(1) & CStr(requiredDays) & "]"
+                giftCount = giftCount + 1
+            End If
+        End If
+    Next rowIndex
+
+    global_00829178 = CStr(Proc_3_0_6D2AF0(giftCount, Empty, vbNullString)) & global_00829178
+
+BuildFailed:
     Proc_1_18_6CE9C0 = Empty
 End Function
 
