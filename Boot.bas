@@ -7,7 +7,56 @@ Option Explicit
 
 ' Original declaration: Private Sub Proc_1_0_6BA9D0
 Public Function Proc_1_0_6BA9D0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim chanceRows() As String
+    Dim productRows() As String
+    Dim chanceIndex As Long
+    Dim productIndex As Long
+    Dim chanceValue As Long
+    Dim productId As Long
+    Dim productCount As Long
+    Dim productList As String
+    Dim groupPayload As String
+
+    On Error GoTo BuildFailed
+
+    global_0082912C = vbNullString
+    global_00829168 = 0
+    ReDim global_00829140(0 To 49)
+    ReDim global_0082915C(0 To 49)
+
+    chanceRows = Split(CStr(Proc_5_2_6D4690("SELECT chance FROM settings_recycler GROUP BY settings_recycler.chance ORDER BY settings_recycler.chance DESC LIMIT 50", 0, 0)), Chr$(13))
+    For chanceIndex = LBound(chanceRows) To UBound(chanceRows)
+        If global_00829168 > 49 Then Exit For
+        If Len(chanceRows(chanceIndex)) > 0 Then
+            chanceValue = CInt(Val(CStr(chanceRows(chanceIndex))))
+            global_0082915C(global_00829168) = chanceValue
+            global_00829140(global_00829168) = vbNullString
+
+            productCount = 0
+            productList = vbNullString
+            groupPayload = vbNullString
+            productRows = Split(CStr(Proc_5_2_6D4690("SELECT id_product FROM settings_recycler WHERE chance='" & CStr(chanceValue) & "' LIMIT 100", 0, 0)), Chr$(13))
+            For productIndex = LBound(productRows) To UBound(productRows)
+                If Len(productRows(productIndex)) > 0 Then
+                    productId = CLng(Val(CStr(productRows(productIndex))))
+                    If productId > 0 Then
+                        productList = productList & CStr(productId) & Chr$(2)
+                        groupPayload = groupPayload & CStr(Proc_3_0_6D2AF0(productId, Empty, vbNullString))
+                        productCount = productCount + 1
+                    End If
+                End If
+            Next productIndex
+
+            global_00829140(global_00829168) = productList
+            global_0082912C = global_0082912C & CStr(Proc_3_0_6D2AF0(chanceValue, Empty, vbNullString))
+            global_0082912C = global_0082912C & CStr(Proc_3_0_6D2AF0(productCount, Empty, vbNullString)) & groupPayload
+            global_00829168 = global_00829168 + 1
+        End If
+    Next chanceIndex
+
+    global_0082912C = CStr(Proc_3_0_6D2AF0(global_00829168, Empty, vbNullString)) & global_0082912C
+
+BuildFailed:
     Proc_1_0_6BA9D0 = Empty
 End Function
 
@@ -48,6 +97,7 @@ Public Function Proc_1_1_6BB340(ParamArray args() As Variant) As Variant
 
     Proc_1_13_6C9820 0, 0, 0
     BuildCampaignReplacementCache
+    Proc_1_0_6BA9D0 0, 0, 0
 
     global_00829078 = CStr(Proc_5_2_6D4690("SELECT id_product,type_secondary,id_contain,type_check FROM packages", 0, 0))
     global_0082907C = CStr(Proc_5_2_6D4690("SELECT id,id_pet,id_race,color FROM packages_pets", 0, 0))
