@@ -1889,7 +1889,53 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_66_721D60
 Public Function Proc_6_66_721D60(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim callerUserId As String
+    Dim roomId As Long
+    Dim furnitureId As Long
+    Dim noteColor As String
+    Dim noteCaption As String
+    Dim rowText As String
+    Dim fields() As String
+    Dim productId As Long
+    Dim broadcastPayload As String
+
+    On Error GoTo StickyUpdateFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "AT" Then requestPayload = Mid$(requestPayload, 3)
+
+    If Not StickyNoteUpdateFromWire(requestPayload, furnitureId, noteColor, noteCaption) Then GoTo StickyUpdateFailed
+    If furnitureId <= 0 Then GoTo StickyUpdateFailed
+
+    callerUserId = HandlingUserIdFromSocket(socketIndex)
+    If Len(callerUserId) = 0 Or callerUserId = "0" Then GoTo StickyUpdateFailed
+
+    roomId = HandlingCurrentRoomId(socketIndex, callerUserId)
+    If roomId <= 0 Then GoTo StickyUpdateFailed
+    If Not HandlingUserHasRoomRight(callerUserId, roomId) Then GoTo StickyUpdateFailed
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT id,id_product,sign,caption,position_wall FROM furnitures WHERE id='" & CStr(furnitureId) & "' AND id_room='" & CStr(roomId) & "' LIMIT 1", 0, 0))
+    If Len(rowText) = 0 Then GoTo StickyUpdateFailed
+
+    fields = Split(rowText, Chr$(9))
+    If UBound(fields) < 1 Then GoTo StickyUpdateFailed
+
+    productId = CLng(Val(CStr(fields(1))))
+    If Left$(LCase$(CStr(Proc_8_12_806C30(productId, 18, 0))), 7) <> "post.it" Then GoTo StickyUpdateFailed
+
+    Proc_5_0_6D3CD0 "UPDATE furnitures SET sign='" & Proc_10_11_80A9C0(noteColor, 0, 0) & "',caption='" & Proc_10_11_80A9C0(noteCaption, 0, 0) & "' WHERE id='" & CStr(furnitureId) & "'", 0, 0
+    broadcastPayload = "AT" & CStr(furnitureId) & Chr$(1) & "AS" & CStr(furnitureId) & Chr$(2)
+    broadcastPayload = CStr(Proc_3_0_6D2AF0(productId, Empty, broadcastPayload)) & CStr(productId) & Chr$(2) & noteColor & Chr$(2)
+    Proc_6_247_8027E0 socketIndex, broadcastPayload, 0
+
+StickyUpdateFailed:
     Proc_6_66_721D60 = Empty
 End Function
 
@@ -4176,6 +4222,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_77_727590 socketIndex, "FD", packetPayload
         Case "A`"
             Proc_6_65_721A10 socketIndex, "A`", packetPayload
+        Case "AT"
+            Proc_6_66_721D60 socketIndex, "AT", packetPayload
         Case "AS"
             Proc_6_67_722940 socketIndex, "AS", packetPayload
         Case "AU"
@@ -4904,6 +4952,64 @@ Private Function HandlingField(ByRef fields() As String, ByVal fieldIndex As Lon
 
 MissingField:
     HandlingField = vbNullString
+End Function
+
+Private Function StickyNoteUpdateFromWire(ByVal packetPayload As String, ByRef furnitureId As Long, ByRef noteColor As String, ByRef noteCaption As String) As Boolean
+    Dim idText As String
+    Dim idLengthSize As Long
+    Dim notePayload As String
+    Dim separatorAt As Long
+    Dim offset As Long
+
+    On Error GoTo ParseFailed
+
+    idText = CStr(Proc_10_6_809F10(packetPayload, 0, 0))
+    furnitureId = CLng(Val(idText))
+    If furnitureId <= 0 Then
+        offset = 1
+        furnitureId = ReadWireLong(packetPayload, offset)
+        notePayload = Mid$(packetPayload, offset)
+    Else
+        idLengthSize = CLng(Proc_3_2_6D30A0(packetPayload, 0, 0))
+        If idLengthSize > 0 Then notePayload = Mid$(packetPayload, idLengthSize + Len(idText) + 1)
+    End If
+
+    If Len(notePayload) = 0 Then notePayload = CStr(Proc_10_7_80A190(packetPayload, 0, 0))
+    If Len(notePayload) = 0 Then GoTo ParseFailed
+
+    notePayload = Left$(notePayload, 510)
+    separatorAt = InStr(1, notePayload, Chr$(13), vbBinaryCompare)
+    If separatorAt = 0 Then separatorAt = InStr(1, notePayload, Chr$(10), vbBinaryCompare)
+    If separatorAt = 0 Then separatorAt = InStr(1, notePayload, Chr$(2), vbBinaryCompare)
+
+    If separatorAt > 0 Then
+        noteColor = UCase$(Left$(notePayload, separatorAt - 1))
+        noteCaption = Mid$(notePayload, separatorAt + 1)
+    Else
+        noteColor = UCase$(Left$(notePayload, 6))
+        noteCaption = Mid$(notePayload, 7)
+    End If
+
+    noteColor = Left$(noteColor, 6)
+    If Not IsStickyNoteColor(noteColor) Then GoTo ParseFailed
+
+    noteCaption = Left$(noteCaption, 510)
+    noteCaption = Replace(noteCaption, Chr$(160), Chr$(31), 1, -1, vbBinaryCompare)
+    noteCaption = Replace(noteCaption, Chr$(13), Chr$(31), 1, -1, vbBinaryCompare)
+    noteCaption = Replace(noteCaption, Chr$(10), Chr$(31), 1, -1, vbBinaryCompare)
+
+    StickyNoteUpdateFromWire = True
+    Exit Function
+
+ParseFailed:
+    StickyNoteUpdateFromWire = False
+End Function
+
+Private Function IsStickyNoteColor(ByVal noteColor As String) As Boolean
+    Select Case UCase$(noteColor)
+        Case "9CFF9C", "FFFF33", "FF9CFF", "9CCEFF"
+            IsStickyNoteColor = True
+    End Select
 End Function
 
 Private Function ReadWireString(ByVal packetPayload As String, ByRef offset As Long) As String
