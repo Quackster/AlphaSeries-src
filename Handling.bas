@@ -612,8 +612,58 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_15_6E1900
 Public Function Proc_6_15_6E1900(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim rowText As String
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim slotId As Long
+    Dim figureText As String
+    Dim genderText As String
+    Dim wardrobePayload As String
+    Dim slotCount As Long
+    Dim maxSlots As Long
+
+    On Error GoTo WardrobeFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo WardrobeFailed
+    If Not HandlingUserHasPermission(userId, "fuse_use_wardrobe") Then GoTo WardrobeFailed
+
+    maxSlots = 5
+    If HandlingUserHasPermission(userId, "fuse_larger_wardrobe") Then maxSlots = 10
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT id_slot,figure,gender FROM users_wardrobe WHERE id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "' ORDER BY id_slot", 0, 0))
+    If Len(rowText) > 0 Then
+        rows = Split(rowText, Chr$(13))
+        For rowIndex = LBound(rows) To UBound(rows)
+            If Len(rows(rowIndex)) > 0 Then
+                fields = Split(CStr(rows(rowIndex)), Chr$(9))
+                If UBound(fields) >= 2 Then
+                    slotId = CLng(Val(CStr(fields(0))))
+                    If slotId >= 1 And slotId <= maxSlots Then
+                        figureText = CStr(fields(1))
+                        genderText = UCase$(Left$(CStr(fields(2)), 1))
+                        If genderText <> "M" And genderText <> "F" Then genderText = "M"
+
+                        wardrobePayload = wardrobePayload & WardrobeSlotPayload(slotId, figureText, genderText)
+                        slotCount = slotCount + 1
+                    End If
+                End If
+            End If
+        Next rowIndex
+    End If
+
+    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(slotCount, Empty, "DK")) & wardrobePayload, 0
+
+WardrobeFailed:
     Proc_6_15_6E1900 = Empty
+End Function
+
+Private Function WardrobeSlotPayload(ByVal slotId As Long, ByVal figureText As String, ByVal genderText As String) As String
+    WardrobeSlotPayload = CStr(Proc_3_0_6D2AF0(slotId, Empty, vbNullString)) & figureText & Chr$(2) & genderText & Chr$(2)
 End Function
 
 ' Original declaration: Private Sub Proc_6_16_6E2320
@@ -3742,6 +3792,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_104_74AB60 socketIndex, "FC", packetPayload
         Case "Af"
             Proc_6_136_765F10 socketIndex, "Af", packetPayload
+        Case "Ew"
+            Proc_6_15_6E1900 socketIndex, "Ew", packetPayload
         Case "oC"
             Proc_6_135_765D80 socketIndex, "oC", packetPayload
         Case "oV"
