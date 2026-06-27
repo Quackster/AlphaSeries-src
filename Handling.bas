@@ -468,8 +468,42 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_51_716AC0
 Public Function Proc_6_51_716AC0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_51_716AC0 = Empty
+    Dim roomId As Long
+    Dim rowText As String
+    Dim fields() As String
+    Dim timeFormat As String
+    Dim payload As String
+    Dim fieldIndex As Long
+
+    On Error GoTo BuildFailed
+    If UBound(args) < 0 Then GoTo BuildFailed
+
+    roomId = CLng(Val(CStr(args(0))))
+    If roomId <= 0 Then GoTo BuildFailed
+
+    timeFormat = CStr(Proc_10_0_809570("com.mysql.format.time", "%H:%i", 0))
+    rowText = CStr(Proc_5_2_6D4690("SELECT users.id,users.name,rooms_events.id_room,rooms_events.id_category,rooms_events.name,rooms_events.description,DATE_FORMAT(FROM_UNIXTIME(rooms_events.timestamp), '" & timeFormat & "'),rooms_events.tag_1,rooms_events.tag_2 FROM rooms_events,users WHERE rooms_events.id_room='" & CStr(roomId) & "' AND users.id=rooms_events.id_user LIMIT 1", 0, 0))
+
+    If Len(rowText) = 0 Then
+        Proc_6_51_716AC0 = "-1" & Chr$(2)
+        Exit Function
+    End If
+
+    fields = Split(rowText, Chr$(9))
+    If UBound(fields) < 8 Then GoTo BuildFailed
+
+    For fieldIndex = 4 To 8
+        payload = payload & CStr(fields(fieldIndex)) & Chr$(2)
+    Next fieldIndex
+
+    payload = CStr(Proc_3_0_6D2AF0(CLng(Val(CStr(fields(0)))), Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(CLng(Val(CStr(fields(2)))), Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(CLng(Val(CStr(fields(3)))), Empty, payload))
+    Proc_6_51_716AC0 = payload
+    Exit Function
+
+BuildFailed:
+    Proc_6_51_716AC0 = "-1" & Chr$(2)
 End Function
 
 ' Original declaration: Private Sub Proc_6_52_7172B0
