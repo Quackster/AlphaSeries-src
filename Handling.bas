@@ -3551,8 +3551,54 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_84_733600
 Public Function Proc_6_84_733600(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_84_733600 = Empty
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim roomId As Long
+    Dim cacheRoot As String
+    Dim triggerCache As String
+    Dim actionCache As String
+    Dim conditionCache As String
+    Dim pathfinderCache As String
+    Dim destinationCache As String
+    Dim roomCache As String
+    Dim payload As String
+
+    On Error GoTo CacheDone
+
+    If UBound(args) >= 0 Then socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 1 Then roomId = CLng(Val(CStr(args(1))))
+    If roomId <= 0 And socketIndex > 0 Then
+        userId = HandlingUserIdFromSocket(socketIndex)
+        If Len(userId) > 0 And userId <> "0" Then roomId = HandlingCurrentRoomId(socketIndex, userId)
+    End If
+
+    payload = "Di" & CStr(global_00829094)
+    If socketIndex > 0 Then Proc_6_244_801E80 socketIndex, payload, 0
+    If roomId <= 0 Then GoTo CacheDone
+
+    cacheRoot = App.Path & "\cache"
+    On Error Resume Next
+    MkDir cacheRoot
+    MkDir cacheRoot & "\wired_trigger"
+    MkDir cacheRoot & "\wired_action"
+    MkDir cacheRoot & "\wired_condition"
+    MkDir cacheRoot & "\pathfinder"
+    MkDir cacheRoot & "\rooms"
+    On Error GoTo CacheDone
+
+    triggerCache = HandlingEnsureRoomCacheFile(cacheRoot & "\wired_trigger\" & CStr(roomId) & ".cache")
+    actionCache = HandlingEnsureRoomCacheFile(cacheRoot & "\wired_action\" & CStr(roomId) & ".cache")
+    conditionCache = HandlingEnsureRoomCacheFile(cacheRoot & "\wired_condition\" & CStr(roomId) & ".cache")
+    pathfinderCache = HandlingEnsureRoomCacheFile(cacheRoot & "\pathfinder\" & CStr(roomId) & ".cache")
+    destinationCache = HandlingEnsureRoomCacheFile(cacheRoot & "\rooms\destination_" & CStr(roomId) & ".cache")
+    roomCache = HandlingEnsureRoomCacheFile(cacheRoot & "\rooms\" & CStr(roomId) & ".cache")
+
+    Proc_6_84_733600 = payload & Chr$(9) & triggerCache & Chr$(9) & actionCache & Chr$(9) & conditionCache & _
+        Chr$(9) & pathfinderCache & Chr$(9) & destinationCache & Chr$(9) & roomCache
+    Exit Function
+
+CacheDone:
+    Proc_6_84_733600 = payload
 End Function
 
 ' Original declaration: Private Sub Proc_6_85_73A8E0
@@ -13679,6 +13725,20 @@ Private Function RemoveRepresentedLineRecord(ByVal cacheText As String, ByVal ma
 
 RemoveFailed:
     RemoveRepresentedLineRecord = cacheText
+End Function
+
+Private Function HandlingEnsureRoomCacheFile(ByVal cachePath As String) As String
+    On Error GoTo CacheFailed
+    If Len(cachePath) = 0 Then GoTo CacheFailed
+
+    If Not CBool(Proc_8_8_806720(cachePath, 0, 0)) Then
+        Proc_8_10_8068E0 cachePath, vbNullString, 0
+    End If
+    HandlingEnsureRoomCacheFile = CStr(Proc_6_239_7FC170(cachePath, 0, 0))
+    Exit Function
+
+CacheFailed:
+    HandlingEnsureRoomCacheFile = vbNullString
 End Function
 
 Private Function RemoveRepresentedCacheRecord(ByVal cacheText As String, ByVal markerText As String) As String
