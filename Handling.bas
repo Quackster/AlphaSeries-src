@@ -1068,7 +1068,42 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_65_721A10
 Public Function Proc_6_65_721A10(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim callerUserId As String
+    Dim targetUserId As String
+    Dim roomId As Long
+    Dim targetSocketIndex As Integer
+    Dim offset As Long
+
+    On Error GoTo GrantFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "A`" Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    targetUserId = CStr(ReadWireLong(requestPayload, offset))
+    If Len(targetUserId) = 0 Or targetUserId = "0" Then GoTo GrantFailed
+
+    callerUserId = HandlingUserIdFromSocket(socketIndex)
+    If Len(callerUserId) = 0 Or callerUserId = "0" Then GoTo GrantFailed
+
+    roomId = HandlingCurrentRoomId(socketIndex, callerUserId)
+    If roomId <= 0 Then GoTo GrantFailed
+    If Not HandlingUserHasRoomRight(callerUserId, roomId) Then GoTo GrantFailed
+
+    targetSocketIndex = HandlingSocketFromUserId(targetUserId)
+    If targetSocketIndex <= 0 Then GoTo GrantFailed
+
+    Proc_5_0_6D3CD0 "INSERT IGNORE INTO rooms_rights(id_user,id_room) VALUES('" & Proc_10_11_80A9C0(targetUserId, 0, 0) & "','" & CStr(roomId) & "')", 0, 0
+    Proc_6_244_801E80 targetSocketIndex, "@j", 0
+
+GrantFailed:
     Proc_6_65_721A10 = Empty
 End Function
 
@@ -3036,6 +3071,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_62_7209F0 socketIndex, "E@", packetPayload
         Case "DE"
             Proc_6_63_721050 socketIndex, "DE", packetPayload
+        Case "A`"
+            Proc_6_65_721A10 socketIndex, "A`", packetPayload
         Case "FA"
             Proc_6_60_720060 socketIndex, "FA", packetPayload
         Case "oL", "CD"
@@ -3246,6 +3283,26 @@ Private Function HandlingSocketFromUserId(ByVal userId As String) As Integer
 
 LookupFailed:
     HandlingSocketFromUserId = 0
+End Function
+
+Private Function HandlingUserHasRoomRight(ByVal userId As String, ByVal roomId As Long) As Boolean
+    Dim rightUserId As String
+
+    On Error GoTo CheckFailed
+    If Len(userId) = 0 Or userId = "0" Or roomId <= 0 Then GoTo CheckFailed
+
+    rightUserId = CStr(Proc_5_2_6D4690("SELECT id_owner FROM rooms WHERE id='" & CStr(roomId) & "' AND id_owner='" & Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 1", 0, 0))
+    If Len(rightUserId) > 0 Then
+        HandlingUserHasRoomRight = True
+        Exit Function
+    End If
+
+    rightUserId = CStr(Proc_5_2_6D4690("SELECT id_user FROM rooms_rights WHERE id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_room='" & CStr(roomId) & "' LIMIT 1", 0, 0))
+    HandlingUserHasRoomRight = (Len(rightUserId) > 0)
+    Exit Function
+
+CheckFailed:
+    HandlingUserHasRoomRight = False
 End Function
 
 Private Function HandlingUserRank(ByVal userId As String) As Long
