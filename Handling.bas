@@ -1204,7 +1204,46 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_76_726CE0
 Public Function Proc_6_76_726CE0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim giverUserId As String
+    Dim targetUserId As String
+    Dim targetSocketIndex As Integer
+    Dim respectAmount As Long
+    Dim respectReceived As Long
+    Dim offset As Long
+
+    On Error GoTo RespectFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "Es" Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    targetUserId = CStr(ReadWireLong(requestPayload, offset))
+    If Len(targetUserId) = 0 Or targetUserId = "0" Then GoTo RespectFailed
+
+    giverUserId = HandlingUserIdFromSocket(socketIndex)
+    If Len(giverUserId) = 0 Or giverUserId = "0" Then GoTo RespectFailed
+    If giverUserId = targetUserId Then GoTo RespectFailed
+
+    targetSocketIndex = HandlingSocketFromUserId(targetUserId)
+    If targetSocketIndex <= 0 Then GoTo RespectFailed
+
+    respectAmount = CLng(Val(CStr(Proc_5_2_6D4690("SELECT respect_amount FROM users WHERE id='" & Proc_10_11_80A9C0(giverUserId, 0, 0) & "' LIMIT 1", 0, 0))))
+    If respectAmount <= 0 Then GoTo RespectFailed
+
+    Proc_5_0_6D3CD0 "UPDATE users SET respect_amount=respect_amount-1,respect_given=respect_given+1 WHERE id='" & Proc_10_11_80A9C0(giverUserId, 0, 0) & "'", 0, 0
+    Proc_5_0_6D3CD0 "UPDATE users SET respect_received=respect_received+1 WHERE id='" & Proc_10_11_80A9C0(targetUserId, 0, 0) & "'", 0, 0
+
+    respectReceived = CLng(Val(CStr(Proc_5_2_6D4690("SELECT respect_received FROM users WHERE id='" & Proc_10_11_80A9C0(targetUserId, 0, 0) & "' LIMIT 1", 0, 0))))
+    Proc_6_247_8027E0 socketIndex, CStr(Proc_3_0_6D2AF0(targetUserId, Empty, "Fx")) & CStr(Proc_3_0_6D2AF0(respectReceived, Empty, vbNullString)), 0
+
+RespectFailed:
     Proc_6_76_726CE0 = Empty
 End Function
 
@@ -3108,6 +3147,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_63_721050 socketIndex, "DE", packetPayload
         Case "D" & Chr$(127)
             Proc_6_64_721650 socketIndex, "D" & Chr$(127), packetPayload
+        Case "Es"
+            Proc_6_76_726CE0 socketIndex, "Es", packetPayload
         Case "A`"
             Proc_6_65_721A10 socketIndex, "A`", packetPayload
         Case "FA"
