@@ -687,7 +687,38 @@ End Sub
 
 ' Original declaration: Private Sub DownloadFile_Timer() '821E60
 Private Sub DownloadFile_Timer()
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim updateRows() As String
+    Dim updateCount As Long
+    Dim targetWidth As Long
+    Dim executableName As String
+    Dim destinationPath As String
+    Dim sourceUrl As String
+
+    On Error GoTo DownloadFailed
+    DownloadFile.Enabled = False
+
+    updateRows = Split(global_00829044, Chr$(10))
+    updateCount = UBound(updateRows)
+    If updateCount <= 0 Then updateCount = 1
+
+    targetWidth = CLng(11535 / updateCount)
+    If targetWidth < 1 Then targetWidth = 1
+    QueueProgressWidth targetWidth
+
+    executableName = GetUpdaterExecutableName()
+    destinationPath = App.Path & "\" & executableName & ".exe"
+    sourceUrl = "http://www.alpha-series.com/upgrades/" & executableName & "/file.database?timestamp=" & Format$(Now, "dmYnhs")
+
+    If Not CBool(Proc_10_28_8210C0(sourceUrl, destinationPath)) Then GoTo DownloadFailed
+    lblInit.Caption = "Installiere..."
+    Timer3.Enabled = True
+    Exit Sub
+
+DownloadFailed:
+    On Error Resume Next
+    Hide
+    MsgBox "Es ist ein Fehler aufgetreten. Versuche es erneut!", vbCritical
+    End
 End Sub
 
 ' Original declaration: Private Sub Timer1_Timer() '823220
@@ -785,3 +816,11 @@ Private Sub QueueProgressWidth(ByVal targetWidth As Long)
     pendingProgressWidth = targetWidth
     walkPerCent.Enabled = True
 End Sub
+
+Private Function GetUpdaterExecutableName() As String
+    If Len(global_00829040) > 0 Then
+        GetUpdaterExecutableName = global_00829040
+    Else
+        GetUpdaterExecutableName = App.EXEName
+    End If
+End Function
