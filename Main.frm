@@ -758,6 +758,80 @@ Private Sub MainRepresentedRoomOccupantAdd(ByVal roomSlot As Long, ByVal entityI
     MainRepresentedRoomRecordSet roomSlot, Join(fields, Chr$(9))
 End Sub
 
+Private Sub MainRepresentedRoomOccupantMove(ByVal roomSlot As Long, ByVal entityIndex As Long, ByVal occupantType As Long, ByVal positionX As Long, ByVal positionY As Long, ByVal directionValue As Long, ByVal movingValue As Long)
+    Dim roomRecord As String
+    Dim fields() As String
+    Dim fieldIndex As Long
+    Dim movementRecord As String
+
+    If roomSlot <= 0 Or entityIndex <= 0 Then Exit Sub
+
+    fieldIndex = IIf(occupantType = 2, 5, 4)
+    roomRecord = MainRepresentedRoomRecord(roomSlot)
+    If Len(roomRecord) = 0 Then roomRecord = CStr(roomSlot) & Chr$(9) & vbNullString & Chr$(9) & vbNullString & Chr$(9) & "0"
+
+    fields = Split(roomRecord, Chr$(9))
+    MainEnsureFieldCount fields, fieldIndex
+
+    movementRecord = CStr(entityIndex) & Chr$(9) & CStr(positionX) & Chr$(9) & _
+        CStr(positionY) & Chr$(9) & CStr(directionValue) & Chr$(9) & CStr(movingValue)
+    fields(fieldIndex) = MainRepresentedCacheRemove(CStr(fields(fieldIndex)), Chr$(1) & CStr(entityIndex) & Chr$(9))
+    fields(fieldIndex) = CStr(fields(fieldIndex)) & Chr$(1) & movementRecord & Chr$(2)
+
+    MainRepresentedRoomRecordSet roomSlot, Join(fields, Chr$(9))
+End Sub
+
+Private Function MainMovementField(ByVal movementText As String, ByVal fieldIndex As Long) As Long
+    Dim fields() As String
+
+    On Error GoTo LookupFailed
+    fields = Split(movementText, Chr$(0))
+    If fieldIndex <= UBound(fields) Then MainMovementField = CLng(Val(CStr(fields(fieldIndex))))
+    Exit Function
+
+LookupFailed:
+    MainMovementField = 0
+End Function
+
+Private Function MainCurrentRoomIdForSlot(ByVal roomSlot As Long) As Long
+    On Error GoTo LookupFailed
+    If roomSlot > 0 Then MainCurrentRoomIdForSlot = CLng(Val(CStr(Proc_5_2_6D4690("SELECT id FROM rooms WHERE id_slot='" & CStr(roomSlot) & "' LIMIT 1", 0, 0))))
+    Exit Function
+
+LookupFailed:
+    MainCurrentRoomIdForSlot = 0
+End Function
+
+Private Function MainUserIdFromSocket(ByVal socketIndex As Long) As String
+    On Error GoTo LookupFailed
+    MainUserIdFromSocket = CStr(Proc_9_6_808080(CStr(socketIndex), 0, 0))
+    If Len(MainUserIdFromSocket) = 0 Or MainUserIdFromSocket = "0" Then
+        MainUserIdFromSocket = CStr(Proc_5_2_6D4690("SELECT id FROM users WHERE id_socket='" & CStr(socketIndex) & "' LIMIT 1", 0, 0))
+    End If
+    Exit Function
+
+LookupFailed:
+    MainUserIdFromSocket = vbNullString
+End Function
+
+Private Function MainCurrentRoomIdForSocket(ByVal socketIndex As Long) As Long
+    Dim userId As String
+
+    On Error GoTo LookupFailed
+
+    MainCurrentRoomIdForSocket = CLng(Val(CStr(Proc_9_10_808F30(CStr(socketIndex), 1, 0))))
+    If MainCurrentRoomIdForSocket > 0 Then Exit Function
+
+    userId = MainUserIdFromSocket(socketIndex)
+    If Len(userId) > 0 And userId <> "0" Then
+        MainCurrentRoomIdForSocket = CLng(Val(CStr(Proc_5_2_6D4690("SELECT id_room FROM logs_visitedrooms WHERE id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND timestamp_left IS NULL ORDER BY timestamp_enter DESC LIMIT 1", 0, 0))))
+    End If
+    Exit Function
+
+LookupFailed:
+    MainCurrentRoomIdForSocket = 0
+End Function
+
 Private Function MainRepresentedRecordByBracket(ByVal cacheText As String, ByVal recordId As Long) As String
     Dim markerText As String
     Dim startAt As Long
@@ -877,11 +951,92 @@ AttachDone:
 End Sub
 
 ' Original declaration: Private  Proc_0_28_6AD850(arg_C) '6AD850
-Private Sub Proc_0_28_6AD850()
-    ' TODO: Reconstruct behavior from decompiled reference.
+Private Sub Proc_0_28_6AD850(ParamArray args() As Variant)
+    Dim entityIndex As Long
+    Dim roomSlot As Long
+    Dim roomId As Long
+    Dim currentX As Long
+    Dim currentY As Long
+    Dim targetX As Long
+    Dim targetY As Long
+    Dim movementText As String
+    Dim nextX As Long
+    Dim nextY As Long
+    Dim directionValue As Long
+    Dim movingValue As Long
+
+    On Error GoTo WalkDone
+    If UBound(args) < 0 Then GoTo WalkDone
+
+    entityIndex = CLng(Val(CStr(args(0))))
+    If entityIndex <= 0 Then GoTo WalkDone
+
+    roomSlot = MainRepresentedBotRoomSlot(entityIndex)
+    If roomSlot <= 0 Then GoTo WalkDone
+    roomId = MainCurrentRoomIdForSlot(roomSlot)
+
+    If UBound(args) >= 4 Then
+        currentX = CLng(Val(CStr(args(1))))
+        currentY = CLng(Val(CStr(args(2))))
+        targetX = CLng(Val(CStr(args(3))))
+        targetY = CLng(Val(CStr(args(4))))
+    End If
+
+    movementText = CStr(Proc_10_26_81E4E0(entityIndex, currentX, currentY, targetX, targetY))
+    nextX = MainMovementField(movementText, 0)
+    nextY = MainMovementField(movementText, 1)
+    directionValue = MainMovementField(movementText, 2)
+    movingValue = MainMovementField(movementText, 3)
+
+    If roomId <= 0 Or CLng(Val(CStr(Proc_10_27_81F1A0(entityIndex, nextX, nextY)))) <> 0 Then
+        MainRepresentedRoomOccupantMove roomSlot, entityIndex, 2, nextX, nextY, directionValue, movingValue
+    End If
+
+WalkDone:
 End Sub
 
 ' Original declaration: Private  Proc_0_29_6B0E10(arg_C) '6B0E10
-Private Sub Proc_0_29_6B0E10()
-    ' TODO: Reconstruct behavior from decompiled reference.
+Private Sub Proc_0_29_6B0E10(ParamArray args() As Variant)
+    Dim socketIndex As Long
+    Dim roomSlot As Long
+    Dim roomId As Long
+    Dim currentX As Long
+    Dim currentY As Long
+    Dim targetX As Long
+    Dim targetY As Long
+    Dim movementText As String
+    Dim nextX As Long
+    Dim nextY As Long
+    Dim directionValue As Long
+    Dim movingValue As Long
+
+    On Error GoTo WalkDone
+    If UBound(args) < 0 Then GoTo WalkDone
+
+    socketIndex = CLng(Val(CStr(args(0))))
+    If socketIndex <= 0 Then GoTo WalkDone
+    If Proc_11_2_821390(socketIndex, 0, 0) <> 1 Then GoTo WalkDone
+
+    roomSlot = MainRepresentedSocketRoomSlot(socketIndex)
+    If roomSlot <= 0 Then roomSlot = socketIndex
+    roomId = MainCurrentRoomIdForSocket(socketIndex)
+
+    If UBound(args) >= 4 Then
+        currentX = CLng(Val(CStr(args(1))))
+        currentY = CLng(Val(CStr(args(2))))
+        targetX = CLng(Val(CStr(args(3))))
+        targetY = CLng(Val(CStr(args(4))))
+    End If
+
+    movementText = CStr(Proc_10_24_80E790(socketIndex, currentX, currentY, targetX, targetY))
+    nextX = MainMovementField(movementText, 0)
+    nextY = MainMovementField(movementText, 1)
+    directionValue = MainMovementField(movementText, 2)
+    movingValue = MainMovementField(movementText, 3)
+
+    If roomId <= 0 Or CLng(Val(CStr(Proc_10_25_80F5D0(roomId, nextX, nextY)))) <> 0 Then
+        MainRepresentedRoomOccupantMove roomSlot, socketIndex, 1, nextX, nextY, directionValue, movingValue
+    End If
+
+WalkDone:
 End Sub
