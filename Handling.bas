@@ -1134,7 +1134,27 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_125_755650
 Public Function Proc_6_125_755650(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim tagText As String
+    Dim limitValue As Long
+    Dim eventQueryTail As String
+    Dim roomQueryTail As String
+
+    On Error GoTo NavigatorFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    Proc_10_5_809D80 packetPayload, 3, 0
+    tagText = CStr(Proc_10_11_80A9C0(Proc_10_7_80A190(packetPayload, 0, 0), 0, 0))
+    limitValue = NavigatorListLimit()
+
+    eventQueryTail = "rooms_events,users,rooms,rooms_categories WHERE (rooms_events.name_category='" & tagText & "' OR rooms_events.tag_1='" & tagText & "' OR rooms_events.tag_2='" & tagText & "') AND rooms.id=rooms_events.id_room AND rooms_categories.id=rooms.id_category AND users.id=rooms.id_owner GROUP BY rooms_events.id ORDER BY rooms_events.id ASC LIMIT " & CStr(limitValue)
+    roomQueryTail = "users,rooms,rooms_categories WHERE (rooms.tag_1 = '" & tagText & "' OR rooms.tag_2 = '" & tagText & "') AND users.id=rooms.id_owner AND rooms_categories.id=rooms.id_category GROUP BY rooms.id ORDER BY rooms.visitors_now DESC LIMIT " & CStr(limitValue)
+
+    Proc_6_244_801E80 socketIndex, "GCSA" & tagText & Chr$(2) & CStr(Proc_3_0_6D2AF0(limitValue, Empty, vbNullString)) & Proc_6_113_74EE70(eventQueryTail, roomQueryTail, 0), 0
+
+NavigatorFailed:
     Proc_6_125_755650 = Empty
 End Function
 
@@ -1157,7 +1177,33 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_127_755D30
 Public Function Proc_6_127_755D30(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim searchText As String
+    Dim limitValue As Long
+    Dim roomPredicate As String
+    Dim eventQueryTail As String
+    Dim roomQueryTail As String
+
+    On Error GoTo NavigatorFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    Proc_10_5_809D80 packetPayload, 3, 0
+    searchText = NavigatorSearchTerm(CStr(Proc_10_7_80A190(packetPayload, 0, 0)))
+    If Len(searchText) > 2 Then
+        roomPredicate = "(users.name LIKE '" & searchText & "%' OR rooms.name LIKE '" & searchText & "%')"
+    Else
+        roomPredicate = "(users.name = '" & searchText & "' OR rooms.name = '" & searchText & "')"
+    End If
+
+    limitValue = NavigatorListLimit()
+    roomQueryTail = "users,rooms,rooms_categories WHERE " & roomPredicate & " AND users.id=rooms.id_owner AND rooms_categories.id=rooms.id_category GROUP BY rooms.id ORDER BY rooms.visitors_now DESC LIMIT " & CStr(limitValue)
+    eventQueryTail = "rooms_events,users,rooms,rooms_categories WHERE (users.name='" & searchText & "' AND rooms_events.id_user=users.id OR rooms_events.name LIKE '" & searchText & "%' AND users.id=rooms.id_owner) AND rooms.id=rooms_events.id_room AND rooms_categories.id=rooms.id_category GROUP BY rooms_events.id ORDER BY rooms_events.id ASC LIMIT " & CStr(limitValue)
+
+    Proc_6_244_801E80 socketIndex, "GCSA" & searchText & Chr$(2) & CStr(Proc_3_0_6D2AF0(limitValue, Empty, vbNullString)) & Proc_6_113_74EE70(eventQueryTail, roomQueryTail, 0), 0
+
+NavigatorFailed:
     Proc_6_127_755D30 = Empty
 End Function
 
@@ -2454,6 +2500,13 @@ End Function
 Private Function NavigatorListLimit() As Long
     NavigatorListLimit = CLng(Val(CStr(Proc_10_0_809570("com.client.navigator.list.limit", 50, 0))))
     If NavigatorListLimit <= 0 Then NavigatorListLimit = 50
+End Function
+
+Private Function NavigatorSearchTerm(ByVal rawText As String) As String
+    Dim escapedText As String
+
+    escapedText = CStr(Proc_10_11_80A9C0(rawText, 0, 0))
+    NavigatorSearchTerm = Replace(escapedText, "%", vbNullString)
 End Function
 
 Private Function RecommendedRoomPayload(ByVal treeIndex As Long) As String
