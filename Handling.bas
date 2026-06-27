@@ -226,7 +226,75 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_4_6DAFB0
 Public Function Proc_6_4_6DAFB0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim callerUserId As String
+    Dim roomId As Long
+    Dim roomFields() As String
+    Dim roomText As String
+    Dim roomOwnerId As String
+    Dim actionType As Long
+    Dim logType As Long
+    Dim messageText As String
+    Dim offset As Long
+
+    On Error GoTo RoomModerationFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "CH" Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    actionType = ReadWireLong(requestPayload, offset)
+    If actionType <= 0 Then actionType = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    messageText = ReadWireString(requestPayload, offset)
+    If Len(messageText) = 0 Then messageText = CStr(Proc_10_7_80A190(requestPayload, 0, 0))
+    messageText = CStr(Proc_10_10_80A7F0(messageText, 0, 0))
+
+    callerUserId = HandlingUserIdFromSocket(socketIndex)
+    If Len(callerUserId) = 0 Or callerUserId = "0" Then GoTo RoomModerationFailed
+    If Not HandlingUserHasPermission(callerUserId, "fuse_mod") Then GoTo RoomModerationFailed
+
+    roomId = HandlingCurrentRoomId(socketIndex, callerUserId)
+    If roomId <= 0 Then GoTo RoomModerationFailed
+    If actionType <= 0 Or Len(messageText) = 0 Then GoTo RoomModerationFailed
+    If ContainsUnsafeStaffAlert(messageText) Then GoTo RoomModerationFailed
+
+    roomText = CStr(Proc_5_2_6D4690("SELECT id_slot,id_owner FROM rooms WHERE id='" & CStr(roomId) & "' LIMIT 1", 0, 0))
+    roomFields = Split(roomText, Chr$(9))
+    roomOwnerId = CStr(Val(HandlingField(roomFields, 1)))
+    If Len(roomOwnerId) = 0 Or roomOwnerId = "0" Then GoTo RoomModerationFailed
+
+    If actionType = 1 Then
+        logType = 1
+    Else
+        logType = 2
+    End If
+
+    Proc_5_1_6D4110 "INSERT INTO logs_moderation(id_type,id_user,id_target,timestamp,message,id_session) VALUES('" & CStr(logType) & "','" & _
+        Proc_10_11_80A9C0(callerUserId, 0, 0) & "','" & CStr(roomId) & "',UNIX_TIMESTAMP(),'" & Proc_10_11_80A9C0(messageText, 0, 0) & "','" & CStr(socketIndex) & "')", 0, 0
+
+    BroadcastToRoomUsers roomId, "Ba" & messageText & Chr$(2)
+
+    If actionType = 1 Or actionType = 4 Then
+        Proc_5_0_6D3CD0 "DELETE FROM rooms_events WHERE id_room='" & CStr(roomId) & "' LIMIT 1", 0, 0
+        Proc_6_247_8027E0 socketIndex, "Er" & CStr(Proc_6_51_716AC0(roomId)), 0
+        Proc_10_18_80C9E0 roomId, 0, 0
+    End If
+
+    If actionType = 1 Then
+        Proc_5_0_6D3CD0 "INSERT INTO users_cautions(id_user,id_partner,message,timestamp_submit) VALUES('" & Proc_10_11_80A9C0(roomOwnerId, 0, 0) & "','" & _
+            Proc_10_11_80A9C0(callerUserId, 0, 0) & "','" & Proc_10_11_80A9C0(messageText & " (Room caution of room id: " & CStr(roomId) & ")", 0, 0) & "',UNIX_TIMESTAMP())", 0, 0
+    End If
+
+    Proc_6_4_6DAFB0 = actionType
+    Exit Function
+
+RoomModerationFailed:
     Proc_6_4_6DAFB0 = Empty
 End Function
 
@@ -4826,6 +4894,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_2_6D9880 socketIndex, "GO", packetPayload
         Case "GP"
             Proc_6_3_6DA490 socketIndex, "GP", packetPayload
+        Case "CH"
+            Proc_6_4_6DAFB0 socketIndex, "CH", packetPayload
         Case "GB"
             Proc_6_6_6DC9D0 socketIndex, "GB", packetPayload
         Case "GC"
