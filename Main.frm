@@ -513,7 +513,71 @@ End Sub
 
 ' Original declaration: Private Sub tmrRollers_Timer(Index As Integer) '6B5900
 Private Sub tmrRollers_Timer(Index As Integer)
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim roomId As Long
+    Dim rollerRows As String
+    Dim rollerList() As String
+    Dim rollerIndex As Long
+    Dim rollerRow As String
+    Dim rollerFields() As String
+    Dim rollerId As Long
+    Dim rollerX As Long
+    Dim rollerY As Long
+    Dim rollerZ As String
+    Dim rollerR As Long
+    Dim targetX As Long
+    Dim targetY As Long
+    Dim movedId As Long
+    Dim movedZ As String
+    Dim payload As String
+
+    On Error GoTo RollersDone
+
+    tmrRollers(Index).Enabled = False
+    roomId = MainCurrentRoomIdForSlot(Index)
+    If roomId <= 0 Then GoTo RollersDone
+
+    rollerRows = CStr(Proc_5_2_6D4690("SELECT furnitures.id,furnitures.position_x,furnitures.position_y,furnitures.position_z,furnitures.position_r FROM furnitures,products WHERE furnitures.id_room='" & _
+        CStr(roomId) & "' AND furnitures.id_product=products.id AND (products.action LIKE '%roller%' OR products.name LIKE '%roller%' OR products.sprite LIKE '%roller%') ORDER BY furnitures.id", 0, 0))
+    If Len(rollerRows) = 0 Then GoTo RollersDone
+
+    rollerList = Split(rollerRows, Chr$(13))
+    For rollerIndex = LBound(rollerList) To UBound(rollerList)
+        rollerRow = Trim$(CStr(rollerList(rollerIndex)))
+        If Len(rollerRow) > 0 Then
+            rollerFields = Split(rollerRow, Chr$(9))
+            rollerId = CLng(Val(MainArrayField(rollerFields, 0)))
+            rollerX = CLng(Val(MainArrayField(rollerFields, 1)))
+            rollerY = CLng(Val(MainArrayField(rollerFields, 2)))
+            rollerZ = MainArrayField(rollerFields, 3)
+            rollerR = CLng(Val(MainArrayField(rollerFields, 4)))
+
+            targetX = rollerX + MainRollerDeltaX(rollerR)
+            targetY = rollerY + MainRollerDeltaY(rollerR)
+
+            If rollerId > 0 And (targetX <> rollerX Or targetY <> rollerY) Then
+                If CLng(Val(CStr(Proc_10_25_80F5D0(roomId, targetX, targetY)))) <> 0 Then
+                    movedId = MainRollerFurnitureOnTile(roomId, rollerId, rollerX, rollerY)
+                    If movedId > 0 Then
+                        movedZ = MainRollerTargetHeight(roomId, targetX, targetY, rollerZ)
+                        Proc_5_0_6D3CD0 "UPDATE furnitures SET position_x='" & CStr(targetX) & "',position_y='" & CStr(targetY) & _
+                            "',position_z='" & Proc_10_11_80A9C0(movedZ, 0, 0) & "' WHERE id='" & CStr(movedId) & "' AND id_room='" & CStr(roomId) & "' LIMIT 1", 0, 0
+                        Proc_6_151_78AC20 roomId, movedId, 0
+                        payload = MainRollerMovePayload(movedId, targetX, targetY, movedZ)
+                        If Len(payload) > 0 Then Proc_6_246_8024C0 roomId, payload, 0
+                    End If
+
+                    MainRollerMoveOccupants Index, rollerX, rollerY, targetX, targetY, rollerR
+                End If
+            End If
+        End If
+    Next rollerIndex
+
+    Proc_6_106_74B750 App.Path & "\CACHE\ROOMS\" & CStr(roomId) & ".cache", 0, 0
+    Proc_6_106_74B750 App.Path & "\CACHE\PATHFINDER\" & CStr(roomId) & ".cache", 0, 0
+
+RollersDone:
+    On Error Resume Next
+    tmrRollers(Index).Enabled = True
 End Sub
 
 ' Original declaration: Private Sub tmrPing_Timer() '694630
@@ -942,6 +1006,99 @@ Private Function MainCurrentRoomIdForSlot(ByVal roomSlot As Long) As Long
 LookupFailed:
     MainCurrentRoomIdForSlot = 0
 End Function
+
+Private Function MainRollerDeltaX(ByVal rotationValue As Long) As Long
+    Select Case rotationValue
+        Case 2
+            MainRollerDeltaX = 1
+        Case 6
+            MainRollerDeltaX = -1
+    End Select
+End Function
+
+Private Function MainRollerDeltaY(ByVal rotationValue As Long) As Long
+    Select Case rotationValue
+        Case 0
+            MainRollerDeltaY = -1
+        Case 4
+            MainRollerDeltaY = 1
+    End Select
+End Function
+
+Private Function MainRollerFurnitureOnTile(ByVal roomId As Long, ByVal rollerId As Long, ByVal positionX As Long, ByVal positionY As Long) As Long
+    On Error GoTo LookupFailed
+    MainRollerFurnitureOnTile = CLng(Val(CStr(Proc_5_2_6D4690("SELECT id FROM furnitures WHERE id_room='" & CStr(roomId) & _
+        "' AND position_x='" & CStr(positionX) & "' AND position_y='" & CStr(positionY) & "' AND id<>'" & CStr(rollerId) & _
+        "' ORDER BY position_z DESC,id DESC LIMIT 1", 0, 0))))
+    Exit Function
+
+LookupFailed:
+    MainRollerFurnitureOnTile = 0
+End Function
+
+Private Function MainRollerTargetHeight(ByVal roomId As Long, ByVal positionX As Long, ByVal positionY As Long, ByVal fallbackHeight As String) As String
+    Dim heightText As String
+
+    On Error GoTo LookupFailed
+    heightText = CStr(Proc_5_2_6D4690("SELECT position_z FROM furnitures WHERE id_room='" & CStr(roomId) & _
+        "' AND position_x='" & CStr(positionX) & "' AND position_y='" & CStr(positionY) & "' ORDER BY position_z DESC,id DESC LIMIT 1", 0, 0))
+    If Len(heightText) > 0 Then
+        MainRollerTargetHeight = CStr(Val(heightText))
+    Else
+        MainRollerTargetHeight = CStr(Val(fallbackHeight))
+    End If
+    Exit Function
+
+LookupFailed:
+    MainRollerTargetHeight = CStr(Val(fallbackHeight))
+End Function
+
+Private Function MainRollerMovePayload(ByVal furnitureId As Long, ByVal positionX As Long, ByVal positionY As Long, ByVal positionZ As String) As String
+    Dim payload As String
+
+    On Error GoTo BuildFailed
+    payload = CStr(Proc_3_0_6D2AF0(furnitureId, Empty, "AZ"))
+    payload = CStr(Proc_3_0_6D2AF0(positionX, Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(positionY, Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(CLng(Val(positionZ)), Empty, payload))
+    MainRollerMovePayload = payload
+    Exit Function
+
+BuildFailed:
+    MainRollerMovePayload = vbNullString
+End Function
+
+Private Sub MainRollerMoveOccupants(ByVal roomSlot As Long, ByVal fromX As Long, ByVal fromY As Long, ByVal toX As Long, ByVal toY As Long, ByVal directionValue As Long)
+    MainRollerMoveOccupantsInField roomSlot, 4, 1, fromX, fromY, toX, toY, directionValue
+    MainRollerMoveOccupantsInField roomSlot, 5, 2, fromX, fromY, toX, toY, directionValue
+End Sub
+
+Private Sub MainRollerMoveOccupantsInField(ByVal roomSlot As Long, ByVal fieldIndex As Long, ByVal occupantType As Long, ByVal fromX As Long, ByVal fromY As Long, ByVal toX As Long, ByVal toY As Long, ByVal directionValue As Long)
+    Dim movementText As String
+    Dim records() As String
+    Dim recordIndex As Long
+    Dim fields() As String
+    Dim entityIndex As Long
+
+    On Error GoTo MoveDone
+    movementText = MainRepresentedRoomRecordField(roomSlot, fieldIndex)
+    If Len(movementText) = 0 Then GoTo MoveDone
+
+    records = Split(movementText, Chr$(1))
+    For recordIndex = LBound(records) To UBound(records)
+        If Len(records(recordIndex)) > 0 Then
+            fields = Split(Replace(CStr(records(recordIndex)), Chr$(2), vbNullString, 1, -1, vbBinaryCompare), Chr$(9))
+            entityIndex = CLng(Val(MainArrayField(fields, 0)))
+            If entityIndex > 0 Then
+                If CLng(Val(MainArrayField(fields, 1))) = fromX And CLng(Val(MainArrayField(fields, 2))) = fromY Then
+                    MainRepresentedRoomOccupantMove roomSlot, entityIndex, occupantType, toX, toY, directionValue, 0
+                End If
+            End If
+        End If
+    Next recordIndex
+
+MoveDone:
+End Sub
 
 Private Function MainUserIdFromSocket(ByVal socketIndex As Long) As String
     On Error GoTo LookupFailed
