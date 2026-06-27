@@ -7,19 +7,54 @@ Option Explicit
 
 ' Original declaration: Private  Proc_2_0_6D1510(arg_C, arg_10) '6D1510
 Public Function Proc_2_0_6D1510(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim messageText As String
+    Dim sourceName As String
+    Dim foreColor As Long
+
+    On Error GoTo AppendDone
+    If UBound(args) >= 0 Then messageText = CStr(args(0))
+    If UBound(args) >= 1 Then sourceName = CStr(args(1))
+    If UBound(args) >= 2 Then foreColor = CLng(Val(CStr(args(2)))) Else foreColor = vbWhite
+
+    AppendConsoleLine "[" & sourceName & "] " & messageText, foreColor
+
+AppendDone:
     Proc_2_0_6D1510 = Empty
 End Function
 
 ' Original declaration: Private  Proc_2_1_6D1B60(arg_C, arg_10, arg_14) '6D1B60
 Public Function Proc_2_1_6D1B60(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim messageText As String
+    Dim foreColor As Long
+
+    On Error GoTo AppendDone
+    If UBound(args) >= 0 Then messageText = CStr(args(0))
+    If UBound(args) >= 2 Then foreColor = CLng(Val(CStr(args(2)))) Else foreColor = vbWhite
+
+    AppendConsoleLine messageText, foreColor
+
+AppendDone:
     Proc_2_1_6D1B60 = Empty
 End Function
 
 ' Original declaration: Private  Proc_2_2_6D21D0(arg_C, arg_10) '6D21D0
 Public Function Proc_2_2_6D21D0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim messageText As String
+    Dim sourceName As String
+    Dim foreColor As Long
+
+    On Error GoTo AppendDone
+    If UBound(args) >= 0 Then messageText = CStr(args(0))
+    If UBound(args) >= 1 Then sourceName = CStr(args(1))
+    If UBound(args) >= 2 Then foreColor = CLng(Val(CStr(args(2)))) Else foreColor = vbWhite
+
+    If Len(sourceName) > 0 And UCase$(sourceName) <> "HIDDEN" Then
+        AppendConsoleLine "[" & sourceName & "] " & messageText, foreColor
+    Else
+        AppendConsoleLine messageText, foreColor
+    End If
+
+AppendDone:
     Proc_2_2_6D21D0 = Empty
 End Function
 
@@ -72,3 +107,16 @@ Private Function ElapsedSeconds(ByVal startTime As Single, ByVal endTime As Sing
         ElapsedSeconds = endTime - startTime
     End If
 End Function
+
+Private Sub AppendConsoleLine(ByVal lineText As String, ByVal foreColor As Long)
+    On Error Resume Next
+
+    With Main.txtLog
+        .SelStart = Len(.Text)
+        If Len(.Text) > 0 Then .SelText = vbCrLf
+        .SelStart = Len(.Text)
+        .SelColor = foreColor
+        .SelText = lineText
+        .SelStart = Len(.Text)
+    End With
+End Sub
