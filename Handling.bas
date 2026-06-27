@@ -5272,8 +5272,21 @@ End Function
 
 ' Original declaration: Private  Proc_6_218_7EA200(arg_C) '7EA200
 Public Function Proc_6_218_7EA200(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_218_7EA200 = Empty
+    Dim itemState As Long
+
+    On Error GoTo BuildFailed
+    If UBound(args) < 0 Then GoTo BuildFailed
+
+    itemState = CLng(Val(CStr(args(0))))
+    If itemState = 1507 Then
+        Proc_6_218_7EA200 = "5;1;7;1;5;0;"
+    Else
+        Proc_6_218_7EA200 = vbNullString
+    End If
+    Exit Function
+
+BuildFailed:
+    Proc_6_218_7EA200 = vbNullString
 End Function
 
 ' Original declaration: Private Sub Proc_6_219_7EA390
