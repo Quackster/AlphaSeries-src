@@ -465,8 +465,34 @@ End Function
 
 ' Original declaration: Private  Proc_1_14_6C9DD0(arg_C, arg_10, arg_14, arg_18) '6C9DD0
 Public Function Proc_1_14_6C9DD0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_1_14_6C9DD0 = Empty
+    Dim pageId As Long
+    Dim parentId As Long
+    Dim caption As String
+    Dim visibleState As Long
+    Dim iconId As Long
+    Dim childCount As Long
+    Dim payload As String
+
+    On Error GoTo BuildFailed
+
+    If UBound(args) >= 0 Then pageId = CLng(Val(CStr(args(0))))
+    If UBound(args) >= 1 Then parentId = CLng(Val(CStr(args(1))))
+    If UBound(args) >= 2 Then caption = CStr(args(2))
+    If UBound(args) >= 3 Then visibleState = CLng(Val(CStr(args(3))))
+    If UBound(args) >= 4 Then iconId = CLng(Val(CStr(args(4))))
+    If UBound(args) >= 5 Then childCount = CLng(Val(CStr(args(5))))
+
+    payload = "0"
+    payload = payload & CStr(Proc_3_0_6D2AF0(pageId, Empty, vbNullString))
+    payload = payload & CStr(Proc_3_0_6D2AF0(parentId, Empty, vbNullString))
+    payload = payload & CStr(Proc_3_0_6D2AF0(iconId, Empty, vbNullString))
+    payload = payload & CStr(Proc_3_0_6D2AF0(visibleState, Empty, vbNullString))
+
+    Proc_1_14_6C9DD0 = payload & caption & Chr$(2) & CStr(Proc_3_0_6D2AF0(childCount, Empty, vbNullString))
+    Exit Function
+
+BuildFailed:
+    Proc_1_14_6C9DD0 = vbNullString
 End Function
 
 ' Original declaration: Private Sub Proc_1_15_6CA000
