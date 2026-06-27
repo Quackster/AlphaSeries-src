@@ -3670,7 +3670,25 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_243_7FFEB0
 Public Function Proc_6_243_7FFEB0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim marker As String
+
+    On Error Resume Next
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex <= 0 Then GoTo CleanupDone
+
+    Proc_6_242_7FF0D0 socketIndex, 0, 0
+
+    marker = "[" & CStr(socketIndex) & "]"
+    global_008291A0 = Replace(global_008291A0, marker, vbNullString, 1, -1, vbBinaryCompare)
+    global_00829350 = Replace(global_00829350, marker, vbNullString, 1, -1, vbBinaryCompare)
+    global_00829354 = Replace(global_00829354, marker, vbNullString, 1, -1, vbBinaryCompare)
+
+    If Main.DataProcess(socketIndex).Enabled Then Main.DataProcess(socketIndex).Enabled = False
+    If Main.musServer(socketIndex).State <> 0 Then Main.musServer(socketIndex).Close
+
+CleanupDone:
     Proc_6_243_7FFEB0 = Empty
 End Function
 
