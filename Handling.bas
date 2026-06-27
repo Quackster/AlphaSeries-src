@@ -5771,14 +5771,117 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_179_7C7790
 Public Function Proc_6_179_7C7790(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_179_7C7790 = Empty
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim offset As Long
+    Dim petId As Long
+    Dim positionX As Long
+    Dim positionY As Long
+    Dim positionR As Long
+    Dim userId As String
+    Dim roomId As Long
+    Dim roomSlot As Long
+    Dim botRow As String
+    Dim botFields() As String
+    Dim botEntityId As Long
+    Dim positionZ As String
+    Dim placementPayload As String
+
+    On Error GoTo PlaceFailed
+
+    If CLng(Val(CStr(Proc_10_0_809570("com.client.rooms.bots.pets.enabled", "0", 0)))) = 0 Then GoTo PlaceFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex <= 0 Then GoTo PlaceFailed
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "nz" Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    petId = ReadWireLong(requestPayload, offset)
+    positionX = ReadWireLong(requestPayload, offset)
+    positionY = ReadWireLong(requestPayload, offset)
+    positionR = ReadWireLong(requestPayload, offset)
+    If petId <= 0 Then GoTo PlaceFailed
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo PlaceFailed
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId <= 0 Then GoTo PlaceFailed
+
+    roomSlot = CLng(Val(CStr(Proc_5_2_6D4690("SELECT id_slot FROM rooms WHERE id='" & CStr(roomId) & "' LIMIT 1", 0, 0))))
+    If roomSlot <= 0 Then GoTo PlaceFailed
+
+    positionZ = CStr(Val(CStr(Proc_5_2_6D4690("SELECT heightmap FROM models,rooms WHERE rooms.id='" & CStr(roomId) & _
+        "' AND models.id=rooms.id_model LIMIT 1", 0, 0))))
+
+    botRow = CStr(Proc_5_2_6D4690("SELECT bots.id,bots.name,bots.motto,bots.speech,bots.responses,'" & _
+        CStr(positionX) & "','" & CStr(positionY) & "','" & Proc_10_11_80A9C0(positionZ, 0, 0) & "','" & _
+        CStr(positionR) & "',bots.figure,NULL,bots.id_handle,bots.id_handleaction,NULL,bots.speech_submit,bots.allow_walk,bots.max_fields_away FROM bots,bots_petdata WHERE bots_petdata.id_bot='" & _
+        CStr(petId) & "' AND bots.id=bots_petdata.id_bot AND bots.id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND bots.id_room IS NULL LIMIT 1", 0, 0))
+    If Len(botRow) = 0 Then GoTo PlaceFailed
+
+    botFields = Split(botRow, Chr$(9))
+    botEntityId = CLng(Val(CStr(Proc_6_187_7CD700(roomSlot, botFields, 0))))
+    If botEntityId <= 0 Then GoTo PlaceFailed
+
+    StoreRepresentedBotPosition botEntityId, positionX, positionY, positionZ, positionR
+    Proc_5_0_6D3CD0 "UPDATE bots SET id_room='" & CStr(roomId) & "',position_x='" & CStr(positionX) & _
+        "',position_y='" & CStr(positionY) & "',position_z='" & Proc_10_11_80A9C0(positionZ, 0, 0) & _
+        "',position_r='" & CStr(positionR) & "' WHERE id='" & CStr(petId) & "'", 0, 0
+
+    placementPayload = RepresentedBotRoomEntryPayload(botEntityId)
+    If Len(placementPayload) > 0 Then Proc_6_247_8027E0 socketIndex, placementPayload, 0
+    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(petId, Empty, "I\")), 0
+
+    Proc_6_179_7C7790 = botEntityId
+    Exit Function
+
+PlaceFailed:
+    Proc_6_179_7C7790 = 0
 End Function
 
 ' Original declaration: Private  Proc_6_180_7C96F0(arg_C) '7C96F0
 Public Function Proc_6_180_7C96F0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_180_7C96F0 = Empty
+    Dim botEntityId As Long
+    Dim botId As Long
+    Dim petName As String
+    Dim petFigure As String
+    Dim scratches As Long
+    Dim pickupPayload As String
+
+    On Error GoTo PickupFailed
+
+    If UBound(args) >= 1 Then botEntityId = CLng(Val(CStr(args(1))))
+    If botEntityId <= 0 Then
+        Proc_6_180_7C96F0 = 0
+        Exit Function
+    End If
+
+    botId = RepresentedBotRecordLong(botEntityId, 1)
+    If botId <= 0 Then GoTo PickupFailed
+
+    Proc_5_0_6D3CD0 "UPDATE bots SET id_room=null WHERE id='" & CStr(botId) & "'", 0, 0
+    Proc_5_0_6D3CD0 "UPDATE bots_petdata SET id_level=id_level,energy=energy,experience=experience,nutrition=nutrition,scratches=scratches WHERE id_bot='" & CStr(botId) & "'", 0, 0
+
+    Proc_6_247_8027E0 CLng(Val(CStr(args(0)))), "@]" & CStr(botEntityId) & Chr$(2), 0
+
+    petName = RepresentedBotRecordField(botEntityId, 2)
+    petFigure = LCase$(RepresentedBotRecordField(botEntityId, 10))
+    scratches = CLng(Val(CStr(Proc_5_2_6D4690("SELECT scratches FROM bots_petdata WHERE id_bot='" & CStr(botId) & "' LIMIT 1", 0, 0))))
+    pickupPayload = RepresentedPetInventoryRow(botId, petName, petFigure, scratches)
+    If Len(pickupPayload) > 0 Then Proc_6_244_801E80 CLng(Val(CStr(args(0)))), "I[" & pickupPayload, 0
+
+    RemoveRepresentedBotRecord botEntityId
+    Proc_6_180_7C96F0 = botId
+    Exit Function
+
+PickupFailed:
+    Proc_6_180_7C96F0 = 0
 End Function
 
 ' Original declaration: Private Sub Proc_6_181_7CA920
@@ -6920,6 +7023,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_177_7C6580 socketIndex, "n" & Chr$(127), packetPayload
         Case "nx"
             Proc_6_178_7C6E60 socketIndex, "nx", packetPayload
+        Case "nz"
+            Proc_6_179_7C7790 socketIndex, "nz", packetPayload
         Case "E["
             Proc_6_45_714B60 socketIndex, "E[", packetPayload
         Case "A_"
@@ -7393,6 +7498,143 @@ Private Sub StoreRepresentedBotRecord(ByVal botEntityId As Long, ByVal recordTex
 
 StoreDone:
 End Sub
+
+Private Sub RemoveRepresentedBotRecord(ByVal botEntityId As Long)
+    Dim startMarker As String
+    Dim startAt As Long
+    Dim endAt As Long
+
+    On Error GoTo RemoveDone
+    If botEntityId <= 0 Then GoTo RemoveDone
+
+    startMarker = "[" & CStr(botEntityId) & ":"
+    startAt = InStr(1, global_00829358, startMarker, vbBinaryCompare)
+    If startAt > 0 Then
+        endAt = InStr(startAt + Len(startMarker), global_00829358, "]", vbBinaryCompare)
+        If endAt > 0 Then global_00829358 = Left$(global_00829358, startAt - 1) & Mid$(global_00829358, endAt + 1)
+    End If
+    global_008292D4 = Replace(global_008292D4, "[" & CStr(botEntityId) & "]", vbNullString, 1, 1, vbBinaryCompare)
+
+RemoveDone:
+End Sub
+
+Private Function RepresentedBotRecordText(ByVal botEntityId As Long) As String
+    Dim startMarker As String
+    Dim startAt As Long
+    Dim endAt As Long
+
+    On Error GoTo MissingRecord
+    If botEntityId <= 0 Or Len(global_00829358) = 0 Then GoTo MissingRecord
+
+    startMarker = "[" & CStr(botEntityId) & ":"
+    startAt = InStr(1, global_00829358, startMarker, vbBinaryCompare)
+    If startAt <= 0 Then GoTo MissingRecord
+
+    startAt = startAt + Len(startMarker)
+    endAt = InStr(startAt, global_00829358, "]", vbBinaryCompare)
+    If endAt <= startAt Then GoTo MissingRecord
+
+    RepresentedBotRecordText = Mid$(global_00829358, startAt, endAt - startAt)
+    Exit Function
+
+MissingRecord:
+    RepresentedBotRecordText = vbNullString
+End Function
+
+Private Function RepresentedBotRecordField(ByVal botEntityId As Long, ByVal fieldIndex As Long) As String
+    Dim fields() As String
+
+    On Error GoTo MissingField
+    fields = Split(RepresentedBotRecordText(botEntityId), Chr$(2))
+    If fieldIndex < LBound(fields) Or fieldIndex > UBound(fields) Then GoTo MissingField
+    RepresentedBotRecordField = CStr(fields(fieldIndex))
+    Exit Function
+
+MissingField:
+    RepresentedBotRecordField = vbNullString
+End Function
+
+Private Function RepresentedBotRecordLong(ByVal botEntityId As Long, ByVal fieldIndex As Long) As Long
+    RepresentedBotRecordLong = CLng(Val(RepresentedBotRecordField(botEntityId, fieldIndex)))
+End Function
+
+Private Sub StoreRepresentedBotPosition(ByVal botEntityId As Long, ByVal positionX As Long, ByVal positionY As Long, ByVal positionZ As String, ByVal positionR As Long)
+    Dim fields() As String
+    Dim recordText As String
+    Dim fieldIndex As Long
+
+    On Error GoTo StoreDone
+    fields = Split(RepresentedBotRecordText(botEntityId), Chr$(2))
+    If UBound(fields) < 9 Then GoTo StoreDone
+
+    fields(6) = CStr(positionX)
+    fields(7) = CStr(positionY)
+    fields(8) = positionZ
+    fields(9) = CStr(positionR)
+
+    For fieldIndex = LBound(fields) To UBound(fields)
+        If fieldIndex > LBound(fields) Then recordText = recordText & Chr$(2)
+        recordText = recordText & CStr(fields(fieldIndex))
+    Next fieldIndex
+
+    StoreRepresentedBotRecord botEntityId, recordText
+
+StoreDone:
+End Sub
+
+Private Function RepresentedBotRoomEntryPayload(ByVal botEntityId As Long) As String
+    Dim botId As Long
+    Dim botName As String
+    Dim botFigure As String
+    Dim positionX As Long
+    Dim positionY As Long
+    Dim positionZ As String
+    Dim positionR As Long
+
+    On Error GoTo PayloadFailed
+    botId = RepresentedBotRecordLong(botEntityId, 1)
+    botName = RepresentedBotRecordField(botEntityId, 2)
+    positionX = RepresentedBotRecordLong(botEntityId, 6)
+    positionY = RepresentedBotRecordLong(botEntityId, 7)
+    positionZ = RepresentedBotRecordField(botEntityId, 8)
+    positionR = RepresentedBotRecordLong(botEntityId, 9)
+    botFigure = RepresentedBotRecordField(botEntityId, 10)
+    If botEntityId <= 0 Or botId <= 0 Then GoTo PayloadFailed
+
+    RepresentedBotRoomEntryPayload = "@\" & CStr(Proc_3_0_6D2AF0(botEntityId, Empty, vbNullString))
+    RepresentedBotRoomEntryPayload = RepresentedBotRoomEntryPayload & botName & Chr$(2)
+    RepresentedBotRoomEntryPayload = RepresentedBotRoomEntryPayload & CStr(positionX) & " " & CStr(positionY) & " " & positionZ & Chr$(2)
+    RepresentedBotRoomEntryPayload = RepresentedBotRoomEntryPayload & CStr(positionR) & Chr$(2) & botFigure & Chr$(2)
+    Exit Function
+
+PayloadFailed:
+    RepresentedBotRoomEntryPayload = vbNullString
+End Function
+
+Private Function RepresentedPetInventoryRow(ByVal petId As Long, ByVal petName As String, ByVal petFigure As String, ByVal scratches As Long) As String
+    Dim figureParts() As String
+    Dim petType As Long
+    Dim petRace As Long
+    Dim petColor As String
+
+    On Error GoTo RowFailed
+    If petId <= 0 Then GoTo RowFailed
+
+    figureParts = Split(LCase$(petFigure), Chr$(32))
+    If UBound(figureParts) >= 0 Then petType = CLng(Val(CStr(figureParts(0))))
+    If UBound(figureParts) >= 1 Then petRace = CLng(Val(CStr(figureParts(1))))
+    If UBound(figureParts) >= 2 Then petColor = CStr(figureParts(2))
+
+    RepresentedPetInventoryRow = "0" & CStr(Proc_3_0_6D2AF0(petId, Empty, vbNullString)) & petName & Chr$(2)
+    RepresentedPetInventoryRow = RepresentedPetInventoryRow & CStr(Proc_3_0_6D2AF0(petType, Empty, vbNullString))
+    RepresentedPetInventoryRow = RepresentedPetInventoryRow & CStr(Proc_3_0_6D2AF0(petRace, Empty, vbNullString))
+    RepresentedPetInventoryRow = RepresentedPetInventoryRow & "0" & petColor & Chr$(2)
+    RepresentedPetInventoryRow = RepresentedPetInventoryRow & CStr(Proc_3_0_6D2AF0(scratches, Empty, vbNullString))
+    Exit Function
+
+RowFailed:
+    RepresentedPetInventoryRow = vbNullString
+End Function
 
 Private Function IsRepresentedBotAllocated(ByVal roomSlot As Long, ByVal botId As Long) As Boolean
     Dim records() As String
