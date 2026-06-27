@@ -2597,8 +2597,43 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_103_74A510
 Public Function Proc_6_103_74A510(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_103_74A510 = Empty
+    Dim queryText As String
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim effectId As Long
+    Dim socketIndex As Integer
+    Dim effectRowId As Long
+    Dim expiredCount As Long
+    Dim broadcastPayload As String
+
+    On Error GoTo ExpireDone
+
+    queryText = "SELECT users_effects.id_effect,users.id_socket,users_effects.id FROM users_effects,users WHERE users_effects.timestamp_expire IS NOT NULL AND users_effects.timestamp_expire<UNIX_TIMESTAMP() AND users.id=users_effects.id_user AND users.id_socket IS NOT NULL LIMIT 500"
+    rows = Split(CStr(Proc_5_2_6D4690(queryText, 1, 0)), Chr$(13))
+
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(rows(rowIndex)) > 0 Then
+            fields = Split(rows(rowIndex), Chr$(9))
+            If UBound(fields) >= 2 Then
+                effectId = CLng(Val(fields(0)))
+                socketIndex = CInt(Val(fields(1)))
+                effectRowId = CLng(Val(fields(2)))
+
+                If socketIndex > 0 And effectId > 0 Then
+                    broadcastPayload = CStr(Proc_3_0_6D2AF0(socketIndex, Empty, "Ge")) & "H"
+                    Proc_6_247_8027E0 socketIndex, broadcastPayload, 0
+                    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(effectId, Empty, "GO")), 0
+                    expiredCount = expiredCount + 1
+                End If
+            End If
+        End If
+    Next rowIndex
+
+    Proc_5_0_6D3CD0 "DELETE FROM users_effects WHERE users_effects.timestamp_expire IS NOT NULL AND users_effects.timestamp_expire<UNIX_TIMESTAMP() LIMIT 500", 0, 0
+
+ExpireDone:
+    Proc_6_103_74A510 = expiredCount
 End Function
 
 ' Original declaration: Private Sub Proc_6_104_74AB60
