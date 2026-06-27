@@ -92,10 +92,10 @@ Option Explicit
 
 ' Original declaration: Private Sub Form_Load() '821C80
 Private Sub Form_Load()
-    ' TODO: Reconstruct behavior from decompiled reference.
+    MsgBox "The Emulator does not work with your current PC-settings. Please change these settings in your ""Local Settings""!", vbCritical
 End Sub
 
 ' Original declaration: Private Sub Form_QueryUnload(Cancel As Integer, UnloadMode As Integer) '821DF0
 Private Sub Form_QueryUnload(Cancel As Integer, UnloadMode As Integer)
-    ' TODO: Reconstruct behavior from decompiled reference.
+    End
 End Sub
