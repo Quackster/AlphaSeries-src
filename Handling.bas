@@ -431,7 +431,64 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_11_6DF4A0
 Public Function Proc_6_11_6DF4A0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim callerUserId As String
+    Dim targetUserId As String
+    Dim targetRow As String
+    Dim targetFields() As String
+    Dim visitRows As String
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim visitCount As Long
+    Dim visitPayload As String
+    Dim responsePayload As String
+
+    On Error GoTo RoomHistoryFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "GJ" Then requestPayload = Mid$(requestPayload, 3)
+
+    callerUserId = HandlingUserIdFromSocket(socketIndex)
+    If Len(callerUserId) = 0 Or callerUserId = "0" Then GoTo RoomHistoryFailed
+    If Not HandlingUserHasPermission(callerUserId, "fuse_mod") Then GoTo RoomHistoryFailed
+
+    targetUserId = CStr(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    If Len(targetUserId) = 0 Or targetUserId = "0" Then GoTo RoomHistoryFailed
+
+    targetRow = CStr(Proc_5_2_6D4690("SELECT users.id,users.name FROM users WHERE users.id='" & Proc_10_11_80A9C0(targetUserId, 0, 0) & "' LIMIT 1", 0, 0))
+    If Len(targetRow) = 0 Then GoTo RoomHistoryFailed
+    targetFields = Split(targetRow, Chr$(9))
+    targetUserId = CStr(Val(HandlingField(targetFields, 0)))
+    If Len(targetUserId) = 0 Or targetUserId = "0" Then GoTo RoomHistoryFailed
+
+    visitRows = CStr(Proc_5_2_6D4690("SELECT models.type,rooms.id,rooms.name,DATE_FORMAT(FROM_UNIXTIME(logs_visitedrooms.timestamp_enter), '" & Chr$(37) & _
+        "H'),DATE_FORMAT(FROM_UNIXTIME(logs_visitedrooms.timestamp_enter), '" & Chr$(37) & _
+        "i') FROM rooms,logs_visitedrooms,models WHERE logs_visitedrooms.timestamp_enter > UNIX_TIMESTAMP()-21600 AND logs_visitedrooms.id_user='" & _
+        Proc_10_11_80A9C0(targetUserId, 0, 0) & "' AND rooms.id=logs_visitedrooms.id_room AND models.id=rooms.id_model GROUP BY logs_visitedrooms.id ORDER BY logs_visitedrooms.id DESC LIMIT 50", 0, 0))
+
+    If Len(visitRows) > 0 Then
+        rows = Split(visitRows, Chr$(13))
+        For rowIndex = LBound(rows) To UBound(rows)
+            If Len(rows(rowIndex)) > 0 Then
+                fields = Split(rows(rowIndex), Chr$(9))
+                visitPayload = visitPayload & StaffRoomVisitPayload(fields)
+                visitCount = visitCount + 1
+            End If
+        Next rowIndex
+    End If
+
+    responsePayload = CStr(Proc_3_0_6D2AF0(CLng(Val(targetUserId)), Empty, "HY")) & HandlingField(targetFields, 1) & Chr$(2)
+    responsePayload = CStr(Proc_3_0_6D2AF0(visitCount, Empty, responsePayload)) & visitPayload
+    Proc_6_244_801E80 socketIndex, responsePayload, 0
+
+RoomHistoryFailed:
     Proc_6_11_6DF4A0 = Empty
 End Function
 
@@ -3667,6 +3724,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_5_6_6D7090 socketIndex, "GK", packetPayload
         Case "GF"
             Proc_6_0_6D7FF0 socketIndex, "GF", packetPayload
+        Case "GJ"
+            Proc_6_11_6DF4A0 socketIndex, "GJ", packetPayload
         Case "GM"
             Proc_6_1_6D8B70 socketIndex, "GM", packetPayload
         Case "GO"
@@ -4296,6 +4355,31 @@ Private Function StaffUserSummaryPayload(ByRef fields() As String) As String
 
 BuildFailed:
     StaffUserSummaryPayload = vbNullString
+End Function
+
+Private Function StaffRoomVisitPayload(ByRef fields() As String) As String
+    Dim modelType As Long
+    Dim roomId As Long
+    Dim enterHour As Long
+    Dim enterMinute As Long
+    Dim payload As String
+
+    On Error GoTo BuildFailed
+
+    modelType = CLng(Val(HandlingField(fields, 0)))
+    roomId = CLng(Val(HandlingField(fields, 1)))
+    enterHour = CLng(Val(HandlingField(fields, 3)))
+    enterMinute = CLng(Val(HandlingField(fields, 4)))
+
+    payload = CStr(Proc_3_0_6D2AF0(modelType, Empty, vbNullString))
+    payload = CStr(Proc_3_0_6D2AF0(roomId, Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(enterHour, Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(enterMinute, Empty, payload))
+    StaffRoomVisitPayload = payload & HandlingField(fields, 2) & Chr$(2)
+    Exit Function
+
+BuildFailed:
+    StaffRoomVisitPayload = vbNullString
 End Function
 
 Private Function ContainsUnsafeStaffAlert(ByVal messageText As String) As Boolean
