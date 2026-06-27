@@ -675,6 +675,8 @@ Option Explicit
 Private pendingHeightTarget As Long
 Private pendingAnimationInterval As Long
 Private pendingProgressWidth As Long
+Private currentUpdateIndex As Long
+Private currentUpdateEntry As String
 
 ' Reconstructed code shell generated from decompiled output.
 ' Source reference: /opt/git/AlphaSeries_cracked/DECOMPILED/Updater.frm
@@ -682,7 +684,65 @@ Private pendingProgressWidth As Long
 
 ' Original declaration: Private Sub Timer3_Timer() '8238F0
 Private Sub Timer3_Timer()
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim entries() As String
+    Dim fields() As String
+    Dim bodyLines() As String
+    Dim lineIndex As Long
+    Dim visibleLineCount As Long
+    Dim featureTop As Long
+
+    On Error GoTo RenderFailed
+
+    If Height <> 1000 Then
+        QueueHeightAnimation 1000, 5
+        Timer3.Interval = 2500
+        Exit Sub
+    End If
+
+    entries = Split(global_00829044, Chr$(10))
+    If currentUpdateIndex > UBound(entries) Then
+        QueueHeightAnimation 1000, 5
+        Timer3.Enabled = False
+        Exit Sub
+    End If
+
+    currentUpdateEntry = CStr(entries(currentUpdateIndex))
+    fields = Split(currentUpdateEntry, Chr$(9))
+    If UBound(fields) < 2 Then
+        AdvanceUpdateProgress UBound(entries) + 1
+        Exit Sub
+    End If
+
+    bodyLines = Split(CStr(fields(2)), "\n")
+    For lineIndex = 1 To 25
+        If lineIndex - 1 <= UBound(bodyLines) And Len(bodyLines(lineIndex - 1)) > 0 Then
+            mText(lineIndex).Visible = True
+            mText(lineIndex).Caption = CStr(bodyLines(lineIndex - 1))
+            visibleLineCount = lineIndex
+        Else
+            mText(lineIndex).Visible = False
+        End If
+    Next lineIndex
+
+    mTitle.Caption = CStr(fields(1))
+    ApplyFeatureState fields
+
+    If visibleLineCount < 1 Then visibleLineCount = 1
+    featureTop = mText(visibleLineCount).Top + 720
+    freeFeature.Top = featureTop
+    unfreeFeature.Top = featureTop
+    downloadFeature.Top = featureTop
+
+    QueueHeightAnimation freeFeature.Top + 920, 10
+    Timer3.Interval = 2500
+    AdvanceUpdateProgress UBound(entries) + 1
+    Exit Sub
+
+RenderFailed:
+    On Error Resume Next
+    Hide
+    MsgBox "Es ist ein Fehler aufgetreten. Versuche es erneut!", vbCritical
+    End
 End Sub
 
 ' Original declaration: Private Sub DownloadFile_Timer() '821E60
@@ -704,6 +764,7 @@ Private Sub DownloadFile_Timer()
     targetWidth = CLng(11535 / updateCount)
     If targetWidth < 1 Then targetWidth = 1
     QueueProgressWidth targetWidth
+    currentUpdateIndex = 0
 
     executableName = GetUpdaterExecutableName()
     destinationPath = App.Path & "\" & executableName & ".exe"
@@ -816,6 +877,46 @@ Private Sub QueueProgressWidth(ByVal targetWidth As Long)
     pendingProgressWidth = targetWidth
     walkPerCent.Enabled = True
 End Sub
+
+Private Sub AdvanceUpdateProgress(ByVal updateCount As Long)
+    currentUpdateIndex = currentUpdateIndex + 1
+    If updateCount <= 0 Then updateCount = 1
+    QueueProgressWidth CLng((11535 / updateCount) * (currentUpdateIndex + 1))
+End Sub
+
+Private Sub ApplyFeatureState(ByRef fields() As String)
+    Dim featureMode As Long
+    Dim featureCost As Long
+
+    featureMode = GetUpdateFieldNumber(fields, 3)
+    featureCost = GetUpdateFieldNumber(fields, 4)
+
+    freeFeature.Visible = False
+    unfreeFeature.Visible = False
+    downloadFeature.Visible = False
+
+    Select Case featureMode
+        Case 0
+            freeFeature.Caption = "Kostenlose Funktion"
+            freeFeature.Visible = True
+        Case 1
+            downloadFeature.Visible = True
+        Case Else
+            unfreeFeature.Caption = "Kostet " & CStr(featureCost) & " Punkte"
+            unfreeFeature.Visible = True
+    End Select
+End Sub
+
+Private Function GetUpdateFieldNumber(ByRef fields() As String, ByVal fieldIndex As Long) As Long
+    On Error GoTo MissingField
+    If fieldIndex <= UBound(fields) Then
+        GetUpdateFieldNumber = CLng(Val(CStr(fields(fieldIndex))))
+    End If
+    Exit Function
+
+MissingField:
+    GetUpdateFieldNumber = 0
+End Function
 
 Private Function GetUpdaterExecutableName() As String
     If Len(global_00829040) > 0 Then
