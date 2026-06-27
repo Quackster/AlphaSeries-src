@@ -484,7 +484,22 @@ End Function
 
 ' Original declaration: Public Sub runServer() '68EC00
 Public Sub runServer()
-    ' TODO: Reconstruct behavior from decompiled reference.
+    On Error GoTo RunFailed
+
+    If InStr(1, Main.Caption, "[!]", vbBinaryCompare) = 0 Then
+        Main.Height = 5730
+        If CBool(Proc_8_7_8051C0(Me, 0, 0)) Then
+            Proc_1_3_6BEBA0 0
+        Else
+            Main.Hide
+            MsgBox "Unbekanntes Problem", vbCritical
+        End If
+        End
+    End If
+    Exit Sub
+
+RunFailed:
+    End
 End Sub
 
 ' Original declaration: Public Function getProcessor() '68EE00
