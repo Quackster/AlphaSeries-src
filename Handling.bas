@@ -974,7 +974,27 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_19_6E8040
 Public Function Proc_6_19_6E8040(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim cachedPayload As String
+    Dim packetPrefix As String
+    Dim payload As String
+
+    On Error GoTo SendFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex <= 0 Then GoTo SendFailed
+
+    If UBound(args) >= 1 Then cachedPayload = CStr(args(1))
+    If UBound(args) >= 2 Then packetPrefix = CStr(args(2))
+    If Len(packetPrefix) = 0 Then packetPrefix = "Gz"
+    If Len(cachedPayload) = 0 Then cachedPayload = global_0082912C
+
+    payload = packetPrefix & cachedPayload
+    Proc_6_244_801E80 socketIndex, payload, 0
+    Proc_6_19_6E8040 = payload
+    Exit Function
+
+SendFailed:
     Proc_6_19_6E8040 = Empty
 End Function
 
