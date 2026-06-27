@@ -3965,6 +3965,7 @@ Public Function Proc_6_85_73A8E0(ParamArray args() As Variant) As Variant
     Dim fields() As String
     Dim rowIndex As Long
     Dim furnitureId As Long
+    Dim rowRoomId As Long
     Dim productId As Long
     Dim wallPosition As String
     Dim signText As String
@@ -7165,7 +7166,76 @@ End Function
 
 ' Original declaration: Private  Proc_6_147_76E910(arg_C, arg_10) '76E910
 Public Function Proc_6_147_76E910(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim roomId As Long
+    Dim positionX As Long
+    Dim positionY As Long
+    Dim rowText As String
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim furnitureId As Long
+    Dim productId As Long
+    Dim stateText As String
+    Dim stateValue As Long
+    Dim productSprite As String
+    Dim productAction As String
+    Dim whereText As String
+    Dim payload As String
+    Dim refreshCount As Long
+
+    On Error GoTo RefreshDone
+
+    If UBound(args) >= 2 Then
+        roomId = CLng(Val(CStr(args(0))))
+        positionX = CLng(Val(CStr(args(1))))
+        positionY = CLng(Val(CStr(args(2))))
+    ElseIf UBound(args) >= 1 Then
+        positionX = CLng(Val(CStr(args(0))))
+        positionY = CLng(Val(CStr(args(1))))
+    Else
+        GoTo RefreshDone
+    End If
+
+    whereText = "position_x='" & CStr(positionX) & "' AND position_y='" & CStr(positionY) & "' AND position_wall IS NULL"
+    If roomId > 0 Then whereText = "id_room='" & CStr(roomId) & "' AND " & whereText
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT id,id_room,id_product,sign FROM furnitures WHERE " & whereText & " LIMIT 250", 0, 0))
+    If Len(rowText) = 0 Then GoTo RefreshDone
+
+    rows = Split(rowText, Chr$(13))
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(CStr(rows(rowIndex))) > 0 Then
+            fields = Split(CStr(rows(rowIndex)), Chr$(9))
+            furnitureId = CLng(Val(HandlingField(fields, 0)))
+            rowRoomId = roomId
+            If rowRoomId <= 0 Then rowRoomId = CLng(Val(HandlingField(fields, 1)))
+            productId = CLng(Val(HandlingField(fields, 2)))
+            stateText = HandlingField(fields, 3)
+
+            If furnitureId > 0 And rowRoomId > 0 And productId > 0 Then
+                productAction = LCase$(CStr(Proc_8_12_806C30(productId, 7, 0)))
+                productSprite = LCase$(CStr(Proc_8_12_806C30(productId, 17, 0)))
+                If Len(productSprite) = 0 Then productSprite = LCase$(CStr(Proc_8_12_806C30(productId, 18, 0)))
+
+                If Len(productAction) = 0 Or InStr(1, productAction, "switch", vbBinaryCompare) > 0 Or _
+                    InStr(1, productAction, "click", vbBinaryCompare) > 0 Or _
+                    InStr(1, productAction, "score", vbBinaryCompare) > 0 Or _
+                    InStr(1, productSprite, "score", vbBinaryCompare) > 0 Or _
+                    InStr(1, productSprite, "dice", vbBinaryCompare) > 0 Then
+                    stateValue = CLng(Val(stateText))
+                    Proc_6_151_78AC20 rowRoomId, furnitureId, stateValue
+                    payload = "AX" & CStr(furnitureId) & Chr$(2) & CStr(stateValue) & Chr$(2)
+                    Proc_6_246_8024C0 rowRoomId, payload, 0
+                    refreshCount = refreshCount + 1
+                End If
+            End If
+        End If
+    Next rowIndex
+
+    Proc_6_147_76E910 = refreshCount
+    Exit Function
+
+RefreshDone:
     Proc_6_147_76E910 = Empty
 End Function
 
