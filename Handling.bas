@@ -2634,7 +2634,71 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_100_748C80
 Public Function Proc_6_100_748C80(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim userId As String
+    Dim roomId As Long
+    Dim dimmerFurnitureId As Long
+    Dim presetId As Long
+    Dim backgroundId As Long
+    Dim colourText As String
+    Dim lightLevel As Long
+    Dim offset As Long
+    Dim signText As String
+    Dim rowText As String
+    Dim fields() As String
+    Dim productId As Long
+    Dim wallPosition As String
+
+    On Error GoTo DimmerUpdateDone
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "EV" Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    presetId = ReadWireLong(requestPayload, offset)
+    backgroundId = ReadWireLong(requestPayload, offset)
+    colourText = UCase$(ReadWireString(requestPayload, offset))
+    lightLevel = ReadWireLong(requestPayload, offset)
+
+    If presetId < 1 Or presetId > 3 Then GoTo DimmerUpdateDone
+    If backgroundId < 1 Or backgroundId > 2 Then GoTo DimmerUpdateDone
+    If Not IsDimmerColour(colourText) Then GoTo DimmerUpdateDone
+    If lightLevel < 76 Or lightLevel > 225 Then GoTo DimmerUpdateDone
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo DimmerUpdateDone
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId <= 0 Then GoTo DimmerUpdateDone
+    If Not HandlingUserOwnsRoom(userId, roomId) And Not HandlingUserHasRoomRight(userId, roomId) Then GoTo DimmerUpdateDone
+
+    dimmerFurnitureId = CLng(Val(CStr(Proc_5_2_6D4690("SELECT furnitures.id FROM furnitures,products WHERE furnitures.id_room='" & CStr(roomId) & "' AND products.id_type='9' AND furnitures.id_product=products.id LIMIT 1", 0, 0))))
+    If dimmerFurnitureId <= 0 Then GoTo DimmerUpdateDone
+
+    signText = "2," & CStr(presetId) & "," & CStr(backgroundId) & "," & colourText & "," & CStr(lightLevel)
+
+    Proc_5_0_6D3CD0 "UPDATE furnitures_dimmerpresets SET id_state='1' WHERE id_furni='" & CStr(dimmerFurnitureId) & "'", 0, 0
+    Proc_5_0_6D3CD0 "UPDATE furnitures_dimmerpresets SET id_state='2',id_light='" & CStr(lightLevel) & "',id_background='" & CStr(backgroundId) & "',colour='" & Proc_10_11_80A9C0(colourText, 0, 0) & "' WHERE id_furni='" & CStr(dimmerFurnitureId) & "' AND id_preset='" & CStr(presetId) & "'", 0, 0
+    Proc_5_0_6D3CD0 "UPDATE furnitures SET sign='" & Proc_10_11_80A9C0(signText, 0, 0) & "' WHERE id='" & CStr(dimmerFurnitureId) & "'", 0, 0
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT id_product,position_wall FROM furnitures WHERE id='" & CStr(dimmerFurnitureId) & "' LIMIT 1", 0, 0))
+    fields = Split(rowText, Chr$(9))
+    If UBound(fields) >= 1 Then
+        productId = CLng(Val(HandlingField(fields, 0)))
+        wallPosition = HandlingField(fields, 1)
+        Proc_6_247_8027E0 socketIndex, "AU" & CStr(dimmerFurnitureId) & Chr$(2) & CStr(Proc_3_0_6D2AF0(productId, Empty, vbNullString)) & wallPosition & Chr$(2) & signText & Chr$(2), 0
+    End If
+
+    Proc_6_100_748C80 = dimmerFurnitureId
+    Exit Function
+
+DimmerUpdateDone:
     Proc_6_100_748C80 = Empty
 End Function
 
@@ -5484,6 +5548,13 @@ Private Function IsStickyNoteColor(ByVal noteColor As String) As Boolean
     Select Case UCase$(noteColor)
         Case "9CFF9C", "FFFF33", "FF9CFF", "9CCEFF"
             IsStickyNoteColor = True
+    End Select
+End Function
+
+Private Function IsDimmerColour(ByVal colourText As String) As Boolean
+    Select Case UCase$(colourText)
+        Case "#0053F7", "#74F5F5", "#E759DE", "#EA4532", "#F2F851", "#82F349", "#000000"
+            IsDimmerColour = True
     End Select
 End Function
 
