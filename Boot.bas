@@ -122,7 +122,52 @@ End Function
 
 ' Original declaration: Private Sub Proc_1_7_6C5E10
 Public Function Proc_1_7_6C5E10(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim maxLevelId As Long
+    Dim maxCommandId As Long
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim cacheIndex As Long
+
+    On Error GoTo BuildFailed
+
+    maxLevelId = CLng(Val(CStr(Proc_5_2_6D4690("SELECT MAX(id_level) FROM bots_petlevels", 0, 0))))
+    If maxLevelId < 0 Then maxLevelId = 0
+    ReDim global_008292D0(0 To maxLevelId)
+
+    rows = Split(CStr(Proc_5_2_6D4690("SELECT id_level,max_energy,max_exp,max_nutrition FROM bots_petlevels ORDER BY id_level ASC", 0, 0)), Chr$(13))
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(rows(rowIndex)) > 0 Then
+            fields = Split(rows(rowIndex), Chr$(9))
+            If UBound(fields) >= 3 Then
+                cacheIndex = CLng(Val(CStr(fields(0))))
+                If cacheIndex >= LBound(global_008292D0) And cacheIndex <= UBound(global_008292D0) Then
+                    global_008292D0(cacheIndex) = CStr(Val(CStr(fields(1)))) & Chr$(9) & CStr(Val(CStr(fields(2)))) & Chr$(9) & CStr(Val(CStr(fields(3))))
+                End If
+            End If
+        End If
+    Next rowIndex
+
+    global_008292C8 = CLng(Val(CStr(Proc_5_2_6D4690("SELECT COUNT(id_command) FROM bots_petcommands", 0, 0))))
+    maxCommandId = CLng(Val(CStr(Proc_5_2_6D4690("SELECT MAX(id_command) FROM bots_petcommands", 0, 0))))
+    If maxCommandId < global_008292C8 Then maxCommandId = global_008292C8
+    If maxCommandId < 0 Then maxCommandId = 0
+    ReDim global_008292CC(0 To maxCommandId)
+
+    rows = Split(CStr(Proc_5_2_6D4690("SELECT id_command,petlevel_required,command,command_action FROM bots_petcommands", 0, 0)), Chr$(13))
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(rows(rowIndex)) > 0 Then
+            fields = Split(rows(rowIndex), Chr$(9))
+            If UBound(fields) >= 3 Then
+                cacheIndex = CLng(Val(CStr(fields(0))))
+                If cacheIndex >= LBound(global_008292CC) And cacheIndex <= UBound(global_008292CC) Then
+                    global_008292CC(cacheIndex) = CStr(Val(CStr(fields(0)))) & Chr$(9) & CStr(Val(CStr(fields(1)))) & Chr$(9) & CStr(fields(2)) & Chr$(9) & CStr(fields(3))
+                End If
+            End If
+        End If
+    Next rowIndex
+
+BuildFailed:
     Proc_1_7_6C5E10 = Empty
 End Function
 
