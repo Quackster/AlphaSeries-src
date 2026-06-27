@@ -5941,7 +5941,58 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_183_7CABF0
 Public Function Proc_6_183_7CABF0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim offset As Long
+    Dim requestedId As Long
+    Dim botEntityId As Long
+    Dim botId As Long
+    Dim userId As String
+    Dim petRow As String
+    Dim petFields() As String
+    Dim payload As String
+
+    On Error GoTo StatusFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex <= 0 Then GoTo StatusFailed
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "ny" Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    requestedId = ReadWireLong(requestPayload, offset)
+    If requestedId <= 0 Then GoTo StatusFailed
+
+    botEntityId = requestedId
+    botId = RepresentedBotRecordLong(botEntityId, 1)
+    If botId <= 0 Then
+        botId = requestedId
+        botEntityId = RepresentedBotEntityFromBotId(botId)
+    End If
+    If botId <= 0 Then GoTo StatusFailed
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo StatusFailed
+
+    petRow = CStr(Proc_5_2_6D4690("SELECT bots.id,bots.name,bots.figure,bots_petdata.id_level,bots_petdata.experience,bots_petdata.energy,bots_petdata.nutrition,bots_petdata.scratches,ROUND((UNIX_TIMESTAMP()-bots_petdata.timestamp_buy)/60/60/24,0),bots_petdata.id_owner,users.name FROM bots,bots_petdata,users WHERE bots.id='" & _
+        CStr(botId) & "' AND bots.id_handle='3' AND bots_petdata.id_bot=bots.id AND users.id=bots_petdata.id_owner LIMIT 1", 0, 0))
+    If Len(petRow) = 0 Then GoTo StatusFailed
+
+    petFields = Split(petRow, Chr$(9))
+    If UBound(petFields) < 10 Then GoTo StatusFailed
+    If botEntityId <= 0 Then botEntityId = botId
+
+    payload = RepresentedPetStatusPayload(botEntityId, petFields)
+    If Len(payload) > 0 Then Proc_6_244_801E80 socketIndex, payload, 0
+
+    Proc_6_183_7CABF0 = payload
+    Exit Function
+
+StatusFailed:
     Proc_6_183_7CABF0 = Empty
 End Function
 
@@ -7261,6 +7312,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_171_7C1520 socketIndex, "@h", packetPayload
         Case "n" & Chr$(127)
             Proc_6_177_7C6580 socketIndex, "n" & Chr$(127), packetPayload
+        Case "ny"
+            Proc_6_183_7CABF0 socketIndex, "ny", packetPayload
         Case "nx"
             Proc_6_178_7C6E60 socketIndex, "nx", packetPayload
         Case "nz"
@@ -7947,6 +8000,51 @@ Private Function RepresentedPetCommandPayloadFromSql(ByVal petLevel As Long, ByV
 
 BuildFailed:
     RepresentedPetCommandPayloadFromSql = vbNullString
+End Function
+
+Private Function RepresentedPetStatusPayload(ByVal botEntityId As Long, ByVal petFields As Variant) As String
+    Dim botId As Long
+    Dim petName As String
+    Dim petFigure As String
+    Dim petLevel As Long
+    Dim petExperience As Long
+    Dim petEnergy As Long
+    Dim petNutrition As Long
+    Dim petScratches As Long
+    Dim petAgeDays As Long
+    Dim ownerId As Long
+    Dim ownerName As String
+
+    On Error GoTo PayloadFailed
+    If Not IsArray(petFields) Then GoTo PayloadFailed
+    If UBound(petFields) < 10 Then GoTo PayloadFailed
+
+    botId = CLng(Val(CStr(petFields(0))))
+    petName = CStr(petFields(1))
+    petFigure = CStr(petFields(2))
+    petLevel = CLng(Val(CStr(petFields(3))))
+    petExperience = CLng(Val(CStr(petFields(4))))
+    petEnergy = CLng(Val(CStr(petFields(5))))
+    petNutrition = CLng(Val(CStr(petFields(6))))
+    petScratches = CLng(Val(CStr(petFields(7))))
+    petAgeDays = CLng(Val(CStr(petFields(8))))
+    ownerId = CLng(Val(CStr(petFields(9))))
+    ownerName = CStr(petFields(10))
+    If botEntityId <= 0 Then botEntityId = botId
+
+    RepresentedPetStatusPayload = "IY" & CStr(Proc_3_0_6D2AF0(botEntityId, Empty, vbNullString)) & petName & Chr$(2)
+    RepresentedPetStatusPayload = RepresentedPetStatusPayload & CStr(Proc_3_0_6D2AF0(petLevel, Empty, vbNullString))
+    RepresentedPetStatusPayload = RepresentedPetStatusPayload & CStr(Proc_3_0_6D2AF0(petExperience, Empty, vbNullString))
+    RepresentedPetStatusPayload = RepresentedPetStatusPayload & CStr(Proc_3_0_6D2AF0(petEnergy, Empty, vbNullString))
+    RepresentedPetStatusPayload = RepresentedPetStatusPayload & CStr(Proc_3_0_6D2AF0(petNutrition, Empty, vbNullString))
+    RepresentedPetStatusPayload = RepresentedPetStatusPayload & CStr(Proc_3_0_6D2AF0(petScratches, Empty, vbNullString))
+    RepresentedPetStatusPayload = RepresentedPetStatusPayload & petFigure & Chr$(2)
+    RepresentedPetStatusPayload = RepresentedPetStatusPayload & CStr(Proc_3_0_6D2AF0(petAgeDays, Empty, vbNullString))
+    RepresentedPetStatusPayload = RepresentedPetStatusPayload & CStr(Proc_3_0_6D2AF0(ownerId, Empty, vbNullString)) & ownerName & Chr$(2)
+    Exit Function
+
+PayloadFailed:
+    RepresentedPetStatusPayload = vbNullString
 End Function
 
 Private Function RepresentedPetLevelMaxExperience(ByVal petLevel As Long) As Long
