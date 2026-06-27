@@ -227,7 +227,25 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_30_70DC90
 Public Function Proc_6_30_70DC90(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim cfhId As Long
+    Dim queryText As String
+
+    On Error GoTo CancelFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Then GoTo CancelFailed
+
+    queryText = "SELECT id FROM staff_cfh WHERE id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_closed='0' AND timestamp_sent > UNIX_TIMESTAMP()-600 ORDER BY id DESC LIMIT 1"
+    cfhId = CLng(Val(CStr(Proc_5_2_6D4690(queryText, 0, 0))))
+    If cfhId > 0 Then
+        Proc_5_0_6D3CD0 "DELETE FROM staff_cfh WHERE id='" & CStr(cfhId) & "'", 0, 0
+        Proc_6_244_801E80 socketIndex, "E@", 0
+    End If
+
+CancelFailed:
     Proc_6_30_70DC90 = Empty
 End Function
 
