@@ -5456,7 +5456,66 @@ End Function
 
 ' Original declaration: Private  Proc_6_146_76D300(arg_C, arg_10) '76D300
 Public Function Proc_6_146_76D300(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim furnitureId As Long
+    Dim productId As Long
+    Dim roomId As Long
+    Dim rowText As String
+    Dim fields() As String
+    Dim markerText As String
+    Dim roomCacheText As String
+
+    On Error GoTo RemoveDone
+
+    If UBound(args) >= 2 Then
+        socketIndex = CInt(Val(CStr(args(0))))
+        furnitureId = CLng(Val(CStr(args(1))))
+        productId = CLng(Val(CStr(args(2))))
+    ElseIf UBound(args) >= 1 Then
+        furnitureId = CLng(Val(CStr(args(0))))
+        productId = CLng(Val(CStr(args(1))))
+    ElseIf UBound(args) >= 0 Then
+        furnitureId = CLng(Val(CStr(args(0))))
+    End If
+
+    If furnitureId <= 0 Then GoTo RemoveDone
+
+    If productId <= 0 Then
+        productId = CLng(Val(CStr(Proc_5_2_6D4690("SELECT id_product FROM furnitures WHERE id='" & CStr(furnitureId) & "' LIMIT 1", 0, 0))))
+    End If
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT id_room FROM furnitures WHERE id='" & CStr(furnitureId) & "' LIMIT 1", 0, 0))
+    If Len(rowText) > 0 Then
+        fields = Split(rowText, Chr$(9))
+        roomId = CLng(Val(HandlingField(fields, 0)))
+    End If
+
+    markerText = Chr$(1) & CStr(furnitureId) & Chr$(2)
+    global_008291F8 = Replace(global_008291F8, markerText, vbNullString, 1, -1, vbBinaryCompare)
+    global_008291FC = Replace(global_008291FC, markerText, vbNullString, 1, -1, vbBinaryCompare)
+
+    markerText = Chr$(1) & CStr(furnitureId) & Chr$(9)
+    global_008291F8 = RemoveRepresentedCacheRecord(global_008291F8, markerText)
+    global_008291FC = RemoveRepresentedCacheRecord(global_008291FC, markerText)
+
+    If Len(global_00829310) > 0 Then
+        roomCacheText = CStr(global_00829310)
+        roomCacheText = RemoveRepresentedCacheRecord(roomCacheText, Chr$(1) & CStr(furnitureId) & Chr$(2))
+        roomCacheText = RemoveRepresentedCacheRecord(roomCacheText, Chr$(1) & CStr(furnitureId) & Chr$(9))
+        global_00829310 = roomCacheText
+    End If
+
+    If roomId <= 0 And socketIndex > 0 Then
+        rowText = HandlingUserIdFromSocket(socketIndex)
+        If Len(rowText) > 0 And rowText <> "0" Then roomId = HandlingCurrentRoomId(socketIndex, rowText)
+    End If
+
+    If roomId > 0 Then
+        Proc_6_106_74B750 App.Path & "\CACHE\ROOMS\" & CStr(roomId) & ".cache", 0, 0
+        Proc_6_106_74B750 App.Path & "\CACHE\PATHFINDER\" & CStr(roomId) & ".cache", 0, 0
+    End If
+
+RemoveDone:
     Proc_6_146_76D300 = Empty
 End Function
 
@@ -11482,6 +11541,34 @@ Private Function HandlingField(ByRef fields() As String, ByVal fieldIndex As Lon
 
 MissingField:
     HandlingField = vbNullString
+End Function
+
+Private Function RemoveRepresentedCacheRecord(ByVal cacheText As String, ByVal markerText As String) As String
+    Dim markerAt As Long
+    Dim recordStart As Long
+    Dim recordEnd As Long
+
+    On Error GoTo RemoveFallback
+    RemoveRepresentedCacheRecord = cacheText
+    If Len(cacheText) = 0 Or Len(markerText) = 0 Then Exit Function
+
+    markerAt = InStr(1, cacheText, markerText, vbBinaryCompare)
+    Do While markerAt > 0
+        recordStart = InStrRev(cacheText, Chr$(1), markerAt, vbBinaryCompare)
+        If recordStart <= 0 Then recordStart = markerAt
+
+        recordEnd = InStr(markerAt + Len(markerText), cacheText, Chr$(2), vbBinaryCompare)
+        If recordEnd <= 0 Then recordEnd = markerAt + Len(markerText) - 1
+
+        cacheText = Left$(cacheText, recordStart - 1) & Mid$(cacheText, recordEnd + 1)
+        markerAt = InStr(1, cacheText, markerText, vbBinaryCompare)
+    Loop
+
+    RemoveRepresentedCacheRecord = cacheText
+    Exit Function
+
+RemoveFallback:
+    RemoveRepresentedCacheRecord = Replace(cacheText, markerText, vbNullString, 1, -1, vbBinaryCompare)
 End Function
 
 Private Function StickyNoteUpdateFromWire(ByVal packetPayload As String, ByRef furnitureId As Long, ByRef noteColor As String, ByRef noteCaption As String) As Boolean

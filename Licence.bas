@@ -26,6 +26,7 @@ Public global_0082917C As String
 Public global_00829258 As String
 Public global_0082916C As Long
 Public global_008291EC As String
+Public global_008291F8 As String
 Public global_008291FC As String
 Public global_00829078 As String
 Public global_0082907C As String
@@ -67,6 +68,7 @@ Public global_00829090 As Date
 Public global_00829098 As String
 Public global_0082909C As String
 Public global_0082934C As Variant
+Public global_00829310 As String
 Public global_0082930C As String
 Public global_00829350 As String
 Public global_00829354 As String
