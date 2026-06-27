@@ -8,6 +8,8 @@ Option Explicit
 Public global_0082928C As String
 Public global_008292A8 As Variant
 
+Private Declare Function URLDownloadToFile Lib "urlmon" Alias "URLDownloadToFileA" (ByVal pCaller As Long, ByVal szURL As String, ByVal szFileName As String, ByVal dwReserved As Long, ByVal lpfnCB As Long) As Long
+
 ' Original declaration: Private Sub Proc_10_0_809570
 Public Function Proc_10_0_809570(ParamArray args() As Variant) As Variant
     Dim keyName As String
@@ -471,8 +473,21 @@ End Function
 
 ' Original declaration: Private  Proc_10_28_8210C0(arg_C) '8210C0
 Public Function Proc_10_28_8210C0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_10_28_8210C0 = Empty
+    Dim sourceUrl As String
+    Dim destinationPath As String
+    Dim resultCode As Long
+
+    On Error GoTo DownloadFailed
+    If UBound(args) < 1 Then GoTo DownloadFailed
+
+    sourceUrl = CStr(args(0))
+    destinationPath = CStr(args(1))
+    resultCode = URLDownloadToFile(0, sourceUrl, destinationPath, 0, 0)
+    Proc_10_28_8210C0 = (resultCode = 0)
+    Exit Function
+
+DownloadFailed:
+    Proc_10_28_8210C0 = False
 End Function
 
 Private Function RandomLongFromArgs(ByRef args() As Variant) As Long
