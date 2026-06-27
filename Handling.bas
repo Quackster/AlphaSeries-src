@@ -102,7 +102,52 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_2_6D9880
 Public Function Proc_6_2_6D9880(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim callerUserId As String
+    Dim targetUserId As String
+    Dim targetSocketIndex As Integer
+    Dim currentRoomId As Long
+    Dim kickMessage As String
+    Dim offset As Long
+
+    On Error GoTo KickFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "GO" Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    targetUserId = CStr(ReadWireLong(requestPayload, offset))
+    If Len(targetUserId) = 0 Or targetUserId = "0" Then targetUserId = CStr(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    If Len(targetUserId) = 0 Or targetUserId = "0" Then GoTo KickFailed
+
+    kickMessage = ReadWireString(requestPayload, offset)
+    If Len(kickMessage) = 0 Then kickMessage = CStr(Proc_10_7_80A190(requestPayload, 0, 0))
+    If Len(kickMessage) = 0 Then GoTo KickFailed
+
+    callerUserId = HandlingUserIdFromSocket(socketIndex)
+    If Len(callerUserId) = 0 Or callerUserId = "0" Then GoTo KickFailed
+    If Not HandlingUserHasPermission(callerUserId, "fuse_mod") Then GoTo KickFailed
+    If Not HandlingUserHasPermission(callerUserId, "fuse_kick") Then GoTo KickFailed
+    If ContainsUnsafeStaffAlert(kickMessage) Then GoTo KickFailed
+
+    targetSocketIndex = HandlingSocketFromUserId(targetUserId)
+    If targetSocketIndex <= 0 Then GoTo KickFailed
+
+    currentRoomId = HandlingCurrentRoomId(socketIndex, callerUserId)
+    Proc_5_1_6D4110 "INSERT INTO logs_moderation(id_type,id_user,id_target,id_target_2,timestamp,message,id_session) VALUES('5','" & _
+        Proc_10_11_80A9C0(callerUserId, 0, 0) & "','" & Proc_10_11_80A9C0(targetUserId, 0, 0) & "','" & CStr(currentRoomId) & "',UNIX_TIMESTAMP(),'" & _
+        Proc_10_11_80A9C0(kickMessage, 0, 0) & "','" & CStr(socketIndex) & "')", 0, 0
+
+    Proc_6_244_801E80 targetSocketIndex, "Ba" & kickMessage & Chr$(2), 0
+    Proc_6_53_718E00 targetSocketIndex, 0, 0
+
+KickFailed:
     Proc_6_2_6D9880 = Empty
 End Function
 
@@ -3350,6 +3395,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_0_6D7FF0 socketIndex, "GF", packetPayload
         Case "GM"
             Proc_6_1_6D8B70 socketIndex, "GM", packetPayload
+        Case "GO"
+            Proc_6_2_6D9880 socketIndex, "GO", packetPayload
         Case "Fw"
             Proc_6_115_751220 socketIndex, "Fw", packetPayload
         Case "Fn"
