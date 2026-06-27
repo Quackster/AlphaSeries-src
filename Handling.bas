@@ -4913,7 +4913,50 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_175_7C4800
 Public Function Proc_6_175_7C4800(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim rows As Variant
+    Dim fields As Variant
+    Dim rowIndex As Long
+    Dim requestCount As Long
+    Dim requestPayload As String
+    Dim requesterId As Long
+    Dim requesterName As String
+    Dim payload As String
+
+    On Error GoTo PendingFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo PendingFailed
+
+    rows = Split(CStr(Proc_5_2_6D4690("SELECT users.id,users.name FROM users,friendships WHERE friendships.has_accept='0' AND friendships.id_user='" & _
+        Proc_10_11_80A9C0(userId, 0, 0) & "' AND users.id=friendships.id_friend LIMIT 50", 0, 0)), Chr$(13))
+
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(CStr(rows(rowIndex))) > 0 Then
+            fields = Split(CStr(rows(rowIndex)), Chr$(9))
+            If UBound(fields) >= 1 Then
+                requesterId = CLng(Val(CStr(fields(0))))
+                requesterName = CStr(fields(1))
+                If requesterId > 0 Then
+                    requestPayload = requestPayload & "0" & CStr(Proc_3_0_6D2AF0(requesterId, Empty, vbNullString))
+                    requestPayload = requestPayload & requesterName & Chr$(2) & requesterName & Chr$(2)
+                    requestCount = requestCount + 1
+                End If
+            End If
+        End If
+    Next rowIndex
+
+    payload = CStr(Proc_3_0_6D2AF0(requestCount, Empty, "Dz"))
+    payload = payload & CStr(Proc_3_0_6D2AF0(requestCount, Empty, "Dz"))
+    payload = CStr(Proc_3_0_6D2AF0(requestCount, Empty, payload)) & requestPayload
+    Proc_6_244_801E80 socketIndex, payload, 0
+
+    Proc_6_175_7C4800 = payload
+    Exit Function
+
+PendingFailed:
     Proc_6_175_7C4800 = Empty
 End Function
 
@@ -5958,6 +6001,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_169_7C0DC0 socketIndex, "DF", packetPayload
         Case "@a"
             Proc_6_173_7C3430 socketIndex, "@a", packetPayload
+        Case "Ci"
+            Proc_6_175_7C4800 socketIndex, "Ci", packetPayload
         Case "E["
             Proc_6_45_714B60 socketIndex, "E[", packetPayload
         Case "A_"
