@@ -859,8 +859,17 @@ End Function
 
 ' Original declaration: Private  Proc_6_112_74E0C0(arg_C) '74E0C0
 Public Function Proc_6_112_74E0C0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_112_74E0C0 = Empty
+    Dim queryTail As String
+
+    On Error GoTo BuildFailed
+    If UBound(args) < 0 Then GoTo BuildFailed
+
+    queryTail = CStr(args(0))
+    Proc_6_112_74E0C0 = NavigatorRoomListPayload(queryTail, False)
+    Exit Function
+
+BuildFailed:
+    Proc_6_112_74E0C0 = vbNullString
 End Function
 
 ' Original declaration: Private  Proc_6_113_74EE70(arg_C, arg_10) '74EE70
@@ -877,43 +886,150 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_115_751220
 Public Function Proc_6_115_751220(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim categoryId As Long
+    Dim categoryFilter As String
+    Dim limitValue As Long
+    Dim queryTail As String
+    Dim randomTree As Long
+
+    On Error GoTo NavigatorFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    Proc_10_5_809D80 packetPayload, 3, 0
+    categoryId = CLng(Val(CStr(Proc_10_7_80A190(packetPayload, 0, 0))))
+    If categoryId > 1 Then categoryFilter = " rooms_events.id_category='" & CStr(categoryId) & "' AND"
+
+    limitValue = NavigatorListLimit()
+    queryTail = "rooms_events,users,rooms,rooms_categories WHERE" & categoryFilter & " rooms.id=rooms_events.id_room AND rooms_categories.id=rooms.id_category AND users.id=rooms.id_owner GROUP BY rooms_events.id ORDER BY rooms_events.id ASC LIMIT " & CStr(limitValue)
+    randomTree = CLng(Val(CStr(Proc_10_4_809CA0(1, global_00829128, 0))))
+    Proc_6_244_801E80 socketIndex, "GCPC" & CStr(categoryId) & Chr$(2) & CStr(Proc_3_0_6D2AF0(limitValue, Empty, vbNullString)) & Proc_6_112_74E0C0(queryTail, 0, 0) & RecommendedRoomPayload(randomTree), 0
+
+NavigatorFailed:
     Proc_6_115_751220 = Empty
 End Function
 
 ' Original declaration: Private Sub Proc_6_116_751550
 Public Function Proc_6_116_751550(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim categoryId As Long
+    Dim categoryFilter As String
+    Dim limitValue As Long
+    Dim queryTail As String
+    Dim randomTree As Long
+
+    On Error GoTo NavigatorFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    Proc_10_5_809D80 packetPayload, 3, 0
+    categoryId = CLng(Val(CStr(Proc_10_7_80A190(packetPayload, 0, 0))))
+    If categoryId > 1 Then categoryFilter = " rooms.id_category='" & CStr(categoryId) & "' AND"
+
+    limitValue = NavigatorListLimit()
+    queryTail = "users,rooms,rooms_categories WHERE" & categoryFilter & " rooms.visitors_now > 0 AND users.id=rooms.id_owner AND rooms_categories.id=rooms.id_category GROUP BY rooms.id ORDER BY rooms.visitors_now DESC LIMIT " & CStr(limitValue)
+    randomTree = CLng(Val(CStr(Proc_10_4_809CA0(1, global_00829128, 0))))
+    Proc_6_244_801E80 socketIndex, "GC" & Chr$(32) & CStr(categoryId) & Chr$(2) & CStr(Proc_3_0_6D2AF0(limitValue, Empty, vbNullString)) & Proc_6_112_74E0C0(queryTail, 0, 0) & RecommendedRoomPayload(randomTree), 0
+
+NavigatorFailed:
     Proc_6_116_751550 = Empty
 End Function
 
 ' Original declaration: Private Sub Proc_6_117_751880
 Public Function Proc_6_117_751880(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim limitValue As Long
+    Dim queryTail As String
+
+    On Error GoTo NavigatorFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    userId = HandlingUserIdFromSocket(socketIndex)
+    limitValue = NavigatorListLimit()
+    queryTail = "friendships,logs_visitedrooms,users,rooms,rooms_categories WHERE friendships.id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND logs_visitedrooms.id_user=friendships.id_friend AND logs_visitedrooms.timestamp_left IS NULL AND rooms.id=logs_visitedrooms.id_room AND rooms_categories.id=rooms.id_category AND users.id=rooms.id_owner GROUP BY rooms.id ORDER BY rooms.id DESC LIMIT " & CStr(limitValue)
+    Proc_6_244_801E80 socketIndex, "GCQA" & Chr$(2) & CStr(Proc_3_0_6D2AF0(limitValue, Empty, vbNullString)) & Proc_6_112_74E0C0(queryTail, 0, 0), 0
+
+NavigatorFailed:
     Proc_6_117_751880 = Empty
 End Function
 
 ' Original declaration: Private Sub Proc_6_118_751A80
 Public Function Proc_6_118_751A80(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim limitValue As Long
+    Dim queryTail As String
+
+    On Error GoTo NavigatorFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    userId = HandlingUserIdFromSocket(socketIndex)
+    limitValue = NavigatorListLimit()
+    queryTail = "friendships,users,rooms,rooms_categories WHERE friendships.id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND users.id=friendships.id_friend AND rooms_categories.id=rooms.id_category AND users.id=rooms.id_owner GROUP BY rooms.id ORDER BY rooms.visitors_now DESC LIMIT " & CStr(limitValue)
+    Proc_6_244_801E80 socketIndex, "GC" & Chr$(0) & Chr$(2) & CStr(Proc_3_0_6D2AF0(limitValue, Empty, vbNullString)) & Proc_6_112_74E0C0(queryTail, 0, 0), 0
+
+NavigatorFailed:
     Proc_6_118_751A80 = Empty
 End Function
 
 ' Original declaration: Private Sub Proc_6_119_751C80
 Public Function Proc_6_119_751C80(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim limitValue As Long
+    Dim queryTail As String
+
+    On Error GoTo NavigatorFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    userId = HandlingUserIdFromSocket(socketIndex)
+    limitValue = NavigatorListLimit()
+    queryTail = "rooms_favourites,users,rooms,rooms_categories WHERE rooms_favourites.id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND rooms.id=rooms_favourites.id_room AND rooms_categories.id=rooms.id_category AND users.id=rooms.id_owner GROUP BY rooms.id ORDER BY rooms.visitors_now DESC LIMIT " & CStr(limitValue)
+    Proc_6_244_801E80 socketIndex, "GCRA" & Chr$(2) & CStr(Proc_3_0_6D2AF0(limitValue, Empty, vbNullString)) & Proc_6_112_74E0C0(queryTail, 0, 0), 0
+
+NavigatorFailed:
     Proc_6_119_751C80 = Empty
 End Function
 
 ' Original declaration: Private Sub Proc_6_120_751E80
 Public Function Proc_6_120_751E80(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim limitValue As Long
+    Dim queryTail As String
+
+    On Error GoTo NavigatorFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    userId = HandlingUserIdFromSocket(socketIndex)
+    limitValue = NavigatorListLimit()
+    queryTail = "logs_visitedrooms,users,rooms,rooms_categories WHERE logs_visitedrooms.id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND rooms.id=logs_visitedrooms.id_room AND rooms_categories.id=rooms.id_category AND users.id=rooms.id_owner GROUP BY rooms.id ORDER BY rooms.id DESC LIMIT " & CStr(limitValue)
+    Proc_6_244_801E80 socketIndex, "GCSA" & Chr$(2) & CStr(Proc_3_0_6D2AF0(limitValue, Empty, vbNullString)) & Proc_6_112_74E0C0(queryTail, 0, 0), 0
+
+NavigatorFailed:
     Proc_6_120_751E80 = Empty
 End Function
 
 ' Original declaration: Private Sub Proc_6_121_752080
 Public Function Proc_6_121_752080(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim limitValue As Long
+    Dim queryTail As String
+
+    On Error GoTo NavigatorFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    userId = HandlingUserIdFromSocket(socketIndex)
+    limitValue = NavigatorListLimit()
+    queryTail = "users,rooms,rooms_categories WHERE rooms.id_owner='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND rooms_categories.id=rooms.id_category AND users.id=rooms.id_owner GROUP BY rooms.id ORDER BY rooms.visitors_now DESC LIMIT " & CStr(limitValue)
+    Proc_6_244_801E80 socketIndex, "GCQA" & Chr$(2) & CStr(Proc_3_0_6D2AF0(limitValue, Empty, vbNullString)) & Proc_6_112_74E0C0(queryTail, 0, 0), 0
+
+NavigatorFailed:
     Proc_6_121_752080 = Empty
 End Function
 
@@ -2233,6 +2349,112 @@ Private Function HandlingUserIdFromSocket(ByVal socketIndex As Integer) As Strin
 
 LookupFailed:
     HandlingUserIdFromSocket = vbNullString
+End Function
+
+Private Function NavigatorListLimit() As Long
+    NavigatorListLimit = CLng(Val(CStr(Proc_10_0_809570("com.client.navigator.list.limit", 50, 0))))
+    If NavigatorListLimit <= 0 Then NavigatorListLimit = 50
+End Function
+
+Private Function RecommendedRoomPayload(ByVal treeIndex As Long) As String
+    On Error GoTo NoPayload
+
+    If Not IsArray(global_0082911C) Then GoTo NoPayload
+    If treeIndex > 0 Then treeIndex = treeIndex - 1
+    If treeIndex < LBound(global_0082911C) Or treeIndex > UBound(global_0082911C) Then GoTo NoPayload
+
+    RecommendedRoomPayload = CStr(global_0082911C(treeIndex))
+    Exit Function
+
+NoPayload:
+    RecommendedRoomPayload = vbNullString
+End Function
+
+Private Function NavigatorRoomListPayload(ByVal queryTail As String, ByVal includeEventTime As Boolean) As String
+    Dim queryText As String
+    Dim rowText As String
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim roomCount As Long
+    Dim payload As String
+
+    On Error GoTo BuildFailed
+
+    If Len(queryTail) = 0 Then GoTo BuildDone
+    queryText = "SELECT rooms.id,rooms.name,users.name,rooms.status_door,rooms.visitors_now,rooms.visitors_max,rooms.description,rooms_categories.has_trading,NULL,rooms.rate,rooms.id_category,rooms.icon,rooms.tag_1,rooms.tag_2,rooms.allow_otherspets,rooms.is_staff_picked FROM " & queryTail
+    rowText = CStr(Proc_5_2_6D4690(queryText, 0, 0))
+    If Len(rowText) = 0 Then GoTo BuildDone
+
+    rows = Split(rowText, Chr$(13))
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(rows(rowIndex)) > 0 Then
+            fields = Split(rows(rowIndex), Chr$(9))
+            payload = payload & NavigatorRoomFragment(fields)
+            roomCount = roomCount + 1
+        End If
+    Next rowIndex
+
+BuildDone:
+    NavigatorRoomListPayload = CStr(Proc_3_0_6D2AF0(roomCount, Empty, payload))
+    Exit Function
+
+BuildFailed:
+    NavigatorRoomListPayload = CStr(Proc_3_0_6D2AF0(0, Empty, vbNullString))
+End Function
+
+Private Function NavigatorRoomFragment(ByRef fields() As String) As String
+    Dim roomId As Long
+    Dim visitorsNow As Long
+    Dim visitorsMax As Long
+    Dim ratingValue As Long
+    Dim categoryId As Long
+    Dim hasTrading As Long
+    Dim allowPets As Long
+    Dim staffPicked As Long
+    Dim payload As String
+
+    On Error GoTo BuildFailed
+
+    roomId = CLng(Val(NavigatorField(fields, 0)))
+    visitorsNow = CLng(Val(NavigatorField(fields, 4)))
+    visitorsMax = CLng(Val(NavigatorField(fields, 5)))
+    hasTrading = CLng(Val(NavigatorField(fields, 7)))
+    ratingValue = CLng(Val(NavigatorField(fields, 9)))
+    categoryId = CLng(Val(NavigatorField(fields, 10)))
+    allowPets = CLng(Val(NavigatorField(fields, 14)))
+    staffPicked = CLng(Val(NavigatorField(fields, 15)))
+
+    payload = CStr(Proc_3_0_6D2AF0(roomId, Empty, vbNullString))
+    payload = CStr(Proc_3_0_6D2AF0(visitorsNow, Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(visitorsMax, Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(ratingValue, Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(categoryId, Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(hasTrading, Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(allowPets, Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(staffPicked, Empty, payload))
+    payload = payload & NavigatorField(fields, 1) & Chr$(2)
+    payload = payload & NavigatorField(fields, 2) & Chr$(2)
+    payload = payload & NavigatorField(fields, 3) & Chr$(2)
+    payload = payload & NavigatorField(fields, 6) & Chr$(2)
+    payload = payload & NavigatorField(fields, 11) & Chr$(2)
+    payload = payload & NavigatorField(fields, 12) & Chr$(2)
+    payload = payload & NavigatorField(fields, 13) & Chr$(2)
+    NavigatorRoomFragment = payload & "H"
+    Exit Function
+
+BuildFailed:
+    NavigatorRoomFragment = vbNullString
+End Function
+
+Private Function NavigatorField(ByRef fields() As String, ByVal fieldIndex As Long) As String
+    On Error GoTo MissingField
+    If fieldIndex < LBound(fields) Or fieldIndex > UBound(fields) Then GoTo MissingField
+    NavigatorField = CStr(fields(fieldIndex))
+    Exit Function
+
+MissingField:
+    NavigatorField = vbNullString
 End Function
 
 Private Function IsSocketMarkedBusy(ByVal socketIndex As Integer) As Boolean
