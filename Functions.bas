@@ -525,8 +525,50 @@ End Function
 
 ' Original declaration: Private Sub Proc_10_22_80D460
 Public Function Proc_10_22_80D460(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_10_22_80D460 = Empty
+    Dim userId As String
+    Dim rowText As String
+    Dim fields() As String
+    Dim socketIndex As Long
+    Dim mottoText As String
+    Dim figureText As String
+    Dim genderText As String
+    Dim payload As String
+
+    On Error GoTo RefreshFailed
+    If UBound(args) < 0 Then
+        Proc_10_22_80D460 = 0
+        Exit Function
+    End If
+
+    userId = CStr(args(0))
+    If Len(userId) = 0 Or userId = "0" Then GoTo RefreshFailed
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT id,id_socket,motto,figure,gender FROM users WHERE id='" & Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 1", 0, 0))
+    If Len(rowText) = 0 Then GoTo RefreshFailed
+
+    fields = Split(rowText, Chr$(9))
+    If UBound(fields) < 4 Then GoTo RefreshFailed
+
+    userId = CStr(Val(CStr(fields(0))))
+    socketIndex = CLng(Val(CStr(fields(1))))
+    If socketIndex <= 0 Then socketIndex = CLng(Val(CStr(Proc_9_9_808AC0(userId, 0, 0))))
+    If socketIndex <= 0 Then GoTo RefreshFailed
+
+    mottoText = CStr(fields(2))
+    figureText = CStr(fields(3))
+    genderText = CStr(fields(4))
+
+    payload = CStr(Proc_3_0_6D2AF0(CLng(Val(userId)), Empty, "DJ"))
+    payload = payload & mottoText & Chr$(2)
+    payload = payload & genderText & Chr$(2)
+    payload = payload & figureText & Chr$(2)
+
+    Proc_12_1_821AA0 CInt(socketIndex), payload, 0
+    Proc_10_22_80D460 = 1
+    Exit Function
+
+RefreshFailed:
+    Proc_10_22_80D460 = 0
 End Function
 
 ' Original declaration: Private  Proc_10_23_80E110(arg_C, arg_10, arg_14) '80E110
