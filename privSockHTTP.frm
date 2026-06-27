@@ -50,6 +50,10 @@ End Sub
 
 ' Original declaration: Public Function ReadHTTP(URL, Action) '825160
 Public Function ReadHTTP(Optional ByVal URL As Variant, Optional ByVal Action As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    ReadHTTP = Empty
+    On Error GoTo ReadFailed
+    ReadHTTP = Inet1.OpenURL(CStr(URL))
+    Exit Function
+
+ReadFailed:
+    ReadHTTP = vbNullString
 End Function

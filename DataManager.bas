@@ -11,8 +11,16 @@ Public global_00829054 As Integer
 
 ' Original declaration: Private Sub Proc_8_0_804330
 Public Function Proc_8_0_804330(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_8_0_804330 = Empty
+    On Error GoTo ReadFailed
+    If UBound(args) < 0 Then
+        Proc_8_0_804330 = vbNullString
+    Else
+        Proc_8_0_804330 = privSockHTTP.ReadHTTP(CStr(args(0)), GetOptionalColumnIndex(args, 1, 0))
+    End If
+    Exit Function
+
+ReadFailed:
+    Proc_8_0_804330 = vbNullString
 End Function
 
 ' Original declaration: Private Sub Proc_8_1_804400
