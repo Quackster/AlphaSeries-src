@@ -8,6 +8,7 @@ Option Explicit
 Public global_008291AC As String
 Public global_00829050 As String
 Public global_00829054 As Integer
+Public global_00829068(1 To 5000) As Integer
 
 ' Original declaration: Private Sub Proc_8_0_804330
 Public Function Proc_8_0_804330(ParamArray args() As Variant) As Variant
@@ -155,8 +156,106 @@ End Function
 
 ' Original declaration: Private Sub Proc_8_7_8051C0
 Public Function Proc_8_7_8051C0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_8_7_8051C0 = Empty
+    Dim timeFormat As String
+    Dim productKeyValue As String
+    Dim tokenSeed As String
+    Dim requestUrl As String
+    Dim responseText As String
+    Dim blocks() As String
+    Dim rankText As String
+    Dim licenseBlock As String
+    Dim licenseParts() As String
+    Dim licenseCheck As Long
+    Dim checksumSalt As Long
+    Dim rankIndex As Long
+    Dim messageText As String
+
+    On Error GoTo LicenceFailed
+
+    timeFormat = "yyyy-mm-dd_h-mm-ss"
+    checksumSalt = CLng(Val(CStr(Proc_8_2_804490(7, &H5A)))) _
+        + CLng(Val(CStr(Proc_8_1_804400(0)))) _
+        + CLng(Val(CStr(Proc_8_2_804490(1, 10))))
+    tokenSeed = CStr(Proc_10_3_809B90(&H9C4, &H3E8)) _
+        & "/" & CStr(Proc_10_3_809B90(&H9C4, &H3E8)) _
+        & "/" & CStr(Proc_10_3_809B90(&H9C4, &H3E8)) & "/L:"
+
+    productKeyValue = Main.productKey.Caption
+    requestUrl = "http://www.alpha-series.com/check_product_sep11?local_time=" _
+        & CStr(Proc_10_3_809B90(&H9C4, &H3E8)) _
+        & CStr(Proc_10_3_809B90(&H9C4, &H3E8)) _
+        & Format$(Now, timeFormat) & ":"
+    requestUrl = requestUrl & "&version=" & global_00829038 _
+        & "&productKey=" & productKeyValue _
+        & "&token=" & CStr(Proc_8_3_804530(tokenSeed))
+
+    responseText = CStr(Proc_8_0_804330(requestUrl, 1, 0))
+    If Len(responseText) = 0 Then GoTo LicenceFailed
+
+    If InStr(1, responseText, "{BLOCKED ", vbBinaryCompare) > 0 Then
+        Main.Hide
+        messageText = Replace(responseText, "%20", " ", 1, -1, vbBinaryCompare)
+        messageText = Replace(messageText, "{BLOCKED ", vbNullString, 1, -1, vbBinaryCompare)
+        messageText = Replace(messageText, "}", vbNullString, 1, -1, vbBinaryCompare)
+        MsgBox messageText, vbCritical
+        End
+    End If
+
+    blocks = Split(responseText, timeFormat, -1, vbBinaryCompare)
+    If UBound(blocks) >= 3 Then
+        licenseBlock = Replace(CStr(blocks(3)), "--*-", vbCr, 1, -1, vbBinaryCompare)
+        licenseBlock = Replace(licenseBlock, "*-*-", vbLf, 1, -1, vbBinaryCompare)
+    ElseIf UBound(blocks) >= 1 Then
+        licenseBlock = CStr(blocks(1))
+    Else
+        licenseBlock = responseText
+    End If
+    global_00829050 = vbCr & Replace(licenseBlock, vbLf, vbCr, 1, -1, vbBinaryCompare) & vbCr
+
+    rankText = ExtractLicenceSetting(global_00829050, "rank")
+    global_00829054 = CInt(Val(rankText))
+    For rankIndex = 1 To 5000
+        global_00829068(rankIndex) = CInt(Val(CStr(Proc_8_6_804D80(CStr(rankIndex)))))
+    Next rankIndex
+
+    licenseParts = Split(licenseBlock, "-", -1, vbBinaryCompare)
+    If UBound(licenseParts) >= 2 And Len(licenseBlock) >= 14 Then
+        licenseCheck = CLng(Val(CStr(licenseParts(2)))) _
+            - CLng(Val(Mid$(licenseBlock, 9, 6))) _
+            + CLng(Val(CStr(licenseParts(1)))) _
+            - checksumSalt
+        If licenseCheck <> 0 Then GoTo LicenceFailed
+    End If
+
+    Proc_8_7_8051C0 = True
+    Exit Function
+
+LicenceFailed:
+    On Error Resume Next
+    Proc_8_7_8051C0 = False
+    Proc_8_4_804970 0, 0, 0
+End Function
+
+Private Function ExtractLicenceSetting(ByVal sourceText As String, ByVal keyName As String) As String
+    Dim marker As String
+    Dim parts() As String
+    Dim values() As String
+
+    On Error GoTo LookupFailed
+    marker = vbCr & keyName & "="
+    parts = Split(sourceText, marker, -1, vbBinaryCompare)
+    If UBound(parts) < 1 Then
+        marker = vbCr & keyName & ":"
+        parts = Split(sourceText, marker, -1, vbBinaryCompare)
+    End If
+    If UBound(parts) < 1 Then GoTo LookupFailed
+
+    values = Split(CStr(parts(1)), vbCr, -1, vbBinaryCompare)
+    ExtractLicenceSetting = CStr(values(0))
+    Exit Function
+
+LookupFailed:
+    ExtractLicenceSetting = vbNullString
 End Function
 
 ' Original declaration: Private Sub Proc_8_8_806720
