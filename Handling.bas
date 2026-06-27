@@ -271,7 +271,45 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_7_6DD0E0
 Public Function Proc_6_7_6DD0E0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim callerUserId As String
+    Dim closeState As Long
+    Dim callForHelpId As Long
+    Dim reporterUserId As String
+    Dim reporterSocketIndex As Integer
+    Dim offset As Long
+
+    On Error GoTo CloseFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "GD" Then requestPayload = Mid$(requestPayload, 3)
+
+    callerUserId = HandlingUserIdFromSocket(socketIndex)
+    If Len(callerUserId) = 0 Or callerUserId = "0" Then GoTo CloseFailed
+    If Not HandlingUserHasPermission(callerUserId, "fuse_mod") Then GoTo CloseFailed
+    If Not HandlingUserHasPermission(callerUserId, "fuse_receive_calls_for_help") Then GoTo CloseFailed
+
+    offset = 1
+    closeState = ReadWireLong(requestPayload, offset)
+    If closeState < 1 Or closeState > 3 Then GoTo CloseFailed
+
+    callForHelpId = ReadWireLong(requestPayload, offset)
+    If callForHelpId <= 0 Then callForHelpId = ReadWireLong(requestPayload, offset)
+    If callForHelpId <= 0 Then GoTo CloseFailed
+
+    reporterUserId = CStr(Val(CStr(Proc_5_2_6D4690("SELECT id_user FROM staff_cfh WHERE id='" & CStr(callForHelpId) & "' LIMIT 1", 0, 0))))
+    reporterSocketIndex = HandlingSocketFromUserId(reporterUserId)
+    If reporterSocketIndex > 0 Then Proc_6_244_801E80 reporterSocketIndex, CStr(Proc_3_0_6D2AF0(closeState, Empty, "H\")), 0
+
+    Proc_5_0_6D3CD0 "UPDATE staff_cfh SET id_closed='" & CStr(closeState) & "',id_tab='0' WHERE id='" & CStr(callForHelpId) & "'", 0, 0
+
+CloseFailed:
     Proc_6_7_6DD0E0 = Empty
 End Function
 
@@ -3524,6 +3562,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_6_6DC9D0 socketIndex, "GB", packetPayload
         Case "GC"
             Proc_6_8_6DD790 socketIndex, "GC", packetPayload
+        Case "GD"
+            Proc_6_7_6DD0E0 socketIndex, "GD", packetPayload
         Case "Fw"
             Proc_6_115_751220 socketIndex, "Fw", packetPayload
         Case "Fn"
