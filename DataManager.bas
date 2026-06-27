@@ -53,8 +53,35 @@ End Function
 
 ' Original declaration: Private Sub Proc_8_3_804530
 Public Function Proc_8_3_804530(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_8_3_804530 = Empty
+    Dim sourceValue As String
+    Dim saltValue As Long
+    Dim markerValue As Long
+    Dim index As Long
+    Dim tokenValue As String
+
+    On Error GoTo BuildFailed
+    If UBound(args) < 0 Then
+        Proc_8_3_804530 = vbNullString
+        Exit Function
+    End If
+
+    sourceValue = CStr(args(0))
+    Randomize
+    saltValue = CLng(Rnd * 100)
+    If saltValue = 0 Then saltValue = 1
+    markerValue = CLng(Proc_10_3_809B90(&H5A, &H41))
+
+    tokenValue = CStr(Len(sourceValue) + saltValue) & Chr$(markerValue)
+    For index = 1 To Len(sourceValue)
+        tokenValue = tokenValue & Chr$(CLng(Proc_10_3_809B90(&H5A, &H41)))
+        tokenValue = tokenValue & CStr(Asc(Mid$(sourceValue, index, 1)) * saltValue * markerValue)
+    Next index
+
+    Proc_8_3_804530 = tokenValue
+    Exit Function
+
+BuildFailed:
+    Proc_8_3_804530 = vbNullString
 End Function
 
 ' Original declaration: Private Sub Proc_8_4_804970
