@@ -10040,7 +10040,57 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_221_7ED1E0
 Public Function Proc_6_221_7ED1E0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim offset As Long
+    Dim furnitureId As Long
+    Dim userId As String
+    Dim roomId As Long
+    Dim rowText As String
+    Dim fields() As String
+    Dim productId As Long
+    Dim wiredCode As Long
+    Dim snapshotPath As String
+
+    On Error GoTo SnapshotDone
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "on" Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    furnitureId = ReadWireLong(requestPayload, offset)
+    If furnitureId <= 0 Then furnitureId = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    If socketIndex <= 0 Or furnitureId <= 0 Then GoTo SnapshotDone
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo SnapshotDone
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId <= 0 Then GoTo SnapshotDone
+    If Not HandlingUserHasRoomRight(userId, roomId) And Not HandlingUserOwnsRoom(userId, roomId) Then GoTo SnapshotDone
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT id_product FROM furnitures WHERE id='" & CStr(furnitureId) & _
+        "' AND id_room='" & CStr(roomId) & "' LIMIT 1", 0, 0))
+    If Len(rowText) = 0 Then GoTo SnapshotDone
+
+    fields = Split(rowText, Chr$(9))
+    productId = CLng(Val(HandlingField(fields, 0)))
+    If productId <= 0 Then GoTo SnapshotDone
+
+    wiredCode = CLng(Val(CStr(Proc_8_12_806C30(productId, 27, 0))))
+    If wiredCode <= 0 Then GoTo SnapshotDone
+
+    snapshotPath = App.Path & "\cache\wired_snapshots\" & CStr(furnitureId) & ".cache"
+    Proc_8_10_8068E0 snapshotPath, CStr(global_00829310), wiredCode
+    Proc_6_221_7ED1E0 = snapshotPath
+    Exit Function
+
+SnapshotDone:
     Proc_6_221_7ED1E0 = Empty
 End Function
 
@@ -11351,6 +11401,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_111_74DF70 socketIndex, "BW", packetPayload
         Case "GI"
             Proc_5_4_6D55E0 socketIndex, "GI", packetPayload
+        Case "on"
+            Proc_6_221_7ED1E0 socketIndex, "on", packetPayload
         Case "GH"
             Proc_5_5_6D64D0 socketIndex, "GH", packetPayload
         Case "GK"
