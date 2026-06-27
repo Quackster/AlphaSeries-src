@@ -57,6 +57,88 @@ End Function
 
 ' Original declaration: Private  Proc_3_5_6D3880(arg_C, arg_10, arg_14, arg_18, arg_1C) '6D3880
 Public Function Proc_3_5_6D3880(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_3_5_6D3880 = Empty
+    Dim connectionString As String
+
+    On Error GoTo ConnectFailed
+    connectionString = BuildDatabaseConnectionString(args)
+    If Len(connectionString) = 0 Then GoTo ConnectFailed
+
+    If ConfigureDatabaseConnection(connectionString) Then
+        Proc_3_5_6D3880 = 1
+    Else
+        Proc_3_5_6D3880 = 0
+    End If
+    Exit Function
+
+ConnectFailed:
+    Proc_3_5_6D3880 = 0
+End Function
+
+Private Function BuildDatabaseConnectionString(ByRef args() As Variant) As String
+    Dim configText As String
+    Dim hostName As String
+    Dim portNumber As String
+    Dim databaseName As String
+    Dim userName As String
+    Dim password As String
+    Dim driverName As String
+
+    On Error GoTo BuildFailed
+    If UBound(args) < 0 Then Exit Function
+
+    configText = CStr(args(0))
+    If InStr(1, configText, "mySQL_", vbTextCompare) > 0 Then
+        hostName = ReadConfigValue(configText, "mySQL_host", "localhost")
+        portNumber = ReadConfigValue(configText, "mySQL_port", "3306")
+        databaseName = ReadConfigValue(configText, "mySQL_db", vbNullString)
+        userName = ReadConfigValue(configText, "mySQL_username", vbNullString)
+        password = ReadConfigValue(configText, "mySQL_password", vbNullString)
+        driverName = ReadConfigValue(configText, "mySQL_driver", "MySQL ODBC 3.51 Driver")
+    ElseIf UBound(args) >= 5 Then
+        hostName = CStr(args(0))
+        portNumber = CStr(args(1))
+        databaseName = CStr(args(2))
+        userName = CStr(args(3))
+        password = CStr(args(4))
+        driverName = CStr(args(5))
+    ElseIf UBound(args) >= 4 Then
+        hostName = "localhost"
+        portNumber = CStr(args(0))
+        databaseName = CStr(args(1))
+        userName = CStr(args(2))
+        password = CStr(args(3))
+        driverName = CStr(args(4))
+    End If
+
+    If Len(databaseName) = 0 Or Len(driverName) = 0 Then Exit Function
+    BuildDatabaseConnectionString = "Driver={" & driverName & "};Server=" & hostName & ";Port=" & portNumber & ";Database=" & databaseName & ";User=" & userName & ";Password=" & password & ";Option=3;"
+    Exit Function
+
+BuildFailed:
+    BuildDatabaseConnectionString = vbNullString
+End Function
+
+Private Function ReadConfigValue(ByVal configText As String, ByVal keyName As String, ByVal defaultValue As String) As String
+    Dim normalizedText As String
+    Dim lines() As String
+    Dim index As Long
+    Dim equalsAt As Long
+    Dim currentKey As String
+
+    normalizedText = Replace(configText, vbCrLf, vbLf)
+    normalizedText = Replace(normalizedText, vbCr, vbLf)
+    lines = Split(normalizedText, vbLf)
+
+    For index = LBound(lines) To UBound(lines)
+        equalsAt = InStr(1, lines(index), "=", vbBinaryCompare)
+        If equalsAt > 0 Then
+            currentKey = Trim$(Left$(lines(index), equalsAt - 1))
+            If StrComp(currentKey, keyName, vbTextCompare) = 0 Then
+                ReadConfigValue = Trim$(Mid$(lines(index), equalsAt + 1))
+                Exit Function
+            End If
+        End If
+    Next index
+
+    ReadConfigValue = defaultValue
 End Function
