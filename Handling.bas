@@ -5,6 +5,8 @@ Option Explicit
 ' Source reference: /opt/git/AlphaSeries_cracked/DECOMPILED/Handling.bas
 ' Decompiled procedure bodies are intentionally not copied until they are understood and made valid VB6.
 
+Private representedActivityPointTicks As String
+
 ' Original declaration: Private Sub Proc_6_0_6D7FF0
 Public Function Proc_6_0_6D7FF0(ParamArray args() As Variant) As Variant
     Dim socketIndex As Integer
@@ -7502,7 +7504,46 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_238_7FA670
 Public Function Proc_6_238_7FA670(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim sessionSeconds As Long
+    Dim pointType As Long
+    Dim intervalSeconds As Long
+    Dim maxPoints As Long
+    Dim awardAmount As Long
+    Dim currentPoints As Long
+    Dim newPoints As Long
+    Dim columnName As String
+
+    On Error GoTo AwardFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo AwardFailed
+
+    sessionSeconds = RepresentedActivityPointSessionSeconds(socketIndex, userId)
+    If sessionSeconds <= 0 Then GoTo AwardFailed
+
+    For pointType = 0 To 4
+        intervalSeconds = CLng(Val(CStr(Proc_10_0_809570("com.server.socket.game.activitypoints_" & CStr(pointType) & ".interval", 0, 0))))
+        If intervalSeconds > 0 Then
+            If (sessionSeconds Mod intervalSeconds) = 0 Then
+                columnName = "activitypoints_" & CStr(pointType)
+                maxPoints = CLng(Val(CStr(Proc_10_0_809570("com.server.socket.game.activitypoints_" & CStr(pointType) & ".max", 1, 0))))
+                currentPoints = CLng(Val(CStr(Proc_5_2_6D4690("SELECT " & columnName & " FROM users WHERE id='" & Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 1", 0, 0))))
+                If currentPoints < maxPoints Then
+                    awardAmount = CLng(Val(CStr(Proc_10_0_809570("com.server.socket.game.activitypoints_" & CStr(pointType) & ".amount", 0, 0))))
+                    If awardAmount <> 0 Then
+                        Proc_5_0_6D3CD0 "UPDATE users SET " & columnName & "=" & columnName & "+" & CStr(awardAmount) & " WHERE id='" & Proc_10_11_80A9C0(userId, 0, 0) & "'", 0, 0
+                        newPoints = currentPoints + awardAmount
+                        Proc_6_244_801E80 socketIndex, RepresentedActivityPointAwardPayload(pointType, newPoints), 0
+                    End If
+                End If
+            End If
+        End If
+    Next pointType
+
+AwardFailed:
     Proc_6_238_7FA670 = Empty
 End Function
 
@@ -10011,6 +10052,39 @@ Private Function NavigatorField(ByRef fields() As String, ByVal fieldIndex As Lo
 
 MissingField:
     NavigatorField = vbNullString
+End Function
+
+Private Function RepresentedActivityPointSessionSeconds(ByVal socketIndex As Integer, ByVal userId As String) As Long
+    Dim marker As String
+    Dim startAt As Long
+    Dim endAt As Long
+    Dim tickValue As Long
+
+    On Error GoTo TickFailed
+    If socketIndex <= 0 Or Len(userId) = 0 Then GoTo TickFailed
+
+    marker = "[" & CStr(socketIndex) & "]"
+    startAt = InStr(1, representedActivityPointTicks, marker, vbBinaryCompare)
+    If startAt > 0 Then
+        endAt = InStr(startAt + Len(marker), representedActivityPointTicks, "[", vbBinaryCompare)
+        If endAt = 0 Then endAt = Len(representedActivityPointTicks) + 1
+        tickValue = CLng(Val(Mid$(representedActivityPointTicks, startAt + Len(marker), endAt - startAt - Len(marker))))
+        representedActivityPointTicks = Left$(representedActivityPointTicks, startAt - 1) & Mid$(representedActivityPointTicks, endAt)
+    Else
+        tickValue = CLng(Val(CStr(Proc_5_2_6D4690("SELECT online_time FROM users WHERE id='" & Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 1", 0, 0))))
+    End If
+
+    tickValue = tickValue + 60
+    representedActivityPointTicks = representedActivityPointTicks & marker & CStr(tickValue)
+    RepresentedActivityPointSessionSeconds = tickValue
+    Exit Function
+
+TickFailed:
+    RepresentedActivityPointSessionSeconds = 0
+End Function
+
+Private Function RepresentedActivityPointAwardPayload(ByVal pointType As Long, ByVal pointsValue As Long) As String
+    RepresentedActivityPointAwardPayload = CStr(Proc_3_0_6D2AF0(pointType, Empty, CStr(Proc_3_0_6D2AF0(pointsValue, Empty, "Fv")))) & "H"
 End Function
 
 Private Function IsSocketMarkedBusy(ByVal socketIndex As Integer) As Boolean
