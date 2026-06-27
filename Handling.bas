@@ -638,7 +638,28 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_46_714D50
 Public Function Proc_6_46_714D50(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim roomId As Long
+    Dim doorStatus As Long
+
+    On Error GoTo RoomDoorFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo RoomDoorFailed
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId <= 0 Then GoTo RoomDoorFailed
+
+    doorStatus = CLng(Val(CStr(Proc_5_2_6D4690("SELECT status_door FROM rooms WHERE id='" & CStr(roomId) & "' LIMIT 1", 0, 0))))
+    If doorStatus <> 0 Then
+        Proc_6_244_801E80 socketIndex, "EoHK", 0
+    Else
+        Proc_6_244_801E80 socketIndex, "EoIH", 0
+    End If
+
+RoomDoorFailed:
     Proc_6_46_714D50 = Empty
 End Function
 
@@ -2798,6 +2819,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_127_755D30 socketIndex, "Fu", packetPayload
         Case "E~"
             Proc_6_124_754D90 socketIndex, "E~", packetPayload
+        Case "EY"
+            Proc_6_46_714D50 socketIndex, "EY", packetPayload
         Case "E["
             Proc_6_45_714B60 socketIndex, "E[", packetPayload
         Case "oL", "CD"
