@@ -8174,7 +8174,69 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_206_7DA450
 Public Function Proc_6_206_7DA450(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim achievementIndex As Long
+    Dim achievementId As Long
+    Dim badgePrefix As String
+    Dim progressRequired As Long
+    Dim rewardIncrease As Long
+    Dim levelTotal As Long
+    Dim scoreIncrease As Long
+    Dim rewardType As Long
+    Dim currentLevel As Long
+    Dim currentProgress As Long
+    Dim rowText As String
+    Dim entryPayload As String
+    Dim payload As String
+    Dim achievementCount As Long
+
+    On Error GoTo SendFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo SendFailed
+    If Not IsArray(global_008291E8) Then GoTo SendFailed
+
+    For achievementIndex = LBound(global_008291E8, 1) To UBound(global_008291E8, 1)
+        achievementId = CLng(Val(CStr(global_008291E8(achievementIndex, 0))))
+        badgePrefix = CStr(global_008291E8(achievementIndex, 1))
+        If achievementId > 0 And Len(badgePrefix) > 0 Then
+            progressRequired = CLng(Val(CStr(global_008291E8(achievementIndex, 2))))
+            rewardIncrease = CLng(Val(CStr(global_008291E8(achievementIndex, 3))))
+            levelTotal = CLng(Val(CStr(global_008291E8(achievementIndex, 4))))
+            scoreIncrease = CLng(Val(CStr(global_008291E8(achievementIndex, 5))))
+            rewardType = CLng(Val(CStr(global_008291E8(achievementIndex, 6))))
+            If levelTotal <= 0 Then levelTotal = 1
+
+            rowText = CStr(Proc_5_2_6D4690("SELECT REPLACE(id_badge,'" & Proc_10_11_80A9C0(badgePrefix, 0, 0) & "','') FROM users_badges WHERE id_user='" & _
+                Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_badge LIKE '" & Proc_10_11_80A9C0(badgePrefix, 0, 0) & "%' ORDER BY id DESC LIMIT 1", 0, 0))
+            currentLevel = CLng(Val(rowText))
+            If currentLevel < 0 Then currentLevel = 0
+            If currentLevel > levelTotal Then currentLevel = levelTotal
+
+            currentProgress = 0
+            If currentLevel > 0 Then currentProgress = progressRequired * currentLevel
+            If currentProgress < 0 Then currentProgress = 0
+
+            entryPayload = CStr(Proc_3_0_6D2AF0(achievementId, Empty, vbNullString))
+            entryPayload = CStr(Proc_3_0_6D2AF0(currentLevel, Empty, entryPayload))
+            entryPayload = CStr(Proc_3_0_6D2AF0(currentProgress, Empty, entryPayload))
+            entryPayload = CStr(Proc_3_0_6D2AF0(progressRequired, Empty, entryPayload))
+            entryPayload = CStr(Proc_3_0_6D2AF0(rewardIncrease, Empty, entryPayload))
+            entryPayload = CStr(Proc_3_0_6D2AF0(scoreIncrease, Empty, entryPayload))
+            entryPayload = CStr(Proc_3_0_6D2AF0(rewardType, Empty, entryPayload))
+            entryPayload = CStr(Proc_3_0_6D2AF0(levelTotal, Empty, entryPayload))
+            entryPayload = entryPayload & badgePrefix & Chr$(2) & CStr(currentLevel) & Chr$(2)
+
+            payload = payload & entryPayload
+            achievementCount = achievementCount + 1
+        End If
+    Next achievementIndex
+
+    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(achievementCount, Empty, "Ft")) & payload, 0
+
+SendFailed:
     Proc_6_206_7DA450 = Empty
 End Function
 
