@@ -109,7 +109,38 @@ End Function
 
 ' Original declaration: Private Sub Proc_1_2_6BE280
 Public Function Proc_1_2_6BE280(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim treeRows() As String
+    Dim treeIndex As Long
+    Dim treeId As Long
+    Dim cacheIndex As Long
+    Dim roomRows As String
+
+    On Error GoTo BuildFailed
+
+    global_00829128 = 0
+    ReDim global_0082911C(0 To 99)
+
+    treeRows = Split(CStr(Proc_5_2_6D4690("SELECT id_tree FROM rooms_recommented GROUP BY id_tree", 0, 0)), Chr$(13))
+    For treeIndex = LBound(treeRows) To UBound(treeRows)
+        treeId = CLng(Val(CStr(treeRows(treeIndex))))
+        If treeId <> 0 Then
+            cacheIndex = global_00829128
+            If cacheIndex > 99 Then Exit For
+
+            roomRows = CStr(Proc_5_2_6D4690(BuildRecommendedRoomsQuery(treeId), 0, 0))
+            global_0082911C(cacheIndex) = CStr(Proc_3_0_6D2AF0(treeId, Empty, vbNullString)) & BuildRecommendedRoomsPayload(roomRows)
+            global_00829128 = global_00829128 + 1
+        End If
+    Next treeIndex
+
+    If global_00829128 = 0 Then
+        global_0082911C = CStr(Proc_3_0_6D2AF0(0, Empty, vbNullString))
+    End If
+
+    Proc_1_2_6BE280 = Empty
+    Exit Function
+
+BuildFailed:
     Proc_1_2_6BE280 = Empty
 End Function
 
@@ -907,6 +938,83 @@ Private Function BuildStaffCategoryPayload() As String
 
 BuildFailed:
     BuildStaffCategoryPayload = payload
+End Function
+
+Private Function BuildRecommendedRoomsQuery(ByVal treeId As Long) As String
+    Dim queryText As String
+    Dim treeText As String
+    Dim separator As String
+
+    treeText = CStr(treeId)
+    separator = " UNION ALL "
+
+    queryText = "SELECT rooms_recommented.id_type,rooms_recommented.id_style,rooms_recommented.icon,"
+    queryText = queryText & "rooms_recommented.caption,rooms_recommented.caption_2,rooms_recommented.caption_3,"
+    queryText = queryText & "NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,"
+    queryText = queryText & "rooms_recommented.id_tree,rooms_recommented.id FROM rooms_recommented WHERE id_tree='"
+    queryText = queryText & treeText & "' AND rooms_recommented.id_type='1' GROUP BY rooms_recommented.id"
+
+    queryText = queryText & separator & "SELECT rooms_recommented.id_type,rooms_recommented.id_style,rooms_recommented.icon,"
+    queryText = queryText & "rooms_recommented.caption,rooms_recommented.caption_2,rooms_recommented.caption_3,NULL,"
+    queryText = queryText & "rooms.id,rooms.name,users.name,rooms.status_door,rooms.visitors_now,rooms.visitors_max,"
+    queryText = queryText & "rooms.description,rooms_categories.has_trading,NULL,rooms.rate,rooms.id_category,rooms.icon,"
+    queryText = queryText & "rooms.tag_1,rooms.tag_2,rooms.allow_otherspets,NULL,NULL,NULL,"
+    queryText = queryText & "rooms_recommented.id_tree,rooms_recommented.id FROM users,rooms,rooms_categories,rooms_recommented "
+    queryText = queryText & "WHERE id_tree='" & treeText & "' AND rooms_recommented.id_type='2' "
+    queryText = queryText & "AND rooms_recommented.id_room IS NOT NULL AND rooms.id=rooms_recommented.id_room "
+    queryText = queryText & "AND users.id=rooms.id_owner AND rooms_categories.id=rooms.id_category GROUP BY rooms_recommented.id"
+
+    queryText = queryText & separator & "SELECT rooms_recommented.id_type,rooms_recommented.id_style,rooms_recommented.icon,"
+    queryText = queryText & "rooms_recommented.caption,rooms_recommented.caption_2,rooms_recommented.caption_3,NULL,"
+    queryText = queryText & "rooms.id,rooms.name,NULL,rooms.status_door,rooms.visitors_now,rooms.visitors_max,"
+    queryText = queryText & "rooms.description,rooms_categories.has_trading,NULL,rooms.rate,rooms.id_category,rooms.icon,"
+    queryText = queryText & "rooms.tag_1,rooms.tag_2,rooms.allow_otherspets,models.name,models.required_files,models.visitors_max,"
+    queryText = queryText & "rooms_recommented.id_tree,rooms_recommented.id FROM models,rooms,rooms_categories,rooms_recommented "
+    queryText = queryText & "WHERE id_tree='" & treeText & "' AND rooms_recommented.id_type='3' "
+    queryText = queryText & "AND rooms_recommented.id_room IS NOT NULL AND rooms.id=rooms_recommented.id_room "
+    queryText = queryText & "AND models.id=rooms.id_model AND rooms_categories.id=rooms.id_category GROUP BY rooms_recommented.id"
+
+    queryText = queryText & separator & "SELECT rooms_recommented.id_type,rooms_recommented.id_style,rooms_recommented.icon,"
+    queryText = queryText & "rooms_recommented.caption,rooms_recommented.caption_2,rooms_recommented.caption_3,"
+    queryText = queryText & "NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,"
+    queryText = queryText & "rooms_recommented.id_tree,rooms_recommented.id FROM rooms_recommented WHERE id_tree='"
+    queryText = queryText & treeText & "' AND rooms_recommented.id_type='4' GROUP BY rooms_recommented.id ORDER BY 27 ASC LIMIT 255"
+
+    BuildRecommendedRoomsQuery = queryText
+End Function
+
+Private Function BuildRecommendedRoomsPayload(ByVal roomRows As String) As String
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim fieldIndex As Long
+    Dim roomCount As Long
+    Dim rowPayload As String
+    Dim payload As String
+
+    On Error GoTo BuildFailed
+
+    rows = Split(roomRows, Chr$(13))
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(rows(rowIndex)) > 0 Then
+            fields = Split(rows(rowIndex), Chr$(9))
+            If UBound(fields) >= 26 Then
+                roomCount = roomCount + 1
+                rowPayload = CStr(Proc_3_0_6D2AF0(CLng(Val(CStr(fields(0)))), Empty, vbNullString))
+                rowPayload = rowPayload & CStr(Proc_3_0_6D2AF0(CLng(Val(CStr(fields(1)))), Empty, vbNullString))
+                rowPayload = rowPayload & CStr(Proc_3_0_6D2AF0(CLng(Val(CStr(fields(2)))), Empty, vbNullString))
+                For fieldIndex = 3 To 24
+                    rowPayload = rowPayload & CStr(fields(fieldIndex)) & Chr$(2)
+                Next fieldIndex
+                rowPayload = rowPayload & CStr(Proc_3_0_6D2AF0(CLng(Val(CStr(fields(25)))), Empty, vbNullString))
+                rowPayload = rowPayload & CStr(Proc_3_0_6D2AF0(CLng(Val(CStr(fields(26)))), Empty, vbNullString))
+                payload = payload & rowPayload
+            End If
+        End If
+    Next rowIndex
+
+BuildFailed:
+    BuildRecommendedRoomsPayload = CStr(Proc_3_0_6D2AF0(roomCount, Empty, vbNullString)) & payload
 End Function
 
 Private Function AppendPermissionPayload(ByVal rankIndex As Long, ByVal hcLevel As Long, ByVal permissionName As String, ByVal payload As String) As String
