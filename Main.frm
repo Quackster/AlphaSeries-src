@@ -440,7 +440,37 @@ End Sub
 
 ' Original declaration: Private Sub tmrPing_Timer() '694630
 Private Sub tmrPing_Timer()
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Long
+    Dim socketMarker As String
+    Dim activeCount As Long
+    Static mostActiveCount As Long
+
+    On Error GoTo PingDone
+
+    tmrPing.Enabled = False
+    Proc_5_0_6D3CD0 "UPDATE settings SET value=UNIX_TIMESTAMP() WHERE variable='com.server.socket.check.time'", 1, Me
+
+    For socketIndex = 1 To global_0082919C
+        socketMarker = "[" & CStr(socketIndex) & "]"
+        If InStr(1, global_008291A0, socketMarker, vbBinaryCompare) > 0 Then
+            If Proc_11_2_821390(socketIndex, 0, 0) = 1 Then
+                activeCount = activeCount + 1
+            Else
+                Proc_6_243_7FFEB0 socketIndex, 0, 0
+            End If
+        End If
+    Next socketIndex
+
+    If activeCount > mostActiveCount Then
+        Proc_5_0_6D3CD0 "UPDATE settings SET value='" & CStr(activeCount) & "' WHERE variable='com.server.socket.mostactive'", 0, 0
+        mostActiveCount = activeCount
+    End If
+
+    Proc_6_103_74A510 0, 0, 0
+
+PingDone:
+    On Error Resume Next
+    tmrPing.Enabled = True
 End Sub
 
 ' Original declaration: Private Sub tmrWalking_Timer(Index As Integer) '693B20
