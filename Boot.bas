@@ -224,7 +224,57 @@ End Function
 
 ' Original declaration: Private Sub Proc_1_20_6CF830
 Public Function Proc_1_20_6CF830(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim maxCategoryId As Long
+    Dim categoryRows() As String
+    Dim categoryFields() As String
+    Dim faqRows() As String
+    Dim faqFields() As String
+    Dim categoryIndex As Long
+    Dim faqIndex As Long
+    Dim categoryId As Long
+    Dim categoryCount As Long
+    Dim faqCount As Long
+    Dim categoryPayload As String
+    Dim faqPayload As String
+
+    On Error GoTo BuildFailed
+
+    maxCategoryId = CLng(Val(CStr(Proc_5_2_6D4690("SELECT MAX(id) FROM faq_categories", 0, 0))))
+    If maxCategoryId < 0 Then maxCategoryId = 0
+    ReDim global_0082920C(0 To maxCategoryId)
+
+    global_00829208 = vbNullString
+    categoryRows = Split(CStr(Proc_5_2_6D4690("SELECT id,name FROM faq_categories", 0, 0)), Chr$(13))
+    For categoryIndex = LBound(categoryRows) To UBound(categoryRows)
+        If Len(categoryRows(categoryIndex)) > 0 Then
+            categoryFields = Split(categoryRows(categoryIndex), Chr$(9))
+            If UBound(categoryFields) >= 1 Then
+                categoryId = CLng(Val(CStr(categoryFields(0))))
+                If categoryId >= LBound(global_0082920C) And categoryId <= UBound(global_0082920C) Then
+                    faqPayload = vbNullString
+                    faqCount = 0
+                    faqRows = Split(CStr(Proc_5_2_6D4690("SELECT id,name FROM faq WHERE id_category='" & CStr(categoryId) & "'", 0, 0)), Chr$(13))
+                    For faqIndex = LBound(faqRows) To UBound(faqRows)
+                        If Len(faqRows(faqIndex)) > 0 Then
+                            faqFields = Split(faqRows(faqIndex), Chr$(9))
+                            If UBound(faqFields) >= 1 Then
+                                faqPayload = CStr(Proc_3_0_6D2AF0(CLng(Val(CStr(faqFields(0)))), Empty, faqPayload)) & CStr(faqFields(1)) & Chr$(2)
+                                faqCount = faqCount + 1
+                            End If
+                        End If
+                    Next faqIndex
+
+                    global_0082920C(categoryId) = CStr(Proc_3_0_6D2AF0(faqCount, Empty, vbNullString)) & faqPayload
+                    categoryPayload = categoryPayload & CStr(Proc_3_0_6D2AF0(categoryId, Empty, vbNullString)) & CStr(categoryFields(1)) & Chr$(2)
+                    categoryCount = categoryCount + 1
+                End If
+            End If
+        End If
+    Next categoryIndex
+
+    global_00829208 = CStr(Proc_3_0_6D2AF0(categoryCount, Empty, vbNullString)) & categoryPayload
+
+BuildFailed:
     Proc_1_20_6CF830 = Empty
 End Function
 
