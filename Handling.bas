@@ -8732,7 +8732,56 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_197_7D43C0
 Public Function Proc_6_197_7D43C0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim userId As String
+    Dim roomId As Long
+    Dim roomSlot As Long
+    Dim lookX As Long
+    Dim lookY As Long
+    Dim currentX As Long
+    Dim currentY As Long
+    Dim directionValue As Long
+    Dim offset As Long
+
+    On Error GoTo LookRequestDone
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex <= 0 Then GoTo LookRequestDone
+
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "AK" Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    lookX = ReadWireLong(requestPayload, offset)
+    lookY = ReadWireLong(requestPayload, offset)
+    If lookX = 0 And lookY = 0 Then
+        lookX = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+        lookY = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    End If
+    If lookX < 0 Or lookY < 0 Then GoTo LookRequestDone
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo LookRequestDone
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId <= 0 Then GoTo LookRequestDone
+
+    roomSlot = socketIndex
+    If Not HandlingRepresentedMovementPosition(roomSlot, socketIndex, currentX, currentY) Then
+        currentX = 0
+        currentY = 0
+    End If
+
+    directionValue = HandlingDirectionCode(Sgn(lookX - currentX), Sgn(lookY - currentY))
+    HandlingRepresentedRoomOccupantMove roomSlot, socketIndex, currentX, currentY, directionValue, 0
+    Proc_6_106_74B750 App.Path & "\CACHE\ROOMS\" & CStr(roomId) & ".cache", 0, 0
+
+LookRequestDone:
     Proc_6_197_7D43C0 = Empty
 End Function
 
@@ -10772,6 +10821,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_193_7D2BB0 socketIndex, "B]", packetPayload
         Case "B^"
             Proc_6_194_7D3180 socketIndex, "B^", packetPayload
+        Case "AK"
+            Proc_6_197_7D43C0 socketIndex, "AK", packetPayload
         Case "AO"
             Proc_6_198_7D4B70 socketIndex, "AO", packetPayload
         Case "n" & Chr$(127)
@@ -12568,6 +12619,28 @@ Private Function HandlingMovementField(ByVal movementText As String, ByVal field
 
 LookupFailed:
     HandlingMovementField = 0
+End Function
+
+Private Function HandlingDirectionCode(ByVal deltaX As Long, ByVal deltaY As Long) As Long
+    If deltaX = 0 And deltaY < 0 Then
+        HandlingDirectionCode = 0
+    ElseIf deltaX > 0 And deltaY < 0 Then
+        HandlingDirectionCode = 1
+    ElseIf deltaX > 0 And deltaY = 0 Then
+        HandlingDirectionCode = 2
+    ElseIf deltaX > 0 And deltaY > 0 Then
+        HandlingDirectionCode = 3
+    ElseIf deltaX = 0 And deltaY > 0 Then
+        HandlingDirectionCode = 4
+    ElseIf deltaX < 0 And deltaY > 0 Then
+        HandlingDirectionCode = 5
+    ElseIf deltaX < 0 And deltaY = 0 Then
+        HandlingDirectionCode = 6
+    ElseIf deltaX < 0 And deltaY < 0 Then
+        HandlingDirectionCode = 7
+    Else
+        HandlingDirectionCode = 0
+    End If
 End Function
 
 Private Function HandlingRepresentedMovementPosition(ByVal roomSlot As Long, ByVal entityIndex As Long, ByRef positionX As Long, ByRef positionY As Long) As Boolean
