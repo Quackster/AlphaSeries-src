@@ -265,7 +265,11 @@ Public Function Proc_6_5_6DC340(ParamArray args() As Variant) As Variant
     representedFields(10) = vbNullString
 
     payload = "HR" & CallForHelpRowPayload(representedFields)
-    If socketIndex > 0 Then Proc_6_244_801E80 socketIndex, payload, 0
+    If socketIndex > 0 Then
+        Proc_6_244_801E80 socketIndex, payload, 0
+    Else
+        Proc_6_249_802F10 payload, 0, 0
+    End If
 
 SendFailed:
     Proc_6_5_6DC340 = Empty
@@ -3773,8 +3777,17 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_249_802F10
 Public Function Proc_6_249_802F10(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_249_802F10 = Empty
+    Dim payload As String
+
+    On Error GoTo BroadcastFailed
+    If UBound(args) < 0 Then GoTo BroadcastFailed
+
+    payload = CStr(args(0))
+    Proc_6_249_802F10 = BroadcastToStaffModerators(payload)
+    Exit Function
+
+BroadcastFailed:
+    Proc_6_249_802F10 = 0
 End Function
 
 Private Function HandlingSocketIndex(ByRef args() As Variant) As Integer
@@ -3991,6 +4004,82 @@ Private Function StaffModerationPayload(ByVal rankIndex As Long, ByVal hcLevel A
 
 MissingPayload:
     StaffModerationPayload = vbNullString
+End Function
+
+Private Function BroadcastToStaffModerators(ByVal payload As String) As Long
+    Dim records() As String
+    Dim recordIndex As Long
+    Dim recordText As String
+    Dim payloadStart As Long
+    Dim payloadEnd As Long
+    Dim fields() As String
+    Dim candidateSocket As Integer
+    Dim candidateUserId As String
+    Dim sentMarkers As String
+    Dim sentCount As Long
+    Dim rowText As String
+    Dim rows() As String
+    Dim rowFields() As String
+    Dim rowIndex As Long
+
+    On Error GoTo BroadcastDone
+    If Len(payload) = 0 Then GoTo BroadcastDone
+
+    If Len(global_00829268) > 0 Then
+        records = Split(global_00829268, "[")
+        For recordIndex = LBound(records) To UBound(records)
+            recordText = records(recordIndex)
+            If Left$(recordText, 2) = "1:" Then
+                payloadStart = InStr(1, recordText, Chr$(1), vbBinaryCompare)
+                If payloadStart > 0 Then
+                    payloadEnd = InStr(payloadStart + 1, recordText, "]", vbBinaryCompare)
+                    If payloadEnd = 0 Then payloadEnd = Len(recordText) + 1
+
+                    fields = Split(Mid$(recordText, payloadStart + 1, payloadEnd - payloadStart - 1), Chr$(2))
+                    If UBound(fields) >= 1 Then
+                        candidateUserId = CStr(Val(CStr(fields(0))))
+                        candidateSocket = CInt(Val(CStr(fields(1))))
+                        If candidateUserId = "0" Then candidateUserId = HandlingUserIdFromSocket(candidateSocket)
+                        If candidateSocket > 0 Then
+                            If InStr(1, sentMarkers, "[" & CStr(candidateSocket) & "]", vbBinaryCompare) = 0 Then
+                                If HandlingUserHasPermission(candidateUserId, "fuse_mod") Then
+                                    Proc_6_244_801E80 candidateSocket, payload, 0
+                                    sentMarkers = sentMarkers & "[" & CStr(candidateSocket) & "]"
+                                    sentCount = sentCount + 1
+                                End If
+                            End If
+                        End If
+                    End If
+                End If
+            End If
+        Next recordIndex
+    End If
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT id,id_socket FROM users WHERE id_socket IS NOT NULL", 0, 0))
+    If Len(rowText) > 0 Then
+        rows = Split(rowText, Chr$(13))
+        For rowIndex = LBound(rows) To UBound(rows)
+            If Len(rows(rowIndex)) > 0 Then
+                rowFields = Split(rows(rowIndex), Chr$(9))
+                If UBound(rowFields) >= 1 Then
+                    candidateUserId = CStr(Val(CStr(rowFields(0))))
+                    candidateSocket = CInt(Val(CStr(rowFields(1))))
+                    If candidateSocket > 0 Then
+                        If InStr(1, sentMarkers, "[" & CStr(candidateSocket) & "]", vbBinaryCompare) = 0 Then
+                            If HandlingUserHasPermission(candidateUserId, "fuse_mod") Then
+                                Proc_6_244_801E80 candidateSocket, payload, 0
+                                sentMarkers = sentMarkers & "[" & CStr(candidateSocket) & "]"
+                                sentCount = sentCount + 1
+                            End If
+                        End If
+                    End If
+                End If
+            End If
+        Next rowIndex
+    End If
+
+BroadcastDone:
+    BroadcastToStaffModerators = sentCount
 End Function
 
 Private Function CallForHelpRowPayload(ByRef fields() As String) As String
