@@ -1069,7 +1069,68 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_137_766470
 Public Function Proc_6_137_766470(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim voucherCode As String
+    Dim voucherRows As String
+    Dim fields() As String
+    Dim userId As String
+    Dim productSprite As String
+    Dim creditsValue As Long
+    Dim shellsValue As Long
+    Dim productId As Long
+    Dim rewardPayload As String
+
+    On Error GoTo VoucherFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) >= 3 Then requestPayload = CStr(Proc_10_5_809D80(packetPayload, 3, 0))
+    voucherCode = Replace(CStr(Proc_10_7_80A190(packetPayload, 0, 0)), Chr$(32), "0", 1, -1, vbBinaryCompare)
+    If Len(voucherCode) = 0 Then voucherCode = Replace(CStr(Proc_10_7_80A190(requestPayload, 0, 0)), Chr$(32), "0", 1, -1, vbBinaryCompare)
+    If Len(voucherCode) = 0 Then voucherCode = Replace(requestPayload, Chr$(32), "0", 1, -1, vbBinaryCompare)
+    If Len(voucherCode) <> 8 Then GoTo VoucherInvalid
+
+    voucherRows = CStr(Proc_5_2_6D4690("SELECT contain_product,contain_credits,contain_shells FROM vouchers WHERE name='" & Proc_10_11_80A9C0(voucherCode, 0, 0) & "' LIMIT 1", 0, 0))
+    If Len(voucherRows) = 0 Then GoTo VoucherInvalid
+
+    fields = Split(voucherRows, Chr$(9))
+    If UBound(fields) < 2 Then GoTo VoucherInvalid
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Then GoTo VoucherInvalid
+
+    productSprite = CStr(fields(0))
+    creditsValue = CLng(Val(CStr(fields(1))))
+    shellsValue = CLng(Val(CStr(fields(2))))
+
+    If Len(productSprite) > 2 Then
+        productId = CLng(Val(CStr(Proc_5_2_6D4690("SELECT id_product FROM catalog_products WHERE sprite='" & Proc_10_11_80A9C0(productSprite, 0, 0) & "' LIMIT 1", 0, 0))))
+        If productId <> 0 Then
+            rewardPayload = CStr(Proc_8_12_806C30(productId, 13, 0)) & Chr$(2) & CStr(Proc_8_12_806C30(productId, 14, 0)) & Chr$(2)
+        End If
+    End If
+
+    If creditsValue <> 0 Then
+        Proc_5_0_6D3CD0 "UPDATE users SET credits=credits+" & CStr(creditsValue) & " WHERE id='" & Proc_10_11_80A9C0(userId, 0, 0) & "'", 0, 0
+        Proc_10_16_80C480 userId, 0, 0
+    End If
+
+    If shellsValue <> 0 Then
+        Proc_5_0_6D3CD0 "UPDATE users SET activitypoints_0=activitypoints_0+" & CStr(shellsValue) & " WHERE id='" & Proc_10_11_80A9C0(userId, 0, 0) & "'", 0, 0
+        Proc_10_17_80C6B0 userId, 0, 0
+    End If
+
+    Proc_5_0_6D3CD0 "DELETE FROM vouchers WHERE name='" & Proc_10_11_80A9C0(voucherCode, 0, 0) & "' LIMIT 1", 0, 0
+    Proc_6_244_801E80 socketIndex, "CT" & rewardPayload, 0
+    Proc_6_137_766470 = Empty
+    Exit Function
+
+VoucherInvalid:
+    Proc_6_244_801E80 socketIndex, "CU" & voucherCode & Chr$(2), 0
+
+VoucherFailed:
     Proc_6_137_766470 = Empty
 End Function
 
@@ -2139,6 +2200,39 @@ Private Function HandlingSocketIndex(ByRef args() As Variant) As Integer
 
 DefaultIndex:
     HandlingSocketIndex = 0
+End Function
+
+Private Function HandlingUserIdFromSocket(ByVal socketIndex As Integer) As String
+    Dim recordText As String
+    Dim marker As String
+    Dim startAt As Long
+    Dim endAt As Long
+    Dim fields() As String
+
+    On Error GoTo LookupFailed
+
+    If Len(global_00829268) > 0 Then
+        marker = "[1:" & CStr(socketIndex) & Chr$(1)
+        startAt = InStr(1, global_00829268, marker, vbTextCompare)
+        If startAt > 0 Then
+            startAt = startAt + Len(marker)
+            endAt = InStr(startAt, global_00829268, "]", vbBinaryCompare)
+            If endAt = 0 Then endAt = Len(global_00829268) + 1
+
+            recordText = Mid$(global_00829268, startAt, endAt - startAt)
+            fields = Split(recordText, Chr$(2))
+            If UBound(fields) >= 0 Then
+                HandlingUserIdFromSocket = CStr(Val(CStr(fields(0))))
+                If Len(HandlingUserIdFromSocket) > 0 And HandlingUserIdFromSocket <> "0" Then Exit Function
+            End If
+        End If
+    End If
+
+    HandlingUserIdFromSocket = CStr(Val(CStr(Proc_5_2_6D4690("SELECT id FROM users WHERE id_socket='" & CStr(socketIndex) & "' LIMIT 1", 0, 0))))
+    Exit Function
+
+LookupFailed:
+    HandlingUserIdFromSocket = vbNullString
 End Function
 
 Private Function IsSocketMarkedBusy(ByVal socketIndex As Integer) As Boolean
