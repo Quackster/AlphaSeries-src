@@ -2440,7 +2440,18 @@ End Sub
 
 ' Original declaration: Private Sub Proc_6_242_7FF0D0
 Public Function Proc_6_242_7FF0D0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+
+    On Error GoTo CleanupFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) > 0 And userId <> "0" Then
+        Proc_5_0_6D3CD0 "UPDATE users SET id_socket=null WHERE id = '" & Proc_10_11_80A9C0(userId, 0, 0) & "'", 0, 0
+    End If
+
+CleanupFailed:
     Proc_6_242_7FF0D0 = Empty
 End Function
 
