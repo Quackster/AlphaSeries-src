@@ -6,6 +6,8 @@ Option Explicit
 ' Decompiled procedure bodies are intentionally not copied until they are understood and made valid VB6.
 
 Private Const WinsockConnectedState As Long = 7
+Private Const SocketIndexStart As String = "["
+Private Const SocketIndexEnd As String = "]"
 
 ' Original declaration: Private  Proc_11_0_821190(arg_C) '821190
 Public Function Proc_11_0_821190(ParamArray args() As Variant) As Variant
@@ -54,6 +56,43 @@ End Function
 
 ' Original declaration: Private Sub Proc_11_3_821440
 Public Function Proc_11_3_821440(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Long
+    Dim marker As String
+
+    On Error GoTo ListenFailed
+    If UBound(args) < 0 Then GoTo ListenFailed
+
+    socketIndex = CLng(Val(CStr(args(0))))
+    If socketIndex < 0 Or socketIndex = 2500 Then GoTo ListenFailed
+
+    marker = SocketIndexStart & CStr(socketIndex) & SocketIndexEnd
+    If InStr(1, global_008291A0, marker, vbBinaryCompare) = 0 Then
+        EnsureSocketControlsLoaded socketIndex
+        global_008291A0 = global_008291A0 & marker
+        If socketIndex > global_0082919C Then global_0082919C = socketIndex
+    Else
+        global_008291A0 = Replace(global_008291A0, marker, vbNullString, 1, -1, vbBinaryCompare)
+    End If
+
+    If Main.musServer(socketIndex).State <> 0 Then
+        Main.musServer(socketIndex).Close
+    End If
+
+    Main.DataProcess(socketIndex).Enabled = True
+    Proc_11_3_821440 = Empty
+
+    Exit Function
+
+ListenFailed:
     Proc_11_3_821440 = Empty
 End Function
+
+Private Sub EnsureSocketControlsLoaded(ByVal socketIndex As Long)
+    Dim controlIndex As Long
+
+    On Error Resume Next
+    For controlIndex = 1 To socketIndex
+        Load Main.musServer(controlIndex)
+        Load Main.DataProcess(controlIndex)
+    Next controlIndex
+End Sub
