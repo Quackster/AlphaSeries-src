@@ -4928,7 +4928,118 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_164_7BC820
 Public Function Proc_6_164_7BC820(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim questId As Long
+    Dim numericQuestId As Long
+    Dim activeRow As String
+    Dim activeFields() As String
+    Dim questRows() As String
+    Dim questFields() As String
+    Dim questRow As String
+    Dim questIndex As Long
+    Dim questName As String
+    Dim rewardAmount As Long
+    Dim rewardType As Long
+    Dim campaignId As Long
+    Dim activityCount As Long
+    Dim progressValue As Long
+    Dim userQuestLevel As Long
+    Dim campaignLevelCount As Long
+    Dim matchedQuest As Boolean
+    Dim completionPayload As String
+    Dim currentPoints As Long
+    Dim newPoints As Long
+    Dim pointColumn As String
+
+    On Error GoTo QuestCompleteFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo QuestCompleteFailed
+
+    If UBound(args) >= 1 Then questId = CLng(Val(CStr(args(1))))
+    If UBound(args) >= 2 Then numericQuestId = CLng(Val(CStr(args(2))))
+
+    If questId <= 0 Then
+        activeRow = CStr(Proc_5_2_6D4690("SELECT id_quest,id_numericquest,progress,id_level FROM users_quests WHERE id_user='" & _
+            Proc_10_11_80A9C0(userId, 0, 0) & "' AND timestamp_accepted IS NOT NULL AND timestamp_done IS NULL LIMIT 1", 0, 0))
+    Else
+        activeRow = CStr(Proc_5_2_6D4690("SELECT id_quest,id_numericquest,progress,id_level FROM users_quests WHERE id_user='" & _
+            Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_quest='" & CStr(questId) & "' LIMIT 1", 0, 0))
+    End If
+    If Len(activeRow) = 0 Then GoTo QuestCompleteFailed
+
+    activeFields = Split(activeRow, Chr$(9))
+    questId = CLng(Val(HandlingField(activeFields, 0)))
+    If numericQuestId <= 0 Then numericQuestId = CLng(Val(HandlingField(activeFields, 1)))
+    progressValue = CLng(Val(HandlingField(activeFields, 2)))
+    userQuestLevel = CLng(Val(HandlingField(activeFields, 3)))
+    If questId <= 0 Then GoTo QuestCompleteFailed
+
+    If Len(global_00829080) > 0 Then
+        questRows = Split(global_00829080, Chr$(13))
+    Else
+        questRows = Split(CStr(Proc_5_2_6D4690("SELECT id,level,name,NULL,reward,reward_type,require_action,id_additional,id_campaign,amount_activities,waitamount FROM quests ORDER BY id_campaign DESC,level ASC", 0, 0)), Chr$(13))
+    End If
+
+    For questIndex = LBound(questRows) To UBound(questRows)
+        questRow = Trim$(CStr(questRows(questIndex)))
+        If Len(questRow) > 0 Then
+            questFields = Split(questRow, Chr$(9))
+            If UBound(questFields) >= 10 Then
+                If CLng(Val(HandlingField(questFields, 0))) = questId Then
+                    questName = HandlingField(questFields, 2)
+                    rewardAmount = CLng(Val(HandlingField(questFields, 4)))
+                    rewardType = CLng(Val(HandlingField(questFields, 5)))
+                    campaignId = CLng(Val(HandlingField(questFields, 8)))
+                    activityCount = CLng(Val(HandlingField(questFields, 9)))
+                    matchedQuest = True
+                End If
+            End If
+        End If
+    Next questIndex
+    If Not matchedQuest Then GoTo QuestCompleteFailed
+    For questIndex = LBound(questRows) To UBound(questRows)
+        questRow = Trim$(CStr(questRows(questIndex)))
+        If Len(questRow) > 0 Then
+            questFields = Split(questRow, Chr$(9))
+            If UBound(questFields) >= 8 Then
+                If CLng(Val(HandlingField(questFields, 8))) = campaignId Then campaignLevelCount = campaignLevelCount + 1
+            End If
+        End If
+    Next questIndex
+    If activityCount <= 0 Then activityCount = 1
+
+    completionPayload = CStr(Proc_3_0_6D2AF0(campaignId, Empty, vbNullString)) & questName & Chr$(2)
+    completionPayload = completionPayload & CStr(Proc_3_0_6D2AF0(campaignLevelCount, Empty, vbNullString))
+    completionPayload = completionPayload & CStr(Proc_3_0_6D2AF0(questId, Empty, vbNullString))
+    completionPayload = completionPayload & CStr(Proc_3_0_6D2AF0(userQuestLevel, Empty, vbNullString))
+    completionPayload = completionPayload & CStr(Proc_3_0_6D2AF0(progressValue, Empty, vbNullString))
+    completionPayload = completionPayload & CStr(Proc_3_0_6D2AF0(activityCount, Empty, vbNullString))
+    completionPayload = completionPayload & CStr(Proc_3_0_6D2AF0(0, Empty, vbNullString))
+
+    Proc_6_244_801E80 socketIndex, "Lb" & completionPayload, 0
+    If progressValue < activityCount Then GoTo QuestCompleteFailed
+
+    If rewardAmount <> 0 Then
+        If rewardType >= 0 And rewardType <= 20 Then
+            pointColumn = "activitypoints_" & CStr(rewardType)
+            currentPoints = CLng(Val(CStr(Proc_5_2_6D4690("SELECT " & pointColumn & " FROM users WHERE id='" & _
+                Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 1", 0, 0))))
+            Proc_5_0_6D3CD0 "UPDATE users SET " & pointColumn & "=" & pointColumn & "+" & CStr(rewardAmount) & _
+                " WHERE id='" & Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 1", 0, 0
+            newPoints = currentPoints + rewardAmount
+            Proc_6_244_801E80 socketIndex, RepresentedActivityPointAwardPayload(rewardType, newPoints), 0
+        End If
+    End If
+
+    Proc_5_0_6D3CD0 "UPDATE users_quests SET id_level=id_level+1,progress='0',id_numericquest='0',timestamp_done=UNIX_TIMESTAMP() WHERE id_user='" & _
+        Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_quest='" & CStr(questId) & "' LIMIT 1", 0, 0
+    Proc_6_244_801E80 socketIndex, "La" & completionPayload, 0
+    Proc_6_236_7F8540 socketIndex, Empty, Empty
+
+QuestCompleteFailed:
     Proc_6_164_7BC820 = Empty
 End Function
 
