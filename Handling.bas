@@ -935,8 +935,19 @@ End Function
 
 ' Original declaration: Private  Proc_6_113_74EE70(arg_C, arg_10) '74EE70
 Public Function Proc_6_113_74EE70(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_113_74EE70 = Empty
+    Dim eventQueryTail As String
+    Dim roomQueryTail As String
+
+    On Error GoTo BuildFailed
+    If UBound(args) < 1 Then GoTo BuildFailed
+
+    eventQueryTail = CStr(args(0))
+    roomQueryTail = CStr(args(1))
+    Proc_6_113_74EE70 = NavigatorCombinedRoomListPayload(eventQueryTail, roomQueryTail)
+    Exit Function
+
+BuildFailed:
+    Proc_6_113_74EE70 = vbNullString
 End Function
 
 ' Original declaration: Private  Proc_6_114_750550(arg_C) '750550
@@ -2523,6 +2534,55 @@ BuildDone:
 
 BuildFailed:
     NavigatorEventListPayload = CStr(Proc_3_0_6D2AF0(0, Empty, vbNullString))
+End Function
+
+Private Function NavigatorCombinedRoomListPayload(ByVal eventQueryTail As String, ByVal roomQueryTail As String) As String
+    Dim eventQueryText As String
+    Dim roomQueryText As String
+    Dim rowText As String
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim itemCount As Long
+    Dim payload As String
+
+    On Error GoTo BuildFailed
+
+    If Len(eventQueryTail) > 0 Then
+        eventQueryText = "SELECT rooms.id,rooms_events.name,users.name,rooms.status_door,rooms.visitors_now,rooms.visitors_max,rooms_events.description,rooms_categories.has_trading,rooms.allow_otherspets,rooms.rate,rooms_events.id_category,rooms.icon,rooms_events.tag_1,rooms_events.tag_2,DATE_FORMAT(FROM_UNIXTIME(rooms_events.timestamp), '" & CStr(Proc_10_0_809570("com.mysql.format.time", "%H:%i", 0)) & "') FROM " & eventQueryTail
+        rowText = CStr(Proc_5_2_6D4690(eventQueryText, 0, 0))
+        If Len(rowText) > 0 Then
+            rows = Split(rowText, Chr$(13))
+            For rowIndex = LBound(rows) To UBound(rows)
+                If Len(rows(rowIndex)) > 0 Then
+                    fields = Split(rows(rowIndex), Chr$(9))
+                    payload = payload & NavigatorEventFragment(fields)
+                    itemCount = itemCount + 1
+                End If
+            Next rowIndex
+        End If
+    End If
+
+    If Len(roomQueryTail) > 0 Then
+        roomQueryText = "SELECT rooms.id,rooms.name,users.name,rooms.status_door,rooms.visitors_now,rooms.visitors_max,rooms.description,rooms_categories.has_trading,rooms.allow_otherspets,rooms.rate,rooms.id_category,rooms.icon,rooms.tag_1,rooms.tag_2 FROM " & roomQueryTail
+        rowText = CStr(Proc_5_2_6D4690(roomQueryText, 0, 0))
+        If Len(rowText) > 0 Then
+            rows = Split(rowText, Chr$(13))
+            For rowIndex = LBound(rows) To UBound(rows)
+                If Len(rows(rowIndex)) > 0 Then
+                    fields = Split(rows(rowIndex), Chr$(9))
+                    payload = payload & NavigatorRoomFragment(fields)
+                    itemCount = itemCount + 1
+                End If
+            Next rowIndex
+        End If
+    End If
+
+    NavigatorCombinedRoomListPayload = CStr(Proc_3_0_6D2AF0(itemCount, Empty, payload))
+    Exit Function
+
+BuildFailed:
+    NavigatorCombinedRoomListPayload = CStr(Proc_3_0_6D2AF0(0, Empty, vbNullString))
 End Function
 
 Private Function NavigatorEventFragment(ByRef fields() As String) As String
