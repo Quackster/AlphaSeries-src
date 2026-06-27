@@ -2567,8 +2567,63 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_98_747D80
 Public Function Proc_6_98_747D80(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_98_747D80 = Empty
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim roomId As Long
+    Dim dimmerFurnitureId As Long
+    Dim rowText As String
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim presetId As Long
+    Dim lightLevel As Long
+    Dim backgroundId As Long
+    Dim colourText As String
+    Dim stateId As Long
+    Dim currentPresetId As Long
+    Dim presetPayload As String
+
+    On Error GoTo DimmerDone
+
+    socketIndex = HandlingSocketIndex(args)
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo DimmerDone
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId <= 0 Then GoTo DimmerDone
+    If Not HandlingUserOwnsRoom(userId, roomId) And Not HandlingUserHasRoomRight(userId, roomId) Then GoTo DimmerDone
+
+    dimmerFurnitureId = CLng(Val(CStr(Proc_5_2_6D4690("SELECT furnitures.id FROM furnitures,products WHERE furnitures.id_room='" & CStr(roomId) & "' AND products.id_type='9' AND furnitures.id_product=products.id LIMIT 1", 0, 0))))
+    If dimmerFurnitureId <= 0 Then GoTo DimmerDone
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT id_light,id_preset,id_background,colour,id_state FROM furnitures_dimmerpresets WHERE id_furni='" & CStr(dimmerFurnitureId) & "' LIMIT 3", 0, 0))
+    If Len(rowText) > 0 Then
+        rows = Split(rowText, Chr$(13))
+        For rowIndex = LBound(rows) To UBound(rows)
+            If Len(rows(rowIndex)) > 0 Then
+                fields = Split(rows(rowIndex), Chr$(9))
+                If UBound(fields) >= 4 Then
+                    lightLevel = CLng(Val(HandlingField(fields, 0)))
+                    presetId = CLng(Val(HandlingField(fields, 1)))
+                    backgroundId = CLng(Val(HandlingField(fields, 2)))
+                    colourText = HandlingField(fields, 3)
+                    stateId = CLng(Val(HandlingField(fields, 4)))
+
+                    If stateId = 2 Or currentPresetId = 0 Then currentPresetId = presetId
+
+                    presetPayload = presetPayload & CStr(Proc_3_0_6D2AF0(presetId, Empty, vbNullString))
+                    presetPayload = presetPayload & CStr(Proc_3_0_6D2AF0(backgroundId, Empty, vbNullString))
+                    presetPayload = presetPayload & CStr(Proc_3_0_6D2AF0(lightLevel, Empty, vbNullString))
+                    presetPayload = presetPayload & colourText & Chr$(2)
+                End If
+            End If
+        Next rowIndex
+    End If
+
+    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(currentPresetId, Empty, CStr(Proc_3_0_6D2AF0(0, Empty, "Em")))) & presetPayload, 0
+
+DimmerDone:
+    Proc_6_98_747D80 = currentPresetId
 End Function
 
 ' Original declaration: Private Sub Proc_6_99_748460
