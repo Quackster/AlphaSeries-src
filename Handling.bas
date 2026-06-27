@@ -813,19 +813,80 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_108_74D800
 Public Function Proc_6_108_74D800(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim maxFavorites As Long
+    Dim rows() As String
+    Dim rowText As String
+    Dim roomIds As String
+    Dim roomCount As Long
+    Dim rowIndex As Long
+
+    On Error GoTo FavouritesFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    userId = HandlingUserIdFromSocket(socketIndex)
+    maxFavorites = CLng(Val(CStr(Proc_10_0_809570("com.server.socket.game.rooms.favourites.max", 30, 0))))
+    If maxFavorites <= 0 Then maxFavorites = 30
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT id_room FROM rooms_favourites WHERE id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT " & CStr(maxFavorites), 0, 0))
+    If Len(rowText) > 0 Then
+        rows = Split(rowText, Chr$(13))
+        For rowIndex = LBound(rows) To UBound(rows)
+            If Len(rows(rowIndex)) > 0 Then
+                roomIds = CStr(Proc_3_0_6D2AF0(CLng(Val(rows(rowIndex))), Empty, roomIds))
+                roomCount = roomCount + 1
+            End If
+        Next rowIndex
+    End If
+
+    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(roomCount, Empty, CStr(Proc_3_0_6D2AF0(maxFavorites, Empty, "GJ")))) & roomIds, 0
+
+FavouritesFailed:
     Proc_6_108_74D800 = Empty
 End Function
 
 ' Original declaration: Private Sub Proc_6_109_74DBD0
 Public Function Proc_6_109_74DBD0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim userId As String
+    Dim roomId As Long
+
+    On Error GoTo FavouriteFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    Proc_10_5_809D80 packetPayload, 3, 0
+    roomId = CLng(Val(CStr(Proc_10_6_809F10(packetPayload, 0, 0))))
+    userId = HandlingUserIdFromSocket(socketIndex)
+
+    Proc_5_0_6D3CD0 "DELETE FROM rooms_favourites WHERE id_room='" & CStr(roomId) & "' AND id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "'", 0, 0
+    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(roomId, Empty, "GK")) & "H", 0
+
+FavouriteFailed:
     Proc_6_109_74DBD0 = Empty
 End Function
 
 ' Original declaration: Private Sub Proc_6_110_74DDA0
 Public Function Proc_6_110_74DDA0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim userId As String
+    Dim roomId As Long
+
+    On Error GoTo FavouriteFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    Proc_10_5_809D80 packetPayload, 3, 0
+    roomId = CLng(Val(CStr(Proc_10_6_809F10(packetPayload, 0, 0))))
+    userId = HandlingUserIdFromSocket(socketIndex)
+
+    Proc_5_0_6D3CD0 "INSERT INTO rooms_favourites(id_user,id_room,timestamp) VALUES('" & Proc_10_11_80A9C0(userId, 0, 0) & "','" & CStr(roomId) & "',UNIX_TIMESTAMP())", 0, 0
+    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(roomId, Empty, "GK")) & Chr$(32), 0
+
+FavouriteFailed:
     Proc_6_110_74DDA0 = Empty
 End Function
 
@@ -2220,6 +2281,10 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_107_74B7E0 socketIndex, "Gc", packetPayload
         Case "@H"
             Proc_6_108_74D800 socketIndex, "@H", packetPayload
+        Case "@S"
+            Proc_6_110_74DDA0 socketIndex, "@S", packetPayload
+        Case "@T"
+            Proc_6_109_74DBD0 socketIndex, "@T", packetPayload
         Case "BW"
             Proc_6_111_74DF70 socketIndex, "BW", packetPayload
         Case "Fw"
@@ -2232,6 +2297,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_117_751880 socketIndex, "Fq", packetPayload
         Case "Fp"
             Proc_6_118_751A80 socketIndex, "Fp", packetPayload
+        Case "Fs"
+            Proc_6_119_751C80 socketIndex, "Fs", packetPayload
         Case "Ft"
             Proc_6_120_751E80 socketIndex, "Ft", packetPayload
         Case "E|"
