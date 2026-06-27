@@ -5499,7 +5499,47 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_237_7F9ED0
 Public Function Proc_6_237_7F9ED0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim rowText As String
+    Dim fields() As String
+    Dim userName As String
+    Dim mottoText As String
+    Dim genderText As String
+    Dim respectAmount As Long
+    Dim scratchAmount As Long
+    Dim payload As String
+
+    On Error GoTo SendFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo SendFailed
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT id,name,motto,gender,respect_amount,scratch_amount FROM users WHERE id='" & Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 1", 0, 0))
+    If Len(rowText) = 0 Then GoTo SendFailed
+
+    fields = Split(rowText, Chr$(9))
+    If UBound(fields) < 5 Then GoTo SendFailed
+
+    userId = CStr(Val(CStr(fields(0))))
+    userName = CStr(fields(1))
+    mottoText = CStr(fields(2))
+    genderText = UCase$(Left$(CStr(fields(3)), 1))
+    If genderText <> "M" And genderText <> "F" Then genderText = "M"
+    respectAmount = CLng(Val(CStr(fields(4))))
+    scratchAmount = CLng(Val(CStr(fields(5))))
+
+    payload = "@E" & userId & Chr$(2) & userName & Chr$(2) & mottoText & Chr$(2)
+    payload = payload & genderText & Chr$(2) & Chr$(2) & Chr$(2) & "H" & Chr$(2) & "HIH"
+    payload = CStr(Proc_3_0_6D2AF0(respectAmount, Empty, payload))
+    payload = CStr(Proc_3_0_6D2AF0(scratchAmount, Empty, payload))
+
+    Proc_6_244_801E80 socketIndex, payload, 0
+    Proc_6_237_7F9ED0 = payload
+    Exit Function
+
+SendFailed:
     Proc_6_237_7F9ED0 = Empty
 End Function
 
