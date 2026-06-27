@@ -31,8 +31,28 @@ End Function
 
 ' Original declaration: Private Sub Proc_3_4_6D3620
 Public Function Proc_3_4_6D3620(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_3_4_6D3620 = Empty
+    Dim encodedValue As String
+    Dim firstValue As Long
+    Dim secondValue As Long
+
+    On Error GoTo DecodeFailed
+    If UBound(args) < 0 Then
+        Proc_3_4_6D3620 = 0
+        Exit Function
+    End If
+
+    encodedValue = CStr(args(0))
+    If Len(encodedValue) = 1 Then
+        encodedValue = "@" & encodedValue
+    End If
+
+    firstValue = Asc(Mid$(encodedValue, 1, 1)) - 64
+    secondValue = Asc(Mid$(encodedValue, 2, 1)) - 64
+    Proc_3_4_6D3620 = (firstValue * &H40&) + secondValue
+    Exit Function
+
+DecodeFailed:
+    Proc_3_4_6D3620 = 0
 End Function
 
 ' Original declaration: Private  Proc_3_5_6D3880(arg_C, arg_10, arg_14, arg_18, arg_1C) '6D3880
