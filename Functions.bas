@@ -682,8 +682,49 @@ End Function
 
 ' Original declaration: Private  Proc_10_23_80E110(arg_C, arg_10, arg_14) '80E110
 Public Function Proc_10_23_80E110(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_10_23_80E110 = Empty
+    Dim userId As String
+    Dim hcRank As Long
+    Dim currentPeriods As Long
+    Dim paidDays As Long
+    Dim periodIncrement As Long
+    Dim giftIncrement As Long
+    Dim periodColumn As String
+    Dim queryText As String
+
+    On Error GoTo UpdateFailed
+    If UBound(args) < 2 Then GoTo UpdateFailed
+
+    userId = CStr(Val(CStr(args(0))))
+    hcRank = CLng(Val(CStr(args(1))))
+    currentPeriods = CLng(Val(CStr(args(2))))
+    If UBound(args) >= 3 Then paidDays = CLng(Val(CStr(args(3))))
+    If userId = "0" Then GoTo UpdateFailed
+
+    If currentPeriods > 0 Or paidDays > 0 Then
+        If paidDays <= 0 Then paidDays = currentPeriods
+        periodIncrement = CLng(Val(CStr(Int(paidDays / 31))))
+        If periodIncrement < 1 Then periodIncrement = 1
+        giftIncrement = 0
+    Else
+        periodIncrement = 1
+        giftIncrement = CInt(Val(CStr(Proc_10_0_809570("com.server.socket.game.club.gifts.hcrank" & CStr(hcRank) & ".amount", 0, 0))))
+    End If
+
+    If hcRank > 1 Then
+        periodColumn = "hc2"
+    Else
+        periodColumn = "hc"
+    End If
+
+    queryText = "UPDATE users SET hc_startperiod=UNIX_TIMESTAMP()," & periodColumn & "_periods=" & _
+        periodColumn & "_periods+" & CStr(periodIncrement) & ",hc_presents=hc_presents+" & _
+        CStr(giftIncrement) & " WHERE id='" & userId & "'"
+    Proc_5_0_6D3CD0 queryText, 0, 0
+    Proc_10_23_80E110 = 1
+    Exit Function
+
+UpdateFailed:
+    Proc_10_23_80E110 = 0
 End Function
 
 ' Original declaration: Private Sub Proc_10_24_80E790
