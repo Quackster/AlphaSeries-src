@@ -7434,7 +7434,94 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_225_7EFBD0
 Public Function Proc_6_225_7EFBD0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim offset As Long
+    Dim diskFurnitureId As Long
+    Dim playlistOrder As Long
+    Dim roomId As Long
+    Dim jukeboxRow As String
+    Dim jukeboxFields() As String
+    Dim jukeboxId As Long
+    Dim jukeboxProductId As Long
+    Dim maxOrderText As String
+    Dim maxOrder As Long
+    Dim playlistLimit As Long
+    Dim playlistCount As Long
+    Dim songDiskProductId As Long
+    Dim destinationId As Long
+
+    On Error GoTo AddFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex <= 0 Then GoTo AddFailed
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo AddFailed
+
+    If UBound(args) >= 1 Then packetPayload = CStr(args(1))
+    If Left$(packetPayload, 2) = "C" & Chr$(127) Then
+        requestPayload = Mid$(packetPayload, 3)
+    Else
+        requestPayload = packetPayload
+    End If
+
+    offset = 1
+    diskFurnitureId = ReadWireLong(requestPayload, offset)
+    playlistOrder = ReadWireLong(requestPayload, offset)
+    If diskFurnitureId <= 0 Then GoTo AddFailed
+    If playlistOrder < 0 Then playlistOrder = 0
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId <= 0 Then GoTo AddFailed
+
+    jukeboxRow = CStr(Proc_5_2_6D4690("SELECT furnitures.id,furnitures.id_product FROM furnitures,soundmachine_jb_playlist WHERE furnitures.id_room='" & _
+        CStr(roomId) & "' AND soundmachine_jb_playlist.id_jukebox=furnitures.id GROUP BY furnitures.id ORDER BY furnitures.id DESC LIMIT 1", 0, 0))
+    If Len(jukeboxRow) = 0 Then
+        jukeboxRow = CStr(Proc_5_2_6D4690("SELECT furnitures.id,furnitures.id_product FROM furnitures,products WHERE furnitures.id_room='" & _
+            CStr(roomId) & "' AND furnitures.id_product=products.id AND (products.action LIKE '%soundmachine%' OR products.action LIKE '%jukebox%' OR products.name LIKE '%jukebox%' OR products.sprite LIKE '%jukebox%') ORDER BY furnitures.id DESC LIMIT 1", 0, 0))
+    End If
+    If Len(jukeboxRow) = 0 Then GoTo AddFailed
+
+    jukeboxFields = Split(jukeboxRow, Chr$(9))
+    jukeboxId = CLng(Val(HandlingField(jukeboxFields, 0)))
+    jukeboxProductId = CLng(Val(HandlingField(jukeboxFields, 1)))
+    If jukeboxId <= 0 Then GoTo AddFailed
+
+    maxOrderText = CStr(Proc_5_2_6D4690("SELECT MAX(id_order) FROM soundmachine_jb_playlist WHERE id_jukebox='" & CStr(jukeboxId) & "'", 0, 0))
+    maxOrder = CLng(Val(maxOrderText))
+    playlistCount = CLng(Val(CStr(Proc_5_2_6D4690("SELECT COUNT(*) FROM soundmachine_jb_playlist WHERE id_jukebox='" & CStr(jukeboxId) & "'", 0, 0))))
+    playlistLimit = CLng(Val(CStr(Proc_10_0_809570("com.server.socket.game.jukebox." & CStr(jukeboxProductId) & ".soundsets.max", 0, 0))))
+    If playlistLimit <= 0 Then playlistLimit = 100
+    If playlistCount >= playlistLimit Then GoTo AddFailed
+
+    If Len(maxOrderText) > 0 Then
+        If playlistOrder <> maxOrder Then
+            If playlistOrder <> maxOrder + 1 Then GoTo AddFailed
+        End If
+    Else
+        If playlistOrder <> 0 Then GoTo AddFailed
+    End If
+
+    songDiskProductId = CLng(Val(CStr(Proc_10_0_809570("com.server.socket.game.default.songdisk", 0, 0))))
+    If songDiskProductId <= 0 Then GoTo AddFailed
+
+    destinationId = CLng(Val(CStr(Proc_5_2_6D4690("SELECT id_destination FROM furnitures WHERE id_owner='" & Proc_10_11_80A9C0(userId, 0, 0) & _
+        "' AND id='" & CStr(diskFurnitureId) & "' AND id_product='" & CStr(songDiskProductId) & "' LIMIT 1", 0, 0))))
+    If destinationId <= 0 Then GoTo AddFailed
+
+    Proc_5_0_6D3CD0 "UPDATE furnitures SET id_owner=NULL WHERE id_owner='" & Proc_10_11_80A9C0(userId, 0, 0) & _
+        "' AND id='" & CStr(diskFurnitureId) & "' AND id_product='" & CStr(songDiskProductId) & "' LIMIT 1", 0, 0
+    Proc_5_0_6D3CD0 "INSERT INTO soundmachine_jb_playlist(id_jukebox,id_cd,id_order,id_destination) VALUES('" & _
+        CStr(jukeboxId) & "','" & CStr(diskFurnitureId) & "','" & CStr(playlistOrder) & "','" & CStr(destinationId) & "')", 0, 0
+
+    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(diskFurnitureId, Empty, "Ac")), 0
+    Proc_6_227_7F2400 socketIndex, 0, 0
+    Proc_6_228_7F2AF0 socketIndex, 0, 0
+
+AddFailed:
     Proc_6_225_7EFBD0 = Empty
 End Function
 
