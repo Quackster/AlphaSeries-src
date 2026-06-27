@@ -559,7 +559,22 @@ End Function
 
 ' Original declaration: Private Sub Proc_1_17_6CCDC0
 Public Function Proc_1_17_6CCDC0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim rankIndex As Long
+    Dim hcLevel As Long
+
+    On Error GoTo BuildFailed
+
+    ReDim global_008292F4(0 To 20, 0 To 2)
+    For rankIndex = 0 To 20
+        For hcLevel = 0 To 2
+            global_008292F4(rankIndex, hcLevel) = BuildCatalogPageTreePayload(rankIndex, hcLevel)
+        Next hcLevel
+    Next rankIndex
+
+    Proc_1_17_6CCDC0 = Empty
+    Exit Function
+
+BuildFailed:
     Proc_1_17_6CCDC0 = Empty
 End Function
 
@@ -1015,6 +1030,115 @@ Private Function BuildRecommendedRoomsPayload(ByVal roomRows As String) As Strin
 
 BuildFailed:
     BuildRecommendedRoomsPayload = CStr(Proc_3_0_6D2AF0(roomCount, Empty, vbNullString)) & payload
+End Function
+
+Private Function BuildCatalogPageTreePayload(ByVal rankIndex As Long, ByVal hcLevel As Long) As String
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim rootCount As Long
+    Dim payload As String
+    Dim pageId As Long
+    Dim childCount As Long
+
+    On Error GoTo BuildFailed
+
+    rows = Split(CStr(Proc_5_2_6D4690(BuildCatalogPageTreeQuery(0, rankIndex, hcLevel), 0, 0)), Chr$(13))
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(rows(rowIndex)) > 0 Then
+            fields = Split(rows(rowIndex), Chr$(9))
+            If UBound(fields) >= 5 Then
+                If CatalogPageVisible(fields, rankIndex, hcLevel) Then
+                    pageId = CLng(Val(CStr(fields(0))))
+                    childCount = CLng(Val(CStr(Proc_5_2_6D4690(BuildCatalogPageChildCountQuery(pageId, rankIndex, hcLevel), 0, 0))))
+                    payload = payload & BuildCatalogPageTreeEntry(fields, childCount)
+                    payload = payload & BuildCatalogPageChildPayload(pageId, rankIndex, hcLevel)
+                    rootCount = rootCount + 1
+                End If
+            End If
+        End If
+    Next rowIndex
+
+BuildFailed:
+    BuildCatalogPageTreePayload = CStr(Proc_3_0_6D2AF0(rootCount, Empty, vbNullString)) & payload
+End Function
+
+Private Function BuildCatalogPageChildPayload(ByVal parentId As Long, ByVal rankIndex As Long, ByVal hcLevel As Long) As String
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim payload As String
+
+    On Error GoTo BuildFailed
+
+    rows = Split(CStr(Proc_5_2_6D4690(BuildCatalogPageTreeQuery(parentId, rankIndex, hcLevel), 0, 0)), Chr$(13))
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(rows(rowIndex)) > 0 Then
+            fields = Split(rows(rowIndex), Chr$(9))
+            If UBound(fields) >= 5 Then
+                If CatalogPageVisible(fields, rankIndex, hcLevel) Then
+                    payload = payload & BuildCatalogPageTreeEntry(fields, 0)
+                End If
+            End If
+        End If
+    Next rowIndex
+
+BuildFailed:
+    BuildCatalogPageChildPayload = payload
+End Function
+
+Private Function BuildCatalogPageTreeEntry(ByRef fields() As String, ByVal childCount As Long) As String
+    Dim pageId As Long
+    Dim colorId As Long
+    Dim iconId As Long
+    Dim pageName As String
+    Dim visibleState As Long
+
+    On Error GoTo BuildFailed
+
+    pageId = CLng(Val(CStr(fields(0))))
+    pageName = CStr(fields(1))
+    colorId = CLng(Val(CStr(fields(2))))
+    iconId = CLng(Val(CStr(fields(3))))
+    visibleState = CLng(Val(CStr(fields(5))))
+
+    BuildCatalogPageTreeEntry = CStr(Proc_1_14_6C9DD0(pageId, colorId, pageName, visibleState, iconId, childCount))
+    Exit Function
+
+BuildFailed:
+    BuildCatalogPageTreeEntry = vbNullString
+End Function
+
+Private Function BuildCatalogPageTreeQuery(ByVal parentId As Long, ByVal rankIndex As Long, ByVal hcLevel As Long) As String
+    Dim queryText As String
+
+    queryText = "SELECT id,name,ctlg_color,ctlg_icon,is_develop,is_visible FROM catalog_pages "
+    queryText = queryText & "WHERE id_parent='" & CStr(parentId) & "' "
+    queryText = queryText & "AND level_minrequired <= '" & CStr(rankIndex) & "' "
+    queryText = queryText & "AND hclevel_minrequired <= '" & CStr(hcLevel) & "' "
+    queryText = queryText & "ORDER BY id_order ASC"
+    BuildCatalogPageTreeQuery = queryText
+End Function
+
+Private Function BuildCatalogPageChildCountQuery(ByVal parentId As Long, ByVal rankIndex As Long, ByVal hcLevel As Long) As String
+    Dim queryText As String
+
+    queryText = "SELECT COUNT(id) FROM catalog_pages WHERE id_parent='" & CStr(parentId) & "' "
+    queryText = queryText & "AND level_minrequired <= '" & CStr(rankIndex) & "' "
+    queryText = queryText & "AND hclevel_minrequired <= '" & CStr(hcLevel) & "'"
+    BuildCatalogPageChildCountQuery = queryText
+End Function
+
+Private Function CatalogPageVisible(ByRef fields() As String, ByVal rankIndex As Long, ByVal hcLevel As Long) As Boolean
+    On Error GoTo VisibilityFailed
+    CatalogPageVisible = (CLng(Val(CStr(fields(5)))) <> 0)
+    If CLng(Val(CStr(fields(4)))) <> 0 Then
+        CatalogPageVisible = CBool(Proc_10_1_809790(rankIndex, vbNullString, "fuse_developer", hcLevel))
+    End If
+    Exit Function
+
+VisibilityFailed:
+    CatalogPageVisible = False
 End Function
 
 Private Function AppendPermissionPayload(ByVal rankIndex As Long, ByVal hcLevel As Long, ByVal permissionName As String, ByVal payload As String) As String
