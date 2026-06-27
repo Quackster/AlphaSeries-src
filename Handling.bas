@@ -8738,7 +8738,67 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_198_7D4B70
 Public Function Proc_6_198_7D4B70(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim userId As String
+    Dim roomId As Long
+    Dim roomSlot As Long
+    Dim targetX As Long
+    Dim targetY As Long
+    Dim currentX As Long
+    Dim currentY As Long
+    Dim movementText As String
+    Dim nextX As Long
+    Dim nextY As Long
+    Dim directionValue As Long
+    Dim movingValue As Long
+    Dim offset As Long
+
+    On Error GoTo WalkRequestDone
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex <= 0 Then GoTo WalkRequestDone
+
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "AO" Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    targetX = ReadWireLong(requestPayload, offset)
+    targetY = ReadWireLong(requestPayload, offset)
+    If targetX = 0 And targetY = 0 Then
+        targetX = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+        targetY = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    End If
+    If targetX < 0 Or targetY < 0 Then GoTo WalkRequestDone
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo WalkRequestDone
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId <= 0 Then GoTo WalkRequestDone
+    If CLng(Val(CStr(Proc_10_25_80F5D0(roomId, targetX, targetY)))) = 0 Then GoTo WalkRequestDone
+
+    roomSlot = socketIndex
+    If Not HandlingRepresentedMovementPosition(roomSlot, socketIndex, currentX, currentY) Then
+        currentX = 0
+        currentY = 0
+    End If
+
+    movementText = CStr(Proc_10_24_80E790(socketIndex, currentX, currentY, targetX, targetY))
+    nextX = HandlingMovementField(movementText, 0)
+    nextY = HandlingMovementField(movementText, 1)
+    directionValue = HandlingMovementField(movementText, 2)
+    movingValue = HandlingMovementField(movementText, 3)
+    If movingValue = 0 And (currentX <> targetX Or currentY <> targetY) Then movingValue = 1
+
+    HandlingRepresentedRoomOccupantMove roomSlot, socketIndex, nextX, nextY, directionValue, movingValue
+    Proc_6_106_74B750 App.Path & "\CACHE\ROOMS\" & CStr(roomId) & ".cache", 0, 0
+
+WalkRequestDone:
     Proc_6_198_7D4B70 = Empty
 End Function
 
@@ -10712,6 +10772,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_193_7D2BB0 socketIndex, "B]", packetPayload
         Case "B^"
             Proc_6_194_7D3180 socketIndex, "B^", packetPayload
+        Case "AO"
+            Proc_6_198_7D4B70 socketIndex, "AO", packetPayload
         Case "n" & Chr$(127)
             Proc_6_177_7C6580 socketIndex, "n" & Chr$(127), packetPayload
         Case "ny"
@@ -12448,6 +12510,121 @@ Private Function RemoveRepresentedCacheRecord(ByVal cacheText As String, ByVal m
 RemoveFallback:
     RemoveRepresentedCacheRecord = Replace(cacheText, markerText, vbNullString, 1, -1, vbBinaryCompare)
 End Function
+
+Private Function HandlingRepresentedRoomRecord(ByVal roomSlot As Long) As String
+    Dim cacheText As String
+    Dim markerText As String
+    Dim startAt As Long
+    Dim endAt As Long
+
+    On Error GoTo LookupFailed
+    cacheText = CStr(global_00829310)
+    markerText = Chr$(1) & CStr(roomSlot) & Chr$(9)
+    startAt = InStr(1, cacheText, markerText, vbBinaryCompare)
+    If startAt = 0 Then
+        markerText = Chr$(1) & CStr(roomSlot) & Chr$(2)
+        startAt = InStr(1, cacheText, markerText, vbBinaryCompare)
+    End If
+    If startAt = 0 Then GoTo LookupFailed
+
+    startAt = startAt + 1
+    endAt = InStr(startAt, cacheText, Chr$(2), vbBinaryCompare)
+    If endAt = 0 Then endAt = Len(cacheText) + 1
+    HandlingRepresentedRoomRecord = Mid$(cacheText, startAt, endAt - startAt)
+    Exit Function
+
+LookupFailed:
+    HandlingRepresentedRoomRecord = vbNullString
+End Function
+
+Private Sub HandlingEnsureFieldCount(ByRef fields() As String, ByVal lastIndex As Long)
+    On Error GoTo EmptyFields
+    If UBound(fields) >= lastIndex Then Exit Sub
+    ReDim Preserve fields(LBound(fields) To lastIndex)
+    Exit Sub
+
+EmptyFields:
+    ReDim fields(0 To lastIndex)
+End Sub
+
+Private Sub HandlingRepresentedRoomRecordSet(ByVal roomSlot As Long, ByVal roomRecord As String)
+    Dim cacheText As String
+
+    If roomSlot <= 0 Then Exit Sub
+
+    cacheText = CStr(global_00829310)
+    cacheText = RemoveRepresentedCacheRecord(cacheText, Chr$(1) & CStr(roomSlot) & Chr$(9))
+    cacheText = RemoveRepresentedCacheRecord(cacheText, Chr$(1) & CStr(roomSlot) & Chr$(2))
+    global_00829310 = cacheText & Chr$(1) & roomRecord & Chr$(2)
+End Sub
+
+Private Function HandlingMovementField(ByVal movementText As String, ByVal fieldIndex As Long) As Long
+    Dim fields() As String
+
+    On Error GoTo LookupFailed
+    fields = Split(movementText, Chr$(0))
+    If fieldIndex <= UBound(fields) Then HandlingMovementField = CLng(Val(CStr(fields(fieldIndex))))
+    Exit Function
+
+LookupFailed:
+    HandlingMovementField = 0
+End Function
+
+Private Function HandlingRepresentedMovementPosition(ByVal roomSlot As Long, ByVal entityIndex As Long, ByRef positionX As Long, ByRef positionY As Long) As Boolean
+    Dim roomRecord As String
+    Dim fields() As String
+    Dim movementRecord As String
+    Dim movementFields() As String
+    Dim parts() As String
+    Dim partIndex As Long
+
+    On Error GoTo LookupFailed
+    roomRecord = HandlingRepresentedRoomRecord(roomSlot)
+    If Len(roomRecord) = 0 Then GoTo LookupFailed
+
+    fields = Split(roomRecord, Chr$(9))
+    If UBound(fields) < 4 Then GoTo LookupFailed
+
+    parts = Split(CStr(fields(4)), Chr$(1))
+    For partIndex = LBound(parts) To UBound(parts)
+        movementRecord = CStr(parts(partIndex))
+        If Len(movementRecord) > 0 Then
+            If Right$(movementRecord, 1) = Chr$(2) Then movementRecord = Left$(movementRecord, Len(movementRecord) - 1)
+            movementFields = Split(movementRecord, Chr$(9))
+            If UBound(movementFields) >= 2 Then
+                If CLng(Val(CStr(movementFields(0)))) = entityIndex Then
+                    positionX = CLng(Val(CStr(movementFields(1))))
+                    positionY = CLng(Val(CStr(movementFields(2))))
+                    HandlingRepresentedMovementPosition = True
+                    Exit Function
+                End If
+            End If
+        End If
+    Next partIndex
+
+LookupFailed:
+    HandlingRepresentedMovementPosition = False
+End Function
+
+Private Sub HandlingRepresentedRoomOccupantMove(ByVal roomSlot As Long, ByVal entityIndex As Long, ByVal positionX As Long, ByVal positionY As Long, ByVal directionValue As Long, ByVal movingValue As Long)
+    Dim roomRecord As String
+    Dim fields() As String
+    Dim movementRecord As String
+
+    If roomSlot <= 0 Or entityIndex <= 0 Then Exit Sub
+
+    roomRecord = HandlingRepresentedRoomRecord(roomSlot)
+    If Len(roomRecord) = 0 Then roomRecord = CStr(roomSlot) & Chr$(9) & vbNullString & Chr$(9) & vbNullString & Chr$(9) & "0"
+
+    fields = Split(roomRecord, Chr$(9))
+    HandlingEnsureFieldCount fields, 4
+
+    movementRecord = CStr(entityIndex) & Chr$(9) & CStr(positionX) & Chr$(9) & CStr(positionY) & Chr$(9) & CStr(directionValue) & Chr$(9) & CStr(movingValue)
+    fields(4) = RemoveRepresentedCacheRecord(CStr(fields(4)), Chr$(1) & CStr(entityIndex) & Chr$(9))
+    fields(4) = CStr(fields(4)) & Chr$(1) & movementRecord & Chr$(2)
+
+    HandlingRepresentedRoomRecordSet roomSlot, Join(fields, Chr$(9))
+End Sub
 
 Private Function HandlingRepresentedFurnitureStateWrite(ByRef args() As Variant) As Variant
     Dim roomId As Long
