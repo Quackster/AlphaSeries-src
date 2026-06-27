@@ -5412,7 +5412,67 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_177_7C6580
 Public Function Proc_6_177_7C6580(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim userId As String
+    Dim productPet As String
+    Dim rankIndex As Long
+    Dim hcLevel As Long
+    Dim rows As Variant
+    Dim fields As Variant
+    Dim rowIndex As Long
+    Dim raceCount As Long
+    Dim racePayload As String
+    Dim payload As String
+    Dim breedId As Long
+    Dim minRank As Long
+    Dim minHcRank As Long
+
+    On Error GoTo RaceListFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "n" & Chr$(127) Then requestPayload = Mid$(requestPayload, 3)
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo RaceListFailed
+
+    productPet = CStr(Proc_10_7_80A190(requestPayload, 0, 0))
+    If Len(productPet) = 0 Then productPet = ReadWireString(requestPayload, 1)
+    If Len(productPet) = 0 Then GoTo RaceListFailed
+
+    rankIndex = HandlingUserRank(userId)
+    hcLevel = HandlingUserHcLevel(userId)
+
+    rows = Split(CStr(Proc_5_2_6D4690("SELECT id_pet,breed,min_rank,min_hcrank,name FROM settings_petraces WHERE product_pet='" & _
+        Proc_10_11_80A9C0(productPet, 0, 0) & "' ORDER BY breed ASC", 0, 0)), Chr$(13))
+
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(CStr(rows(rowIndex))) > 0 Then
+            fields = Split(CStr(rows(rowIndex)), Chr$(9))
+            If UBound(fields) >= 3 Then
+                breedId = CLng(Val(CStr(fields(1))))
+                minRank = CLng(Val(CStr(fields(2))))
+                minHcRank = CLng(Val(CStr(fields(3))))
+                If rankIndex >= minRank And hcLevel >= minHcRank Then
+                    racePayload = racePayload & CStr(Proc_3_0_6D2AF0(breedId, Empty, vbNullString)) & "II"
+                    raceCount = raceCount + 1
+                End If
+            End If
+        End If
+    Next rowIndex
+
+    payload = CStr(Proc_3_0_6D2AF0(raceCount, Empty, "L{" & productPet & Chr$(2))) & racePayload
+    Proc_6_244_801E80 socketIndex, payload, 0
+
+    Proc_6_177_7C6580 = payload
+    Exit Function
+
+RaceListFailed:
     Proc_6_177_7C6580 = Empty
 End Function
 
@@ -6516,6 +6576,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_174_7C3BC0 socketIndex, "@g", packetPayload
         Case "@h"
             Proc_6_171_7C1520 socketIndex, "@h", packetPayload
+        Case "n" & Chr$(127)
+            Proc_6_177_7C6580 socketIndex, "n" & Chr$(127), packetPayload
         Case "nx"
             Proc_6_178_7C6E60 socketIndex, "nx", packetPayload
         Case "E["
