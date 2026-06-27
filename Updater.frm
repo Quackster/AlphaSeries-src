@@ -819,7 +819,40 @@ End Sub
 
 ' Original declaration: Private Sub Form_Load() '822330
 Private Sub Form_Load()
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim sqlText As String
+    Dim sqlLines() As String
+    Dim lineIndex As Long
+
+    On Error GoTo LoadFailed
+
+    If Len(global_00829048) > 0 Then
+        If CLng(Val(CStr(Proc_3_5_6D3880(0, 0, 0)))) <> 1 Then
+            MsgBox "Es kann keine Verbindung zur MySQL Datenbank hergestellt werden.", vbCritical
+            End
+        End If
+
+        sqlText = NormalizedUpdateSql(global_00829048)
+        sqlLines = Split(sqlText, Chr$(10))
+        For lineIndex = LBound(sqlLines) To UBound(sqlLines)
+            If Len(Trim$(sqlLines(lineIndex))) > 5 Then
+                Proc_5_1_6D4110 Trim$(sqlLines(lineIndex)), 0, 0
+            End If
+        Next lineIndex
+    End If
+
+    Height = 1000
+    Image1.Width = 0
+    pendingProgressWidth = 0
+    pendingHeightTarget = 0
+    pendingAnimationInterval = 0
+    currentUpdateIndex = 0
+    Exit Sub
+
+LoadFailed:
+    On Error Resume Next
+    Hide
+    MsgBox "Es ist ein Fehler aufgetreten. Versuche es erneut!", vbCritical
+    End
 End Sub
 
 ' Original declaration: Private Sub Form_Unload(Cancel As Integer) '823170
@@ -924,4 +957,12 @@ Private Function GetUpdaterExecutableName() As String
     Else
         GetUpdaterExecutableName = App.EXEName
     End If
+End Function
+
+Private Function NormalizedUpdateSql(ByVal updateSql As String) As String
+    Dim resultText As String
+
+    resultText = Replace(updateSql, Chr$(13), vbNullString)
+    resultText = Replace(resultText, "INSERT INTO", "INSERT IGNORE INTO", 1, -1, vbTextCompare)
+    NormalizedUpdateSql = resultText
 End Function

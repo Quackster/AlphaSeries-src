@@ -58,6 +58,7 @@ Public global_00829034 As Boolean
 Public global_008290AC As Long
 Public global_00829040 As String
 Public global_00829044 As String
+Public global_00829048 As String
 Public global_00829080 As String
 Public global_00829098 As String
 Public global_0082909C As String
