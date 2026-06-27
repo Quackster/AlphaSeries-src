@@ -5006,7 +5006,69 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_171_7C1520
 Public Function Proc_6_171_7C1520(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim userId As String
+    Dim removeCount As Long
+    Dim removeIndex As Long
+    Dim removedCount As Long
+    Dim targetUserId As Long
+    Dim targetSocketIndex As Integer
+    Dim targetList As String
+    Dim removedIdsPayload As String
+    Dim callerPayload As String
+    Dim offset As Long
+
+    On Error GoTo RemoveFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "@h" Then requestPayload = Mid$(requestPayload, 3)
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo RemoveFailed
+
+    offset = 1
+    removeCount = ReadWireLong(requestPayload, offset)
+    If removeCount <= 0 Then GoTo RemoveFailed
+    If removeCount > 75 Then removeCount = 75
+
+    For removeIndex = 1 To removeCount
+        targetUserId = ReadWireLong(requestPayload, offset)
+        If targetUserId > 0 And CStr(targetUserId) <> userId Then
+            If InStr(1, "," & targetList & ",", "," & CStr(targetUserId) & ",", vbBinaryCompare) = 0 Then
+                If Len(CStr(Proc_5_2_6D4690("SELECT id_user FROM friendships WHERE has_accept='1' AND ((id_friend='" & _
+                    Proc_10_11_80A9C0(CStr(targetUserId), 0, 0) & "' AND id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "') OR (id_user='" & _
+                    Proc_10_11_80A9C0(CStr(targetUserId), 0, 0) & "' AND id_friend='" & Proc_10_11_80A9C0(userId, 0, 0) & "')) LIMIT 1", 0, 0))) > 0 Then
+                    If Len(targetList) > 0 Then targetList = targetList & ","
+                    targetList = targetList & CStr(targetUserId)
+                    removedIdsPayload = removedIdsPayload & CStr(Proc_3_0_6D2AF0(targetUserId, Empty, vbNullString))
+                    removedCount = removedCount + 1
+
+                    targetSocketIndex = HandlingSocketFromUserId(CStr(targetUserId))
+                    If targetSocketIndex > 0 Then
+                        Proc_6_244_801E80 targetSocketIndex, "@MMIM" & userId, 0
+                    End If
+                End If
+            End If
+        End If
+    Next removeIndex
+
+    If Len(targetList) = 0 Then GoTo RemoveFailed
+
+    Proc_5_0_6D3CD0 "DELETE FROM friendships WHERE has_accept='1' AND ((id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_friend IN (" & _
+        targetList & ")) OR (id_friend='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_user IN (" & targetList & "))) LIMIT 150", 0, 0
+
+    callerPayload = CStr(Proc_3_0_6D2AF0(removedCount, Empty, "@MM")) & removedIdsPayload
+    Proc_6_244_801E80 socketIndex, callerPayload, 0
+    Proc_6_171_7C1520 = callerPayload
+    Exit Function
+
+RemoveFailed:
     Proc_6_171_7C1520 = Empty
 End Function
 
@@ -6327,6 +6389,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_172_7C25B0 socketIndex, "@i", packetPayload
         Case "@g"
             Proc_6_174_7C3BC0 socketIndex, "@g", packetPayload
+        Case "@h"
+            Proc_6_171_7C1520 socketIndex, "@h", packetPayload
         Case "E["
             Proc_6_45_714B60 socketIndex, "E[", packetPayload
         Case "A_"
