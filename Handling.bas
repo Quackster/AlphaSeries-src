@@ -360,7 +360,52 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_32_70EAB0
 Public Function Proc_6_32_70EAB0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim descriptionText As String
+    Dim categoryId As Long
+    Dim partnerUserId As Long
+    Dim userId As String
+    Dim roomId As Long
+    Dim lastClosedState As String
+    Dim cfhId As Long
+    Dim offset As Long
+
+    On Error GoTo SubmitFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) >= 3 Then
+        requestPayload = Mid$(packetPayload, 3)
+    ElseIf UBound(args) >= 1 Then
+        requestPayload = CStr(args(1))
+    End If
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo SubmitFailed
+
+    lastClosedState = CStr(Proc_5_2_6D4690("SELECT id_closed FROM staff_cfh WHERE id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND timestamp_sent > UNIX_TIMESTAMP()-600 ORDER BY id DESC LIMIT 1", 0, 0))
+    If Len(lastClosedState) > 0 And CLng(Val(lastClosedState)) = 0 Then GoTo SubmitFailed
+
+    offset = 1
+    descriptionText = CStr(Proc_10_10_80A7F0(ReadWireString(requestPayload, offset), 0, 0))
+    If Len(descriptionText) < 30 Then GoTo SubmitFailed
+
+    categoryId = ReadWireLong(requestPayload, offset)
+    If categoryId <= 0 Then categoryId = ReadWireLong(requestPayload, offset)
+    partnerUserId = ReadWireLong(requestPayload, offset)
+    If partnerUserId = CLng(Val(userId)) Then partnerUserId = 0
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId <= 0 Then GoTo SubmitFailed
+
+    Proc_5_0_6D3CD0 "INSERT INTO staff_cfh(id_user,id_room,id_category,id_partner,description,timestamp_sent) VALUES('" & Proc_10_11_80A9C0(userId, 0, 0) & "','" & CStr(roomId) & "','" & CStr(categoryId) & "','" & CStr(partnerUserId) & "','" & Proc_10_11_80A9C0(descriptionText, 0, 0) & "',UNIX_TIMESTAMP())", 0, 0
+
+    cfhId = CLng(Val(CStr(Proc_5_2_6D4690("SELECT MAX(id) FROM staff_cfh", 0, 0))))
+    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(cfhId, Empty, "EA")), 0
+
+SubmitFailed:
     Proc_6_32_70EAB0 = Empty
 End Function
 
@@ -2640,7 +2685,7 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
         Case "oW"
             Proc_6_18_6E7480 socketIndex, "GY", packetPayload
         Case "GE"
-            Proc_6_32_70EAB0 socketIndex
+            Proc_6_32_70EAB0 socketIndex, "GE", packetPayload
         Case "F`"
             Proc_6_33_70F4F0 socketIndex
         Case "Fa"
@@ -2821,6 +2866,65 @@ Private Function HandlingUserIdFromSocket(ByVal socketIndex As Integer) As Strin
 
 LookupFailed:
     HandlingUserIdFromSocket = vbNullString
+End Function
+
+Private Function HandlingCurrentRoomId(ByVal socketIndex As Integer, ByVal userId As String) As Long
+    Dim roomId As Long
+
+    On Error GoTo LookupFailed
+
+    roomId = CLng(Val(CStr(Proc_9_10_808F30(CStr(socketIndex), 1, 0))))
+    If roomId > 0 Then
+        HandlingCurrentRoomId = roomId
+        Exit Function
+    End If
+
+    roomId = CLng(Val(CStr(Proc_5_2_6D4690("SELECT id_room FROM logs_visitedrooms WHERE id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND timestamp_left IS NULL ORDER BY timestamp_enter DESC LIMIT 1", 0, 0))))
+    If roomId <= 0 Then roomId = CLng(Val(CStr(Proc_5_2_6D4690("SELECT id FROM rooms WHERE id_slot='" & CStr(socketIndex) & "' LIMIT 1", 0, 0))))
+
+    HandlingCurrentRoomId = roomId
+    Exit Function
+
+LookupFailed:
+    HandlingCurrentRoomId = 0
+End Function
+
+Private Function ReadWireString(ByVal packetPayload As String, ByRef offset As Long) As String
+    Dim fieldLength As Long
+
+    On Error GoTo ReadFailed
+    If offset < 1 Then offset = 1
+    If offset + 1 > Len(packetPayload) Then GoTo ReadFailed
+
+    fieldLength = CLng(Proc_3_4_6D3620(Mid$(packetPayload, offset), 0, 0))
+    If fieldLength <= 0 Then GoTo ReadFailed
+
+    ReadWireString = Mid$(packetPayload, offset + 2, fieldLength)
+    offset = offset + 2 + fieldLength
+    Exit Function
+
+ReadFailed:
+    ReadWireString = vbNullString
+End Function
+
+Private Function ReadWireLong(ByVal packetPayload As String, ByRef offset As Long) As Long
+    Dim remainingPayload As String
+    Dim encodedLengthSize As Long
+
+    On Error GoTo ReadFailed
+    If offset < 1 Then offset = 1
+    If offset > Len(packetPayload) Then GoTo ReadFailed
+
+    remainingPayload = Mid$(packetPayload, offset)
+    encodedLengthSize = CLng(Proc_3_2_6D30A0(remainingPayload, 0, 0))
+    If encodedLengthSize <= 0 Then GoTo ReadFailed
+
+    ReadWireLong = CLng(Val(CStr(Proc_3_3_6D3240(remainingPayload, 0, 0))))
+    offset = offset + encodedLengthSize
+    Exit Function
+
+ReadFailed:
+    ReadWireLong = 0
 End Function
 
 Private Function NavigatorListLimit() As Long
