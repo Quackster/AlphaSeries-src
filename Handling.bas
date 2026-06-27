@@ -3590,7 +3590,57 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_92_744870
 Public Function Proc_6_92_744870(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim userId As String
+    Dim targetSocketIndex As Integer
+    Dim targetUserId As String
+    Dim furnitureId As Long
+    Dim rowText As String
+    Dim offset As Long
+    Dim sourcePayload As String
+    Dim targetPayload As String
+
+    On Error GoTo RemoveItemDone
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex <= 0 Then GoTo RemoveItemDone
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "AH" Then requestPayload = Mid$(requestPayload, 3)
+
+    targetSocketIndex = RepresentedInteractionPartner(socketIndex)
+    If targetSocketIndex <= 0 Then GoTo RemoveItemDone
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    targetUserId = HandlingUserIdFromSocket(targetSocketIndex)
+    If Len(userId) = 0 Or userId = "0" Or Len(targetUserId) = 0 Or targetUserId = "0" Then GoTo RemoveItemDone
+
+    furnitureId = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    If furnitureId <= 0 Then
+        offset = 1
+        furnitureId = ReadWireLong(requestPayload, offset)
+    End If
+    If furnitureId <= 0 Then GoTo RemoveItemDone
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT id,id_product,sign FROM furnitures WHERE id='" & CStr(furnitureId) & _
+        "' AND id_owner='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_room IS NULL LIMIT 1", 0, 0))
+    If Len(rowText) = 0 Then GoTo RemoveItemDone
+
+    RemoveRepresentedTradeOffer socketIndex, furnitureId
+
+    sourcePayload = RepresentedTradeOfferPayload(socketIndex, targetSocketIndex, userId, targetUserId)
+    targetPayload = RepresentedTradeOfferPayload(targetSocketIndex, socketIndex, targetUserId, userId)
+    If Len(sourcePayload) > 0 Then Proc_6_244_801E80 socketIndex, sourcePayload, 0
+    If Len(targetPayload) > 0 Then Proc_6_244_801E80 targetSocketIndex, targetPayload, 0
+
+    Proc_6_92_744870 = sourcePayload
+    Exit Function
+
+RemoveItemDone:
     Proc_6_92_744870 = Empty
 End Function
 
@@ -10886,6 +10936,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_96_747000 socketIndex, "AM", packetPayload
         Case "FU"
             Proc_6_91_743480 socketIndex, "FU", packetPayload
+        Case "AH"
+            Proc_6_92_744870 socketIndex, "AH", packetPayload
         Case "EV"
             Proc_6_100_748C80 socketIndex, "EV", packetPayload
         Case "EU"
@@ -11801,6 +11853,7 @@ Private Sub RemoveRepresentedInteractionPair(ByVal socketIndex As Integer)
     Next rowIndex
 
     representedInteractionPairs = rebuiltText
+    RemoveRepresentedTradeOffer socketIndex, 0
 
 RemoveDone:
 End Sub
@@ -11892,6 +11945,37 @@ Private Sub StoreRepresentedTradeOffer(ByVal socketIndex As Integer, ByVal furni
         rebuiltText = rebuiltText & rowText
     End If
     representedTradeOffers = rebuiltText
+End Sub
+
+Private Sub RemoveRepresentedTradeOffer(ByVal socketIndex As Integer, ByVal furnitureId As Long)
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim rebuiltText As String
+    Dim rowSocketIndex As Integer
+    Dim rowFurnitureId As Long
+
+    On Error GoTo RemoveDone
+    If socketIndex <= 0 Or Len(representedTradeOffers) = 0 Then GoTo RemoveDone
+
+    rows = Split(representedTradeOffers, Chr$(13))
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(rows(rowIndex)) > 0 Then
+            fields = Split(CStr(rows(rowIndex)), Chr$(9))
+            If UBound(fields) >= 1 Then
+                rowSocketIndex = CInt(Val(CStr(fields(0))))
+                rowFurnitureId = CLng(Val(CStr(fields(1))))
+                If rowSocketIndex <> socketIndex Or (furnitureId > 0 And rowFurnitureId <> furnitureId) Then
+                    If Len(rebuiltText) > 0 Then rebuiltText = rebuiltText & Chr$(13)
+                    rebuiltText = rebuiltText & CStr(rows(rowIndex))
+                End If
+            End If
+        End If
+    Next rowIndex
+
+    representedTradeOffers = rebuiltText
+
+RemoveDone:
 End Sub
 
 Private Function RepresentedTradeOfferItemPayload(ByVal socketIndex As Integer, ByRef itemCount As Long) As String
