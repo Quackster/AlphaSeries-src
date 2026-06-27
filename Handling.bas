@@ -4134,7 +4134,35 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_143_76BB80
 Public Function Proc_6_143_76BB80(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim rowText As String
+    Dim fields() As String
+    Dim pointType As Long
+    Dim pointValue As Long
+    Dim itemCount As Long
+    Dim itemPayload As String
+
+    On Error GoTo BalanceFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Then GoTo BalanceFailed
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT activitypoints_1,activitypoints_2,activitypoints_3,activitypoints_4 FROM users WHERE id='" & Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 1", 0, 0))
+    If Len(rowText) = 0 Then GoTo BalanceFailed
+
+    fields = Split(rowText, Chr$(9))
+    For pointType = 1 To 4
+        pointValue = CLng(Val(NavigatorField(fields, pointType - 1)))
+        itemPayload = itemPayload & CStr(Proc_3_0_6D2AF0(pointType, Empty, vbNullString))
+        itemPayload = itemPayload & CStr(Proc_3_0_6D2AF0(pointValue, Empty, vbNullString))
+        itemCount = itemCount + 1
+    Next pointType
+
+    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(itemCount, Empty, "M@")) & itemPayload, 0
+
+BalanceFailed:
     Proc_6_143_76BB80 = Empty
 End Function
 
