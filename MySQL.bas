@@ -43,7 +43,50 @@ End Function
 
 ' Original declaration: Private Sub Proc_5_4_6D55E0
 Public Function Proc_5_4_6D55E0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim userId As String
+    Dim cfhId As Long
+    Dim cfhRow As String
+    Dim cfhFields() As String
+    Dim chatRows As String
+    Dim payload As String
+
+    On Error GoTo CfhLogFailed
+
+    socketIndex = MySqlSocketIndex(args)
+    packetPayload = MySqlPacketPayload(args)
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "GI" Then requestPayload = Mid$(requestPayload, 3)
+
+    userId = MySqlUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo CfhLogFailed
+    If Not MySqlUserHasPermission(userId, "fuse_mod") Then GoTo CfhLogFailed
+    If Not MySqlUserHasPermission(userId, "fuse_receive_calls_for_help") Then GoTo CfhLogFailed
+
+    cfhId = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    If cfhId <= 0 Then GoTo CfhLogFailed
+
+    cfhRow = CStr(Proc_5_2_6D4690("SELECT rooms.id,rooms.name,models.type,staff_cfh.id_user,staff_cfh.id_partner,staff_cfh.timestamp_sent FROM rooms,models,staff_cfh WHERE staff_cfh.id='" & _
+        CStr(cfhId) & "' AND rooms.id=staff_cfh.id_room AND models.id=rooms.id_model LIMIT 1", 0, 0))
+    If Len(cfhRow) = 0 Then GoTo CfhLogFailed
+
+    cfhFields = Split(cfhRow, Chr$(9))
+    If UBound(cfhFields) < 5 Then GoTo CfhLogFailed
+
+    chatRows = CStr(Proc_5_2_6D4690("SELECT DATE_FORMAT(FROM_UNIXTIME(logs_chat.timestamp), '" & Chr$(37) & _
+        "H'),DATE_FORMAT(FROM_UNIXTIME(logs_chat.timestamp), '" & Chr$(37) & _
+        "i'),users.id,users.name,logs_chat.description FROM logs_chat,rooms,users WHERE logs_chat.id_room='" & _
+        CStr(CLng(Val(CStr(cfhFields(0))))) & "' AND logs_chat.timestamp < " & _
+        CStr(CLng(Val(CStr(cfhFields(5))))) & " AND logs_chat.timestamp > " & _
+        CStr(CLng(Val(CStr(cfhFields(5)))) - 600) & " AND users.id=logs_chat.id_user " & _
+        "GROUP BY logs_chat.id ORDER BY logs_chat.id DESC LIMIT 100", 0, 0))
+
+    payload = "HV" & MySqlCallForHelpChatLogPayload(cfhId, cfhFields, chatRows)
+    Proc_6_244_801E80 socketIndex, payload, 0
+
+CfhLogFailed:
     Proc_5_4_6D55E0 = Empty
 End Function
 
@@ -337,6 +380,36 @@ Private Function MySqlRoomInfoPayload(ByRef roomFields() As String, ByRef eventF
 
 BuildFailed:
     MySqlRoomInfoPayload = payload
+End Function
+
+Private Function MySqlCallForHelpChatLogPayload(ByVal cfhId As Long, ByRef cfhFields() As String, ByVal chatRows As String) As String
+    Dim payload As String
+    Dim roomId As Long
+    Dim modelType As Long
+    Dim callerUserId As Long
+    Dim partnerUserId As Long
+
+    On Error GoTo BuildFailed
+    If UBound(cfhFields) < 5 Then GoTo BuildFailed
+
+    roomId = CLng(Val(CStr(cfhFields(0))))
+    modelType = CLng(Val(CStr(cfhFields(2))))
+    callerUserId = CLng(Val(CStr(cfhFields(3))))
+    partnerUserId = CLng(Val(CStr(cfhFields(4))))
+
+    payload = CStr(Proc_3_0_6D2AF0(cfhId, Empty, vbNullString))
+    payload = payload & CStr(Proc_3_0_6D2AF0(roomId, Empty, vbNullString))
+    payload = payload & CStr(Proc_3_0_6D2AF0(modelType, Empty, vbNullString))
+    payload = payload & CStr(Proc_3_0_6D2AF0(callerUserId, Empty, vbNullString))
+    payload = payload & CStr(Proc_3_0_6D2AF0(partnerUserId, Empty, vbNullString))
+    payload = payload & CStr(cfhFields(1)) & Chr$(2)
+    payload = payload & MySqlRoomChatLogRows(chatRows)
+
+    MySqlCallForHelpChatLogPayload = payload
+    Exit Function
+
+BuildFailed:
+    MySqlCallForHelpChatLogPayload = payload
 End Function
 
 Private Function IsIgnorableSqlArg(ByVal value As String) As Boolean

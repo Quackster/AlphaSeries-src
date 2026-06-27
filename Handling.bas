@@ -3257,6 +3257,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_109_74DBD0 socketIndex, "@T", packetPayload
         Case "BW"
             Proc_6_111_74DF70 socketIndex, "BW", packetPayload
+        Case "GI"
+            Proc_5_4_6D55E0 socketIndex, "GI", packetPayload
         Case "GH"
             Proc_5_5_6D64D0 socketIndex, "GH", packetPayload
         Case "GK"
