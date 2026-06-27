@@ -1120,7 +1120,18 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_126_755B40
 Public Function Proc_6_126_755B40(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim limitValue As Long
+    Dim queryTail As String
+
+    On Error GoTo NavigatorFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    limitValue = NavigatorListLimit()
+    queryTail = "users,rooms,rooms_categories WHERE rooms.rate > 0 AND users.id=rooms.id_owner AND rooms_categories.id=rooms.id_category GROUP BY rooms.id ORDER BY rooms.rate DESC LIMIT " & CStr(limitValue)
+    Proc_6_244_801E80 socketIndex, "GC" & Chr$(8) & Chr$(2) & CStr(Proc_3_0_6D2AF0(limitValue, Empty, vbNullString)) & Proc_6_112_74E0C0(queryTail, 0, 0), 0
+
+NavigatorFailed:
     Proc_6_126_755B40 = Empty
 End Function
 
@@ -2299,6 +2310,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_118_751A80 socketIndex, "Fp", packetPayload
         Case "Fs"
             Proc_6_119_751C80 socketIndex, "Fs", packetPayload
+        Case "Fo"
+            Proc_6_126_755B40 socketIndex, "Fo", packetPayload
         Case "Ft"
             Proc_6_120_751E80 socketIndex, "Ft", packetPayload
         Case "E|"
