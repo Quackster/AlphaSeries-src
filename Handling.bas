@@ -3569,7 +3569,108 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_81_730010
 Public Function Proc_6_81_730010(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim roomId As Long
+    Dim roomSlot As Long
+    Dim rowText As String
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim occupantPayload As String
+    Dim statusPayload As String
+    Dim occupantCount As Long
+    Dim statusCount As Long
+    Dim roomUserIndex As Long
+    Dim occupantUserId As Long
+    Dim userName As String
+    Dim figureText As String
+    Dim mottoText As String
+    Dim genderText As String
+    Dim positionX As Long
+    Dim positionY As Long
+    Dim positionZ As String
+    Dim directionValue As Long
+    Dim botEntities As String
+    Dim botRows() As String
+    Dim botEntityId As Long
+    Dim botName As String
+    Dim botFigure As String
+    Dim botRowPayload As String
+
+    On Error GoTo UserListDone
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 1 Then roomId = CLng(Val(CStr(args(1))))
+    If roomId <= 0 And socketIndex > 0 Then
+        userId = HandlingUserIdFromSocket(socketIndex)
+        If Len(userId) > 0 And userId <> "0" Then roomId = HandlingCurrentRoomId(socketIndex, userId)
+    End If
+    If socketIndex <= 0 Or roomId <= 0 Then GoTo UserListDone
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT rooms.id_slot FROM rooms WHERE rooms.id='" & CStr(roomId) & "' LIMIT 1", 0, 0))
+    roomSlot = CLng(Val(rowText))
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT logs_visitedrooms.id,users.id,users.name,users.figure,users.motto,users.gender,models.position_x,models.position_y,users.id_socket FROM logs_visitedrooms,users,rooms,models WHERE logs_visitedrooms.id_room='" & CStr(roomId) & "' AND logs_visitedrooms.timestamp_left IS NULL AND users.id=logs_visitedrooms.id_user AND rooms.id=logs_visitedrooms.id_room AND models.id=rooms.id_model ORDER BY logs_visitedrooms.timestamp_enter ASC LIMIT 250", 0, 0))
+    If Len(rowText) > 0 Then
+        rows = Split(rowText, Chr$(13))
+        For rowIndex = LBound(rows) To UBound(rows)
+            If Len(Trim$(CStr(rows(rowIndex)))) > 0 Then
+                fields = Split(CStr(rows(rowIndex)), Chr$(9))
+                roomUserIndex = CLng(Val(HandlingField(fields, 0)))
+                occupantUserId = CLng(Val(HandlingField(fields, 1)))
+                userName = HandlingField(fields, 2)
+                figureText = HandlingField(fields, 3)
+                mottoText = HandlingField(fields, 4)
+                genderText = UCase$(Left$(HandlingField(fields, 5), 1))
+                If genderText <> "M" And genderText <> "F" Then genderText = "M"
+                positionX = CLng(Val(HandlingField(fields, 6)))
+                positionY = CLng(Val(HandlingField(fields, 7)))
+                positionZ = "0.0"
+                directionValue = 0
+                If roomSlot > 0 Then
+                    If HandlingRepresentedMovementPosition(roomSlot, roomUserIndex, positionX, positionY) Then directionValue = 0
+                End If
+
+                occupantPayload = occupantPayload & CStr(Proc_6_41_712730(occupantUserId, userName, figureText, mottoText, genderText, roomUserIndex, positionX, positionY, positionZ, 0, 0))
+                statusPayload = statusPayload & CStr(Proc_3_0_6D2AF0(roomUserIndex, Empty, vbNullString)) & " " & CStr(positionX) & " " & CStr(positionY) & " " & positionZ & " " & CStr(directionValue) & " " & CStr(directionValue) & "/" & Chr$(13)
+                occupantCount = occupantCount + 1
+                statusCount = statusCount + 1
+            End If
+        Next rowIndex
+    End If
+
+    If roomSlot > 0 Then
+        botEntities = RepresentedBotEntitiesForRoom(roomSlot, 0)
+        If Len(botEntities) > 0 Then
+            botRows = Split(botEntities, Chr$(13))
+            For rowIndex = LBound(botRows) To UBound(botRows)
+                botEntityId = CLng(Val(CStr(botRows(rowIndex))))
+                If botEntityId > 0 Then
+                    botName = RepresentedBotRecordField(botEntityId, 2)
+                    botFigure = RepresentedBotRecordField(botEntityId, 10)
+                    positionX = RepresentedBotRecordLong(botEntityId, 6)
+                    positionY = RepresentedBotRecordLong(botEntityId, 7)
+                    positionZ = RepresentedBotRecordField(botEntityId, 8)
+                    directionValue = RepresentedBotRecordLong(botEntityId, 9)
+                    If Len(positionZ) = 0 Then positionZ = "0.0"
+
+                    botRowPayload = CStr(Proc_6_42_712FB0(botEntityId, botName, botFigure, "M", botEntityId, positionX, positionY, positionZ, 2))
+                    If Len(botRowPayload) > 0 Then
+                        occupantPayload = occupantPayload & botRowPayload
+                        statusPayload = statusPayload & CStr(Proc_3_0_6D2AF0(botEntityId, Empty, vbNullString)) & " " & CStr(positionX) & " " & CStr(positionY) & " " & positionZ & " " & CStr(directionValue) & " " & CStr(directionValue) & "/" & Chr$(13)
+                        occupantCount = occupantCount + 1
+                        statusCount = statusCount + 1
+                    End If
+                End If
+            Next rowIndex
+        End If
+    End If
+
+    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(occupantCount, Empty, "@\")) & occupantPayload, -1
+    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(statusCount, Empty, "Du")) & statusPayload, 0
+
+UserListDone:
     Proc_6_81_730010 = Empty
 End Function
 
