@@ -1006,14 +1006,12 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_61_720490
 Public Function Proc_6_61_720490(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_61_720490 = Empty
+    Proc_6_61_720490 = RoomKickOrBanUser(args, False)
 End Function
 
 ' Original declaration: Private Sub Proc_6_62_7209F0
 Public Function Proc_6_62_7209F0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_62_7209F0 = Empty
+    Proc_6_62_7209F0 = RoomKickOrBanUser(args, True)
 End Function
 
 ' Original declaration: Private Sub Proc_6_63_721050
@@ -2992,6 +2990,10 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_46_714D50 socketIndex, "EY", packetPayload
         Case "E["
             Proc_6_45_714B60 socketIndex, "E[", packetPayload
+        Case "A_"
+            Proc_6_61_720490 socketIndex, "A_", packetPayload
+        Case "E@"
+            Proc_6_62_7209F0 socketIndex, "E@", packetPayload
         Case "FA"
             Proc_6_60_720060 socketIndex, "FA", packetPayload
         Case "oL", "CD"
@@ -3116,6 +3118,56 @@ LookupFailed:
     HandlingUserIdFromSocket = vbNullString
 End Function
 
+Private Function RoomKickOrBanUser(ByRef args() As Variant, ByVal addRoomBan As Boolean) As Variant
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim callerUserId As String
+    Dim targetUserId As String
+    Dim callerRoomId As Long
+    Dim targetRoomId As Long
+    Dim targetSocketIndex As Integer
+    Dim offset As Long
+
+    On Error GoTo KickFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "A_" Or Left$(requestPayload, 2) = "E@" Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    targetUserId = CStr(ReadWireLong(requestPayload, offset))
+    If Len(targetUserId) = 0 Or targetUserId = "0" Then GoTo KickFailed
+
+    callerUserId = HandlingUserIdFromSocket(socketIndex)
+    If Len(callerUserId) = 0 Or callerUserId = "0" Then GoTo KickFailed
+
+    callerRoomId = HandlingCurrentRoomId(socketIndex, callerUserId)
+    If callerRoomId <= 0 Then GoTo KickFailed
+
+    targetSocketIndex = HandlingSocketFromUserId(targetUserId)
+    If targetSocketIndex <= 0 Then GoTo KickFailed
+
+    targetRoomId = HandlingCurrentRoomId(targetSocketIndex, targetUserId)
+    If targetRoomId <> callerRoomId Then GoTo KickFailed
+
+    If Not HandlingUserHasPermission(callerUserId, "fuse_kick") Then GoTo KickFailed
+    If HandlingUserHasPermission(targetUserId, "fuse_unkickable") Then GoTo KickFailed
+
+    Proc_6_244_801E80 targetSocketIndex, "@a" & "XjO", 0
+    Proc_6_53_718E00 targetSocketIndex, "@a" & "XjO", 0
+
+    If addRoomBan Then
+        Proc_5_0_6D3CD0 "INSERT IGNORE INTO rooms_bans(id_room,id_user,timestamp_expire) VALUES('" & CStr(callerRoomId) & "','" & Proc_10_11_80A9C0(targetUserId, 0, 0) & "',UNIX_TIMESTAMP()+900)", 0, 0
+    End If
+
+KickFailed:
+    RoomKickOrBanUser = Empty
+End Function
+
 Private Function HandlingCurrentRoomId(ByVal socketIndex As Integer, ByVal userId As String) As Long
     Dim roomId As Long
 
@@ -3135,6 +3187,23 @@ Private Function HandlingCurrentRoomId(ByVal socketIndex As Integer, ByVal userI
 
 LookupFailed:
     HandlingCurrentRoomId = 0
+End Function
+
+Private Function HandlingSocketFromUserId(ByVal userId As String) As Integer
+    Dim socketIndex As Integer
+
+    On Error GoTo LookupFailed
+
+    socketIndex = CInt(Val(CStr(Proc_9_8_8086A0(userId, 0, 0))))
+    If socketIndex <= 0 Then
+        socketIndex = CInt(Val(CStr(Proc_5_2_6D4690("SELECT id_socket FROM users WHERE id='" & Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 1", 0, 0))))
+    End If
+
+    HandlingSocketFromUserId = socketIndex
+    Exit Function
+
+LookupFailed:
+    HandlingSocketFromUserId = 0
 End Function
 
 Private Function HandlingUserRank(ByVal userId As String) As Long
@@ -3157,6 +3226,21 @@ Private Function HandlingUserHcLevel(ByVal userId As String) As Long
 
 LookupFailed:
     HandlingUserHcLevel = 0
+End Function
+
+Private Function HandlingUserHasPermission(ByVal userId As String, ByVal permissionName As String) As Boolean
+    Dim rankIndex As Long
+    Dim hcLevel As Long
+
+    On Error GoTo CheckFailed
+
+    rankIndex = HandlingUserRank(userId)
+    hcLevel = HandlingUserHcLevel(userId)
+    HandlingUserHasPermission = CBool(Proc_10_1_809790(rankIndex, vbNullString, permissionName, hcLevel))
+    Exit Function
+
+CheckFailed:
+    HandlingUserHasPermission = False
 End Function
 
 Private Function StaffModerationPayload(ByVal rankIndex As Long, ByVal hcLevel As Long) As String
