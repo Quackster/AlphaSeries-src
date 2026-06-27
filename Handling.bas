@@ -852,7 +852,27 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_20_6E88E0
 Public Function Proc_6_20_6E88E0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim rankIndex As Long
+    Dim staffFlag As Long
+    Dim payload As String
+
+    On Error GoTo StaffClientFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo StaffClientFailed
+
+    rankIndex = HandlingUserRank(userId)
+    If HandlingUserHasPermission(userId, "fuse_client_staff") Then staffFlag = 1
+
+    payload = CStr(Proc_3_0_6D2AF0(rankIndex, Empty, "@B"))
+    payload = payload & CStr(Proc_3_0_6D2AF0(rankIndex, Empty, vbNullString))
+    payload = "0" & CStr(Proc_3_0_6D2AF0(staffFlag, Empty, payload))
+    Proc_6_244_801E80 socketIndex, payload, 0
+
+StaffClientFailed:
     Proc_6_20_6E88E0 = Empty
 End Function
 
