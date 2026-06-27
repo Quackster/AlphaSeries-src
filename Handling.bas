@@ -600,13 +600,73 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_13_6E0A80
 Public Function Proc_6_13_6E0A80(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim roomId As Long
+    Dim roomUserIndex As Long
+    Dim payload As String
+
+    On Error GoTo WaveFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo WaveFailed
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId <= 0 Then GoTo WaveFailed
+
+    roomUserIndex = RepresentedRoomUserIndex(socketIndex, userId)
+    payload = CStr(Proc_3_0_6D2AF0(roomUserIndex, Empty, "Ga"))
+    Proc_6_247_8027E0 socketIndex, payload, 0
+    Proc_6_13_6E0A80 = roomUserIndex
+    Exit Function
+
+WaveFailed:
     Proc_6_13_6E0A80 = Empty
 End Function
 
 ' Original declaration: Private Sub Proc_6_14_6E10C0
 Public Function Proc_6_14_6E10C0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim roomId As Long
+    Dim roomUserIndex As Long
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim danceId As Long
+    Dim offset As Long
+    Dim payload As String
+
+    On Error GoTo DanceFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "A]" Then requestPayload = Mid$(requestPayload, 3)
+
+    danceId = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    If danceId <= 0 Then
+        offset = 1
+        danceId = ReadWireLong(requestPayload, offset)
+    End If
+    If danceId < 0 Then danceId = 0
+    If danceId > 4 Then danceId = 4
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo DanceFailed
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId <= 0 Then GoTo DanceFailed
+
+    roomUserIndex = RepresentedRoomUserIndex(socketIndex, userId)
+    payload = CStr(Proc_3_0_6D2AF0(danceId, Empty, CStr(Proc_3_0_6D2AF0(roomUserIndex, Empty, "G`"))))
+    Proc_6_247_8027E0 socketIndex, payload, 0
+    Proc_6_14_6E10C0 = danceId
+    Exit Function
+
+DanceFailed:
     Proc_6_14_6E10C0 = Empty
 End Function
 
@@ -4688,6 +4748,10 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_19_6E8040 socketIndex, global_0082912C, "Gz"
         Case "oW"
             Proc_6_18_6E7480 socketIndex, "GY", packetPayload
+        Case "A^"
+            Proc_6_13_6E0A80 socketIndex, "A^", packetPayload
+        Case "A]"
+            Proc_6_14_6E10C0 socketIndex, "A]", packetPayload
         Case "GE"
             Proc_6_32_70EAB0 socketIndex, "GE", packetPayload
         Case "F`"
@@ -5078,6 +5142,21 @@ Private Function HandlingCurrentRoomId(ByVal socketIndex As Integer, ByVal userI
 
 LookupFailed:
     HandlingCurrentRoomId = 0
+End Function
+
+Private Function RepresentedRoomUserIndex(ByVal socketIndex As Integer, ByVal userId As String) As Long
+    Dim roomUserIndex As Long
+
+    On Error GoTo LookupFailed
+
+    roomUserIndex = CLng(Val(CStr(Proc_5_2_6D4690("SELECT id FROM logs_visitedrooms WHERE id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_socket='" & CStr(socketIndex) & "' AND timestamp_left IS NULL ORDER BY timestamp_enter DESC LIMIT 1", 0, 0))))
+    If roomUserIndex <= 0 Then roomUserIndex = CLng(socketIndex)
+
+    RepresentedRoomUserIndex = roomUserIndex
+    Exit Function
+
+LookupFailed:
+    RepresentedRoomUserIndex = CLng(socketIndex)
 End Function
 
 Private Function HandlingSocketFromUserId(ByVal userId As String) As Integer
