@@ -528,7 +528,40 @@ End Function
 
 ' Original declaration: Private Sub Proc_1_15_6CA000
 Public Function Proc_1_15_6CA000(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim maxPageId As Long
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim pageId As Long
+    Dim pageQuery As String
+
+    On Error GoTo BuildFailed
+
+    maxPageId = CLng(Val(CStr(Proc_5_2_6D4690("SELECT MAX(id) FROM catalog_pages", 0, 0))))
+    ReDim global_00829308(0 To maxPageId)
+
+    pageQuery = "SELECT id,name,level_minrequired,hclevel_minrequired,is_clickable,ctlg_template,"
+    pageQuery = pageQuery & "ctlg_header_img,ctlg_special_img,ctlg_special_template,ctlg_txt1,ctlg_txt2,"
+    pageQuery = pageQuery & "ctlg_txt3,ctlg_txt4,ctlg_txt5,ctlg_txt6,ctlg_txt7,ctlg_txt8,ctlg_txt9,"
+    pageQuery = pageQuery & "ctlg_txt10,ctlg_txt11,ctlg_link,is_develop FROM catalog_pages ORDER BY id_order ASC"
+
+    rows = Split(CStr(Proc_5_2_6D4690(pageQuery, 0, 0)), Chr$(13))
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(rows(rowIndex)) > 0 Then
+            fields = Split(rows(rowIndex), Chr$(9))
+            If UBound(fields) >= 21 Then
+                pageId = CLng(Val(CStr(fields(0))))
+                If pageId >= LBound(global_00829308) And pageId <= UBound(global_00829308) Then
+                    global_00829308(pageId) = BuildCatalogPagePayload(fields)
+                End If
+            End If
+        End If
+    Next rowIndex
+
+    Proc_1_15_6CA000 = Empty
+    Exit Function
+
+BuildFailed:
     Proc_1_15_6CA000 = Empty
 End Function
 
@@ -1061,6 +1094,132 @@ Private Function BuildCatalogPageTreePayload(ByVal rankIndex As Long, ByVal hcLe
 
 BuildFailed:
     BuildCatalogPageTreePayload = CStr(Proc_3_0_6D2AF0(rootCount, Empty, vbNullString)) & payload
+End Function
+
+Private Function BuildCatalogPagePayload(ByRef fields() As String) As String
+    Dim pageId As Long
+    Dim textIndex As Long
+    Dim textCount As Long
+    Dim textPayload As String
+    Dim linkPayload As String
+    Dim payload As String
+
+    On Error GoTo BuildFailed
+
+    pageId = CLng(Val(CStr(fields(0))))
+
+    payload = CStr(fields(1)) & Chr$(2)
+    payload = payload & CStr(Proc_3_0_6D2AF0(CLng(Val(CStr(fields(4)))), Empty, vbNullString))
+    payload = payload & CStr(fields(5)) & Chr$(2)
+    payload = payload & CStr(fields(6)) & Chr$(2)
+    payload = payload & CStr(fields(7)) & Chr$(2)
+    payload = payload & CStr(fields(8)) & Chr$(2)
+
+    For textIndex = 9 To 19
+        If CatalogTextFieldPresent(CStr(fields(textIndex))) Then
+            textCount = textCount + 1
+            textPayload = textPayload & CStr(fields(textIndex)) & Chr$(2)
+        End If
+    Next textIndex
+    payload = payload & CStr(Proc_3_0_6D2AF0(textCount, Empty, vbNullString)) & textPayload
+
+    If CatalogTextFieldPresent(CStr(fields(20))) Then
+        linkPayload = CStr(fields(20)) & Chr$(2)
+        payload = payload & CStr(Proc_3_0_6D2AF0(1, Empty, vbNullString)) & linkPayload
+    Else
+        payload = payload & CStr(Proc_3_0_6D2AF0(0, Empty, vbNullString))
+    End If
+
+    BuildCatalogPagePayload = payload & BuildCatalogProductPayload(pageId)
+    Exit Function
+
+BuildFailed:
+    BuildCatalogPagePayload = vbNullString
+End Function
+
+Private Function BuildCatalogProductPayload(ByVal pageId As Long) As String
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim productCount As Long
+    Dim productPayload As String
+
+    On Error GoTo BuildFailed
+
+    rows = Split(CStr(Proc_5_2_6D4690(BuildCatalogProductQuery(pageId), 0, 0)), Chr$(13))
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(rows(rowIndex)) > 0 Then
+            fields = Split(rows(rowIndex), Chr$(9))
+            If UBound(fields) >= 9 Then
+                productPayload = productPayload & BuildCatalogProductEntry(fields)
+                productCount = productCount + 1
+            End If
+        End If
+    Next rowIndex
+
+BuildFailed:
+    BuildCatalogProductPayload = CStr(Proc_3_0_6D2AF0(productCount, Empty, vbNullString)) & productPayload
+End Function
+
+Private Function BuildCatalogProductEntry(ByRef fields() As String) As String
+    Dim catalogProductId As Long
+    Dim productId As Long
+    Dim productType As Long
+    Dim productClass As String
+    Dim amountValue As Long
+    Dim payload As String
+
+    On Error GoTo BuildFailed
+
+    catalogProductId = CLng(Val(CStr(fields(0))))
+    productId = CLng(Val(CStr(fields(1))))
+    productType = CLng(Val(CStr(Proc_9_0_806F70(productId, 1, 0))))
+    productClass = CatalogProductClass(productType)
+    amountValue = CLng(Val(CStr(fields(6))))
+    If amountValue <= 0 Then amountValue = 1
+
+    payload = CStr(Proc_3_0_6D2AF0(catalogProductId, Empty, vbNullString))
+    payload = payload & CStr(fields(4)) & Chr$(2)
+    payload = payload & CStr(Proc_3_0_6D2AF0(productId, Empty, vbNullString))
+    payload = payload & productClass & Chr$(2)
+    payload = payload & CStr(Proc_3_0_6D2AF0(CLng(Val(CStr(fields(2)))), Empty, vbNullString))
+    payload = payload & CStr(Proc_3_0_6D2AF0(CLng(Val(CStr(fields(3)))), Empty, vbNullString))
+    payload = payload & CStr(Proc_3_0_6D2AF0(CLng(Val(CStr(fields(5)))), Empty, vbNullString))
+    payload = payload & CStr(Proc_3_0_6D2AF0(amountValue, Empty, vbNullString))
+    payload = payload & CStr(fields(7)) & Chr$(2)
+    payload = payload & CStr(Proc_3_0_6D2AF0(CLng(Val(CStr(fields(8)))), Empty, vbNullString))
+    payload = payload & CStr(Proc_3_0_6D2AF0(CLng(Val(CStr(fields(9)))), Empty, vbNullString))
+
+    BuildCatalogProductEntry = payload
+    Exit Function
+
+BuildFailed:
+    BuildCatalogProductEntry = vbNullString
+End Function
+
+Private Function BuildCatalogProductQuery(ByVal pageId As Long) As String
+    Dim queryText As String
+
+    queryText = "SELECT id,id_product,price_credits,price_activitypoints,sprite,type_activitypoints,"
+    queryText = queryText & "amount,type_secondary,replace_defaultsign,min_hc_level_required "
+    queryText = queryText & "FROM catalog_products WHERE ctlg_pageid='" & CStr(pageId) & "' "
+    queryText = queryText & "ORDER BY id_order,sprite ASC"
+    BuildCatalogProductQuery = queryText
+End Function
+
+Private Function CatalogTextFieldPresent(ByVal fieldValue As String) As Boolean
+    CatalogTextFieldPresent = (Len(fieldValue) > 0 And StrComp(fieldValue, "NULL", vbTextCompare) <> 0)
+End Function
+
+Private Function CatalogProductClass(ByVal productType As Long) As String
+    Select Case productType
+        Case 9
+            CatalogProductClass = "i"
+        Case 0, 1
+            CatalogProductClass = "s"
+        Case Else
+            CatalogProductClass = "s"
+    End Select
 End Function
 
 Private Function BuildCatalogPageChildPayload(ByVal parentId As Long, ByVal rankIndex As Long, ByVal hcLevel As Long) As String
