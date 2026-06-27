@@ -2585,8 +2585,61 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_101_749540
 Public Function Proc_6_101_749540(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_101_749540 = Empty
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim effectId As Long
+    Dim rentSeconds As Long
+    Dim effectCount As Long
+    Dim expireTimestamp As Long
+    Dim currentTimestamp As Long
+    Dim remainingSeconds As Long
+    Dim listedEffects As Long
+    Dim payload As String
+
+    On Error GoTo ListDone
+
+    socketIndex = HandlingSocketIndex(args)
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo ListDone
+
+    rows = Split(CStr(Proc_5_2_6D4690("SELECT id_effect,time_rent,COUNT(id_effect),timestamp_expire,UNIX_TIMESTAMP() FROM users_effects WHERE id_user='" & _
+        Proc_10_11_80A9C0(userId, 0, 0) & "' GROUP BY users_effects.id_effect LIMIT 50", 0, 0)), Chr$(13))
+
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(rows(rowIndex)) > 0 Then
+            fields = Split(rows(rowIndex), Chr$(9))
+            If UBound(fields) >= 4 Then
+                effectId = CLng(Val(HandlingField(fields, 0)))
+                rentSeconds = CLng(Val(HandlingField(fields, 1)))
+                effectCount = CLng(Val(HandlingField(fields, 2)))
+                expireTimestamp = CLng(Val(HandlingField(fields, 3)))
+                currentTimestamp = CLng(Val(HandlingField(fields, 4)))
+
+                If effectId > 0 Then
+                    payload = payload & CStr(Proc_3_0_6D2AF0(effectId, Empty, vbNullString))
+                    payload = payload & CStr(Proc_3_0_6D2AF0(rentSeconds, Empty, vbNullString))
+                    payload = payload & CStr(Proc_3_0_6D2AF0(effectCount, Empty, vbNullString))
+
+                    remainingSeconds = expireTimestamp - currentTimestamp
+                    If expireTimestamp > 0 And remainingSeconds > 0 Then
+                        payload = payload & CStr(Proc_3_0_6D2AF0(remainingSeconds, Empty, vbNullString))
+                    Else
+                        payload = payload & "M"
+                    End If
+
+                    listedEffects = listedEffects + 1
+                End If
+            End If
+        End If
+    Next rowIndex
+
+    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(listedEffects, Empty, "GL")) & payload, 0
+
+ListDone:
+    Proc_6_101_749540 = listedEffects
 End Function
 
 ' Original declaration: Private Sub Proc_6_102_749C50
