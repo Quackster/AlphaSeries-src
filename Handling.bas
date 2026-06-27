@@ -965,7 +965,42 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_60_720060
 Public Function Proc_6_60_720060(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim offset As Long
+    Dim requestMode As Long
+    Dim detailFlag As Long
+    Dim roomId As Long
+    Dim queryTail As String
+    Dim roomPayload As String
+
+    On Error GoTo SendFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "FA" Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    requestMode = ReadWireLong(requestPayload, offset)
+    detailFlag = ReadWireLong(requestPayload, offset)
+
+    If detailFlag = 1 Then
+        roomId = ReadWireLong(requestPayload, offset)
+        If roomId <= 0 Then GoTo SendFailed
+
+        queryTail = "users,rooms,rooms_categories WHERE rooms.id='" & CStr(roomId) & "' AND users.id=rooms.id_owner AND rooms_categories.id=rooms.id_category LIMIT 1"
+        roomPayload = SingleNavigatorRoomPayload(queryTail)
+        Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(0, Empty, "GF")) & roomPayload, 0
+    ElseIf requestMode > 0 Then
+        ' The original fallback reads the current room id from global_0082934C session offsets B4/BE/70.
+        ' Leave it deferred until those fields are represented instead of guessing their layout.
+    End If
+
+SendFailed:
     Proc_6_60_720060 = Empty
 End Function
 
@@ -2957,6 +2992,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_46_714D50 socketIndex, "EY", packetPayload
         Case "E["
             Proc_6_45_714B60 socketIndex, "E[", packetPayload
+        Case "FA"
+            Proc_6_60_720060 socketIndex, "FA", packetPayload
         Case "oL", "CD"
             ' Decompiled targets Proc_7F44D0 and Proc_7FA5A0 were not generated as valid symbols.
     End Select
@@ -3412,6 +3449,25 @@ BuildDone:
 
 BuildFailed:
     NavigatorRoomListPayload = CStr(Proc_3_0_6D2AF0(0, Empty, vbNullString))
+End Function
+
+Private Function SingleNavigatorRoomPayload(ByVal queryTail As String) As String
+    Dim listPayload As String
+    Dim singleCountPrefix As String
+
+    On Error GoTo BuildFailed
+
+    listPayload = NavigatorRoomListPayload(queryTail, False)
+    singleCountPrefix = CStr(Proc_3_0_6D2AF0(1, Empty, vbNullString))
+    If Left$(listPayload, Len(singleCountPrefix)) = singleCountPrefix Then
+        SingleNavigatorRoomPayload = Mid$(listPayload, Len(singleCountPrefix) + 1)
+    Else
+        SingleNavigatorRoomPayload = vbNullString
+    End If
+    Exit Function
+
+BuildFailed:
+    SingleNavigatorRoomPayload = vbNullString
 End Function
 
 Private Function NavigatorEventListPayload(ByVal queryTail As String) As String
