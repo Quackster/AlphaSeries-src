@@ -1279,7 +1279,7 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_210_7E1DC0
 Public Function Proc_6_210_7E1DC0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    ' Recovered empty procedure.
     Proc_6_210_7E1DC0 = Empty
 End Function
 
@@ -1405,7 +1405,13 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_231_7F4510
 Public Function Proc_6_231_7F4510(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+
+    On Error GoTo SendFailed
+    socketIndex = HandlingSocketIndex(args)
+    Proc_6_244_801E80 socketIndex, "Ic" & "IQA", 0
+
+SendFailed:
     Proc_6_231_7F4510 = Empty
 End Function
 
