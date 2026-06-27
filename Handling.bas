@@ -2852,7 +2852,73 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_70_724190
 Public Function Proc_6_70_724190(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim callerUserId As String
+    Dim roomId As Long
+    Dim furnitureId As Long
+    Dim rowText As String
+    Dim fields() As String
+    Dim productId As Long
+    Dim currentState As Long
+    Dim stateCount As Long
+    Dim nextState As Long
+    Dim encodedState As Long
+    Dim offset As Long
+    Dim previousOffset As Long
+    Dim payload As String
+
+    On Error GoTo WallStateFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "FI" Then requestPayload = Mid$(requestPayload, 3)
+
+    furnitureId = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    If furnitureId <= 0 Then
+        offset = 1
+        previousOffset = offset
+        furnitureId = ReadWireLong(requestPayload, offset)
+        If offset <= previousOffset Then GoTo WallStateFailed
+    End If
+    If furnitureId <= 0 Then GoTo WallStateFailed
+
+    callerUserId = HandlingUserIdFromSocket(socketIndex)
+    If Len(callerUserId) = 0 Or callerUserId = "0" Then GoTo WallStateFailed
+
+    roomId = HandlingCurrentRoomId(socketIndex, callerUserId)
+    If roomId <= 0 Then GoTo WallStateFailed
+    If Not HandlingUserHasRoomRight(callerUserId, roomId) Then GoTo WallStateFailed
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT id,id_product,sign,position_wall FROM furnitures WHERE id='" & CStr(furnitureId) & "' AND id_room='" & CStr(roomId) & "' AND position_wall IS NOT NULL LIMIT 1", 0, 0))
+    If Len(rowText) = 0 Then GoTo WallStateFailed
+
+    fields = Split(rowText, Chr$(9))
+    If UBound(fields) < 2 Then GoTo WallStateFailed
+
+    productId = CLng(Val(CStr(fields(1))))
+    If productId <= 0 Then GoTo WallStateFailed
+
+    currentState = CLng(Val(CStr(fields(2))))
+    stateCount = CLng(Val(CStr(Proc_9_0_806F70(productId, 5, 0))))
+    If stateCount <= 0 Then stateCount = CLng(Val(CStr(Proc_8_12_806C30(productId, 10, 0))))
+    If stateCount <= 0 Then stateCount = 1
+
+    nextState = currentState + 1
+    If nextState > stateCount Then nextState = 0
+    If nextState < 0 Then nextState = 0
+
+    Proc_5_0_6D3CD0 "UPDATE furnitures SET sign='" & CStr(nextState) & "' WHERE id='" & CStr(furnitureId) & "'", 0, 0
+
+    encodedState = 0
+    payload = CStr(Proc_3_0_6D2AF0(productId, Empty, "AU" & CStr(furnitureId) & Chr$(2))) & CStr(nextState) & Chr$(2) & CStr(encodedState) & Chr$(2)
+    Proc_6_247_8027E0 socketIndex, payload, 0
+
+WallStateFailed:
     Proc_6_70_724190 = Empty
 End Function
 
@@ -8945,6 +9011,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_68_723170 socketIndex, "AU", packetPayload
         Case "FA"
             Proc_6_60_720060 socketIndex, "FA", packetPayload
+        Case "FI"
+            Proc_6_70_724190 socketIndex, "FI", packetPayload
         Case "oL", "CD"
             ' Decompiled targets Proc_7F44D0 and Proc_7FA5A0 were not generated as valid symbols.
     End Select
