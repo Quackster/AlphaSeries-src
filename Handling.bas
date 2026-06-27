@@ -6052,8 +6052,77 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_186_7CD040
 Public Function Proc_6_186_7CD040(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_186_7CD040 = Empty
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim offset As Long
+    Dim requestedId As Long
+    Dim botEntityId As Long
+    Dim botId As Long
+    Dim userId As String
+    Dim scratchAmount As Long
+    Dim petRow As String
+    Dim petFields() As String
+    Dim petName As String
+    Dim petFigure As String
+    Dim scratches As Long
+    Dim payload As String
+
+    On Error GoTo ScratchFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex <= 0 Then GoTo ScratchFailed
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "n}" Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    requestedId = ReadWireLong(requestPayload, offset)
+    If requestedId <= 0 Then GoTo ScratchFailed
+
+    botEntityId = requestedId
+    botId = RepresentedBotRecordLong(botEntityId, 1)
+    If botId <= 0 Then
+        botId = requestedId
+        botEntityId = RepresentedBotEntityFromBotId(botId)
+    End If
+    If botId <= 0 Then GoTo ScratchFailed
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo ScratchFailed
+
+    scratchAmount = CLng(Val(CStr(Proc_5_2_6D4690("SELECT scratch_amount FROM users WHERE id='" & _
+        Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 1", 0, 0))))
+    If scratchAmount <= 0 Then GoTo ScratchFailed
+
+    petRow = CStr(Proc_5_2_6D4690("SELECT bots.id,bots.name,bots.figure,bots_petdata.scratches FROM bots,bots_petdata WHERE bots.id='" & _
+        CStr(botId) & "' AND bots.id_handle='3' AND bots.id_room IS NOT NULL AND bots_petdata.id_bot=bots.id LIMIT 1", 0, 0))
+    If Len(petRow) = 0 Then GoTo ScratchFailed
+
+    petFields = Split(petRow, Chr$(9))
+    If UBound(petFields) < 3 Then GoTo ScratchFailed
+    petName = CStr(petFields(1))
+    petFigure = CStr(petFields(2))
+    scratches = CLng(Val(CStr(petFields(3)))) + 1
+
+    Proc_5_0_6D3CD0 "UPDATE bots_petdata SET scratches='" & CStr(scratches) & "' WHERE id_bot='" & CStr(botId) & "'", 0, 0
+    Proc_5_0_6D3CD0 "UPDATE users SET scratch_amount=scratch_amount-1,scratch_given=scratch_given+1 WHERE id='" & _
+        Proc_10_11_80A9C0(userId, 0, 0) & "'", 0, 0
+
+    If botEntityId <= 0 Then botEntityId = botId
+    payload = "I^" & CStr(Proc_3_0_6D2AF0(botEntityId, Empty, vbNullString))
+    payload = payload & CStr(Proc_3_0_6D2AF0(CLng(Val(userId)), Empty, vbNullString))
+    payload = payload & CStr(Proc_3_0_6D2AF0(scratches, Empty, vbNullString))
+    payload = payload & petName & Chr$(2) & petFigure & Chr$(2)
+    Proc_6_247_8027E0 socketIndex, payload, 0
+
+    Proc_6_186_7CD040 = scratches
+    Exit Function
+
+ScratchFailed:
+    Proc_6_186_7CD040 = 0
 End Function
 
 ' Original declaration: Private  Proc_6_187_7CD700(arg_C) '7CD700
@@ -7120,6 +7189,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_179_7C7790 socketIndex, "nz", packetPayload
         Case "n|"
             Proc_7CC190 socketIndex, "n|", packetPayload
+        Case "n}"
+            Proc_6_186_7CD040 socketIndex, "n}", packetPayload
         Case "E["
             Proc_6_45_714B60 socketIndex, "E[", packetPayload
         Case "A_"
@@ -7651,6 +7722,39 @@ End Function
 
 Private Function RepresentedBotRecordLong(ByVal botEntityId As Long, ByVal fieldIndex As Long) As Long
     RepresentedBotRecordLong = CLng(Val(RepresentedBotRecordField(botEntityId, fieldIndex)))
+End Function
+
+Private Function RepresentedBotEntityFromBotId(ByVal botId As Long) As Long
+    Dim records() As String
+    Dim recordIndex As Long
+    Dim recordText As String
+    Dim payloadAt As Long
+    Dim endAt As Long
+    Dim entityId As Long
+    Dim fields() As String
+
+    On Error GoTo MissingEntity
+    If botId <= 0 Or Len(global_00829358) = 0 Then GoTo MissingEntity
+
+    records = Split(global_00829358, "[")
+    For recordIndex = LBound(records) To UBound(records)
+        recordText = CStr(records(recordIndex))
+        payloadAt = InStr(1, recordText, ":", vbBinaryCompare)
+        endAt = InStr(1, recordText, "]", vbBinaryCompare)
+        If payloadAt > 1 And endAt > payloadAt Then
+            entityId = CLng(Val(Left$(recordText, payloadAt - 1)))
+            fields = Split(Mid$(recordText, payloadAt + 1, endAt - payloadAt - 1), Chr$(2))
+            If UBound(fields) >= 1 Then
+                If CLng(Val(CStr(fields(1)))) = botId Then
+                    RepresentedBotEntityFromBotId = entityId
+                    Exit Function
+                End If
+            End If
+        End If
+    Next recordIndex
+
+MissingEntity:
+    RepresentedBotEntityFromBotId = 0
 End Function
 
 Private Sub StoreRepresentedBotPosition(ByVal botEntityId As Long, ByVal positionX As Long, ByVal positionY As Long, ByVal positionZ As String, ByVal positionR As Long)
