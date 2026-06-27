@@ -818,6 +818,35 @@ Private Function MovementDirectionCode(ByVal deltaX As Long, ByVal deltaY As Lon
     End If
 End Function
 
+Private Function FunctionsRepresentedBotRecordField(ByVal botEntityId As Long, ByVal fieldIndex As Long) As String
+    Dim startMarker As String
+    Dim startAt As Long
+    Dim endAt As Long
+    Dim recordText As String
+    Dim fields() As String
+
+    On Error GoTo MissingField
+    If botEntityId <= 0 Or Len(global_00829358) = 0 Then GoTo MissingField
+
+    startMarker = "[" & CStr(botEntityId) & ":"
+    startAt = InStr(1, global_00829358, startMarker, vbBinaryCompare)
+    If startAt <= 0 Then GoTo MissingField
+
+    startAt = startAt + Len(startMarker)
+    endAt = InStr(startAt, global_00829358, "]", vbBinaryCompare)
+    If endAt <= startAt Then GoTo MissingField
+
+    recordText = Mid$(global_00829358, startAt, endAt - startAt)
+    fields = Split(recordText, Chr$(2))
+    If fieldIndex < LBound(fields) Or fieldIndex > UBound(fields) Then GoTo MissingField
+
+    FunctionsRepresentedBotRecordField = CStr(fields(fieldIndex))
+    Exit Function
+
+MissingField:
+    FunctionsRepresentedBotRecordField = vbNullString
+End Function
+
 ' Original declaration: Private  Proc_10_25_80F5D0(arg_C, arg_10) '80F5D0
 Public Function Proc_10_25_80F5D0(ParamArray args() As Variant) As Variant
     Dim roomId As Long
@@ -897,8 +926,46 @@ End Function
 
 ' Original declaration: Private  Proc_10_27_81F1A0(arg_C, arg_10) '81F1A0
 Public Function Proc_10_27_81F1A0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_10_27_81F1A0 = Empty
+    Dim botEntityId As Long
+    Dim positionX As Long
+    Dim positionY As Long
+    Dim roomSlot As Long
+    Dim botId As Long
+    Dim roomId As Long
+    Dim roomText As String
+    Dim botText As String
+
+    On Error GoTo CheckFailed
+    If UBound(args) < 2 Then GoTo CheckFailed
+
+    botEntityId = CLng(Val(CStr(args(0))))
+    positionX = CLng(Val(CStr(args(1))))
+    positionY = CLng(Val(CStr(args(2))))
+    If botEntityId <= 0 Then GoTo CheckFailed
+
+    roomSlot = CLng(Val(FunctionsRepresentedBotRecordField(botEntityId, 0)))
+    botId = CLng(Val(FunctionsRepresentedBotRecordField(botEntityId, 1)))
+
+    If roomSlot > 0 Then
+        roomText = CStr(Proc_5_2_6D4690("SELECT id FROM rooms WHERE id_slot='" & CStr(roomSlot) & "' LIMIT 1", 0, 0))
+        roomId = CLng(Val(roomText))
+    End If
+
+    If roomId <= 0 Then
+        If botId <= 0 Then botId = botEntityId
+        botText = CStr(Proc_5_2_6D4690("SELECT id_room FROM bots WHERE id='" & CStr(botId) & "' LIMIT 1", 0, 0))
+        roomId = CLng(Val(botText))
+    End If
+
+    If roomId <= 0 Then
+        Proc_10_27_81F1A0 = 1
+    Else
+        Proc_10_27_81F1A0 = Proc_10_25_80F5D0(roomId, positionX, positionY)
+    End If
+    Exit Function
+
+CheckFailed:
+    Proc_10_27_81F1A0 = 0
 End Function
 
 ' Original declaration: Private  Proc_10_28_8210C0(arg_C) '8210C0
