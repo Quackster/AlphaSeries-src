@@ -498,7 +498,27 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_59_71FEE0
 Public Function Proc_6_59_71FEE0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim advertisementIndex As Long
+    Dim advertisementPayload As String
+
+    On Error GoTo SendFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    advertisementPayload = Chr$(2) & Chr$(2)
+
+    If global_008291D8 > 0 And IsArray(global_008291D4) Then
+        advertisementIndex = CLng(Val(CStr(Proc_10_3_809B90(global_008291D8, 1, 0))))
+        If advertisementIndex >= LBound(global_008291D4) And advertisementIndex <= UBound(global_008291D4) Then
+            If Len(CStr(global_008291D4(advertisementIndex))) > 0 Then
+                advertisementPayload = CStr(global_008291D4(advertisementIndex))
+            End If
+        End If
+    End If
+
+    Proc_6_244_801E80 socketIndex, "DB" & advertisementPayload, 0
+
+SendFailed:
     Proc_6_59_71FEE0 = Empty
 End Function
 
