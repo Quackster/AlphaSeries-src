@@ -4728,7 +4728,53 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_169_7C0DC0
 Public Function Proc_6_169_7C0DC0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim userId As String
+    Dim targetUserId As String
+    Dim targetSocketIndex As Integer
+    Dim targetRoomUserIndex As Long
+    Dim targetRoomId As Long
+    Dim friendshipRow As String
+    Dim offset As Long
+    Dim payload As String
+
+    On Error GoTo FollowFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "DF" Then requestPayload = Mid$(requestPayload, 3)
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo FollowFailed
+
+    offset = 1
+    targetUserId = CStr(ReadWireLong(requestPayload, offset))
+    If Len(targetUserId) = 0 Or targetUserId = "0" Then targetUserId = CStr(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    If Len(targetUserId) = 0 Or targetUserId = "0" Then GoTo FollowFailed
+
+    friendshipRow = CStr(Proc_5_2_6D4690("SELECT id_friend FROM friendships WHERE id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_friend='" & Proc_10_11_80A9C0(targetUserId, 0, 0) & "' AND has_accept='1' LIMIT 1", 0, 0))
+    If Len(friendshipRow) = 0 Then GoTo FollowFailed
+
+    targetSocketIndex = HandlingSocketFromUserId(targetUserId)
+    If targetSocketIndex <= 0 Then GoTo FollowFailed
+
+    targetRoomId = HandlingCurrentRoomId(targetSocketIndex, targetUserId)
+    If targetRoomId <= 0 Then GoTo FollowFailed
+
+    targetRoomUserIndex = RepresentedRoomUserIndex(targetSocketIndex, targetUserId)
+    payload = CStr(Proc_3_0_6D2AF0(targetRoomUserIndex, Empty, "D^"))
+    payload = CStr(Proc_3_0_6D2AF0(targetRoomId, Empty, payload))
+
+    Proc_6_244_801E80 socketIndex, payload, 0
+    Proc_6_169_7C0DC0 = payload
+    Exit Function
+
+FollowFailed:
     Proc_6_169_7C0DC0 = Empty
 End Function
 
@@ -5860,6 +5906,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_88_73E4F0 socketIndex, "@L", packetPayload
         Case "@f"
             Proc_6_170_7C1100 socketIndex, "@f", packetPayload
+        Case "DF"
+            Proc_6_169_7C0DC0 socketIndex, "DF", packetPayload
         Case "E["
             Proc_6_45_714B60 socketIndex, "E[", packetPayload
         Case "A_"
