@@ -1616,7 +1616,78 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_52_7172B0
 Public Function Proc_6_52_7172B0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim userId As String
+    Dim roomId As Long
+    Dim roomName As String
+    Dim roomPassword As String
+    Dim doorStatus As Long
+    Dim roomDescription As String
+    Dim visitorsMax As Long
+    Dim categoryId As Long
+    Dim tagOne As String
+    Dim tagTwo As String
+    Dim allowOthersPets As Long
+    Dim allowFeedPets As Long
+    Dim allowWalkthrough As Long
+    Dim disableWalls As Long
+    Dim thicknessFloor As Long
+    Dim thicknessWallpaper As Long
+    Dim queryText As String
+    Dim queryTail As String
+    Dim roomOptionPayload As String
+
+    On Error GoTo SettingsFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then
+        packetPayload = CStr(args(2))
+    ElseIf UBound(args) >= 1 Then
+        packetPayload = CStr(args(1))
+    End If
+    If Left$(packetPayload, 2) = "FQ" Then packetPayload = Mid$(packetPayload, 3)
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo SettingsFailed
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId <= 0 Then GoTo SettingsFailed
+
+    If Not HandlingUserOwnsRoom(userId, roomId) Then
+        If Not HandlingUserHasPermission(userId, "fuse_any_room_controller") Then GoTo SettingsFailed
+    End If
+
+    If Not RoomSettingsFromWire(packetPayload, roomName, roomPassword, doorStatus, roomDescription, _
+        visitorsMax, categoryId, tagOne, tagTwo, allowOthersPets, allowFeedPets, allowWalkthrough, _
+        disableWalls, thicknessFloor, thicknessWallpaper) Then GoTo SettingsFailed
+
+    categoryId = RoomCategoryForUser(categoryId, userId)
+    If categoryId <= 0 Then GoTo SettingsFailed
+
+    If disableWalls <> 0 Then
+        If Not HandlingUserHasPermission(userId, "fuse_hide_room_walls") Then disableWalls = 0
+    End If
+
+    queryText = "UPDATE rooms SET thickness_floor='" & CStr(thicknessFloor) & "',thickness_wallpaper='" & CStr(thicknessWallpaper) & "',name='"
+    queryText = queryText & Proc_10_11_80A9C0(roomName, 0, 0) & "',password='" & Proc_10_11_80A9C0(roomPassword, 0, 0) & "',description='"
+    queryText = queryText & Proc_10_11_80A9C0(roomDescription, 0, 0) & "',status_door='" & CStr(doorStatus) & "',id_category='" & CStr(categoryId) & "'"
+    queryText = queryText & ",tag_1=" & NullableSqlText(tagOne) & ",tag_2=" & NullableSqlText(tagTwo)
+    queryText = queryText & ",allow_otherspets='" & CStr(allowOthersPets) & "',allow_feedpets='" & CStr(allowFeedPets) & "',allow_walkthrough='"
+    queryText = queryText & CStr(allowWalkthrough) & "',visitors_max='" & CStr(visitorsMax) & "',disable_walls='" & CStr(disableWalls) & "' WHERE id='" & CStr(roomId) & "'"
+    Proc_5_0_6D3CD0 queryText, 0, 0
+
+    queryTail = "users,rooms,rooms_categories WHERE rooms.id='" & CStr(roomId) & "' AND users.id=rooms.id_owner AND rooms_categories.id=rooms.id_category LIMIT 1"
+    Proc_6_247_8027E0 socketIndex, CStr(Proc_6_112_74E0C0(queryTail, "GF", 0)), 0
+    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(roomId, Empty, "GS")), 0
+    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(roomId, Empty, "GH")), 0
+
+    roomOptionPayload = CStr(Proc_3_0_6D2AF0(disableWalls, Empty, "GX"))
+    roomOptionPayload = CStr(Proc_3_0_6D2AF0(thicknessFloor, Empty, roomOptionPayload))
+    roomOptionPayload = CStr(Proc_3_0_6D2AF0(thicknessWallpaper, Empty, roomOptionPayload))
+    Proc_6_244_801E80 socketIndex, roomOptionPayload, 0
+
+SettingsFailed:
     Proc_6_52_7172B0 = Empty
 End Function
 
@@ -4179,6 +4250,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_48_7151E0 socketIndex, "EZ", packetPayload
         Case "E\"
             Proc_6_49_715D30 socketIndex, "E\", packetPayload
+        Case "FQ"
+            Proc_6_52_7172B0 socketIndex, "FQ", packetPayload
         Case "@H"
             Proc_6_108_74D800 socketIndex, "@H", packetPayload
         Case "@S"
@@ -5214,6 +5287,116 @@ Private Function RoomEventEditPayloadFromWire(ByVal packetPayload As String, ByR
 
 ParseFailed:
     RoomEventEditPayloadFromWire = False
+End Function
+
+Private Function RoomSettingsFromWire(ByVal packetPayload As String, ByRef roomName As String, ByRef roomPassword As String, ByRef doorStatus As Long, ByRef roomDescription As String, ByRef visitorsMax As Long, ByRef categoryId As Long, ByRef tagOne As String, ByRef tagTwo As String, ByRef allowOthersPets As Long, ByRef allowFeedPets As Long, ByRef allowWalkthrough As Long, ByRef disableWalls As Long, ByRef thicknessFloor As Long, ByRef thicknessWallpaper As Long) As Boolean
+    Dim offset As Long
+    Dim tagCount As Long
+    Dim tagIndex As Long
+    Dim tagText As String
+    Dim previousOffset As Long
+
+    On Error GoTo ParseFailed
+
+    offset = 1
+    roomName = CStr(Proc_10_10_80A7F0(ReadWireString(packetPayload, offset), 0, 0))
+    If Len(roomName) < 3 Then GoTo ParseFailed
+    roomName = Left$(roomName, 60)
+
+    roomPassword = CStr(Proc_10_10_80A7F0(ReadWireString(packetPayload, offset), 0, 0))
+    roomPassword = Left$(roomPassword, 60)
+
+    doorStatus = ReadWireLong(packetPayload, offset)
+    If doorStatus < 0 Or doorStatus > 2 Then GoTo ParseFailed
+
+    roomDescription = CStr(Proc_10_10_80A7F0(ReadWireString(packetPayload, offset), 0, 0))
+    roomDescription = Left$(roomDescription, 255)
+
+    visitorsMax = ReadWireLong(packetPayload, offset)
+    If visitorsMax < 1 Then visitorsMax = 1
+    If visitorsMax > 250 Then visitorsMax = 250
+
+    categoryId = ReadWireLong(packetPayload, offset)
+    If categoryId <= 0 Then GoTo ParseFailed
+
+    tagCount = ReadWireLong(packetPayload, offset)
+    If tagCount < 0 Or tagCount > 2 Then GoTo ParseFailed
+
+    For tagIndex = 1 To tagCount
+        tagText = LCase$(Left$(CStr(Proc_10_10_80A7F0(ReadWireString(packetPayload, offset), 0, 0)), 60))
+        If tagIndex = 1 Then
+            tagOne = tagText
+        ElseIf tagIndex = 2 Then
+            tagTwo = tagText
+        End If
+    Next tagIndex
+
+    previousOffset = offset
+    allowOthersPets = ReadWireLong(packetPayload, offset)
+    If offset <= previousOffset Then allowOthersPets = 0
+
+    previousOffset = offset
+    allowFeedPets = ReadWireLong(packetPayload, offset)
+    If offset <= previousOffset Then allowFeedPets = 0
+
+    previousOffset = offset
+    allowWalkthrough = ReadWireLong(packetPayload, offset)
+    If offset <= previousOffset Then allowWalkthrough = 0
+
+    previousOffset = offset
+    disableWalls = ReadWireLong(packetPayload, offset)
+    If offset <= previousOffset Then disableWalls = 0
+
+    previousOffset = offset
+    thicknessFloor = ReadWireLong(packetPayload, offset)
+    If offset <= previousOffset Then thicknessFloor = 0
+
+    previousOffset = offset
+    thicknessWallpaper = ReadWireLong(packetPayload, offset)
+    If offset <= previousOffset Then thicknessWallpaper = 0
+
+    allowOthersPets = RoomSettingsFlag(allowOthersPets)
+    allowFeedPets = RoomSettingsFlag(allowFeedPets)
+    allowWalkthrough = RoomSettingsFlag(allowWalkthrough)
+    disableWalls = RoomSettingsFlag(disableWalls)
+    thicknessFloor = RoomSettingsThickness(thicknessFloor)
+    thicknessWallpaper = RoomSettingsThickness(thicknessWallpaper)
+
+    RoomSettingsFromWire = True
+    Exit Function
+
+ParseFailed:
+    RoomSettingsFromWire = False
+End Function
+
+Private Function RoomSettingsFlag(ByVal flagValue As Long) As Long
+    If flagValue <> 0 Then
+        RoomSettingsFlag = 1
+    Else
+        RoomSettingsFlag = 0
+    End If
+End Function
+
+Private Function RoomSettingsThickness(ByVal thicknessValue As Long) As Long
+    If thicknessValue < -2 Then thicknessValue = -2
+    If thicknessValue > 1 Then thicknessValue = 1
+    RoomSettingsThickness = thicknessValue
+End Function
+
+Private Function RoomCategoryForUser(ByVal categoryId As Long, ByVal userId As String) As Long
+    Dim rankIndex As Long
+    Dim hcLevel As Long
+
+    On Error GoTo LookupFailed
+    If categoryId <= 0 Then GoTo LookupFailed
+
+    rankIndex = HandlingUserRank(userId)
+    hcLevel = HandlingUserHcLevel(userId)
+    RoomCategoryForUser = CLng(Val(CStr(Proc_5_2_6D4690("SELECT id FROM rooms_categories WHERE id='" & CStr(categoryId) & "' AND level_minrequired <= '" & CStr(rankIndex) & "' AND hclevel_minrequired <= '" & CStr(hcLevel) & "' LIMIT 1", 0, 0))))
+    Exit Function
+
+LookupFailed:
+    RoomCategoryForUser = 0
 End Function
 
 Private Function NullableSqlText(ByVal valueText As String) As String
