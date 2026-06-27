@@ -727,7 +727,55 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_48_7151E0
 Public Function Proc_6_48_7151E0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim userId As String
+    Dim roomId As Long
+    Dim doorStatus As Long
+    Dim categoryId As Long
+    Dim categoryName As String
+    Dim eventName As String
+    Dim eventDescription As String
+    Dim tagOne As String
+    Dim tagTwo As String
+    Dim queryText As String
+
+    On Error GoTo CreateFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then
+        packetPayload = CStr(args(2))
+    ElseIf UBound(args) >= 1 Then
+        packetPayload = CStr(args(1))
+    End If
+    If Left$(packetPayload, 2) = "EZ" Then packetPayload = Mid$(packetPayload, 3)
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo CreateFailed
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId <= 0 Then GoTo CreateFailed
+
+    doorStatus = CLng(Val(CStr(Proc_5_2_6D4690("SELECT status_door FROM rooms WHERE id='" & CStr(roomId) & "' LIMIT 1", 0, 0))))
+    If doorStatus <> 0 Then
+        Proc_6_244_801E80 socketIndex, "EoHK", 0
+        GoTo CreateFailed
+    End If
+
+    If Not RoomEventCreatePayloadFromWire(packetPayload, categoryId, categoryName, eventName, eventDescription, tagOne, tagTwo) Then GoTo CreateFailed
+
+    queryText = "INSERT INTO rooms_events(id_room,id_user,name,description,id_category,tag_1,tag_2,timestamp,name_category) VALUES('"
+    queryText = queryText & CStr(roomId) & "','" & Proc_10_11_80A9C0(userId, 0, 0) & "','"
+    queryText = queryText & Proc_10_11_80A9C0(eventName, 0, 0) & "','"
+    queryText = queryText & Proc_10_11_80A9C0(eventDescription, 0, 0) & "','"
+    queryText = queryText & CStr(categoryId) & "',"
+    queryText = queryText & NullableSqlText(tagOne) & "," & NullableSqlText(tagTwo)
+    queryText = queryText & ",UNIX_TIMESTAMP(),'" & Proc_10_11_80A9C0(categoryName, 0, 0) & "')"
+
+    Proc_5_0_6D3CD0 queryText, 0, 0
+    Proc_6_247_8027E0 socketIndex, "Er" & CStr(Proc_6_51_716AC0(roomId)), 0
+
+CreateFailed:
     Proc_6_48_7151E0 = Empty
 End Function
 
@@ -2823,6 +2871,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_47_714F60 socketIndex, "GG", packetPayload
         Case "FB"
             Proc_6_44_7145E0 socketIndex, "FB", packetPayload
+        Case "EZ"
+            Proc_6_48_7151E0 socketIndex, "EZ", packetPayload
         Case "@H"
             Proc_6_108_74D800 socketIndex, "@H", packetPayload
         Case "@S"
@@ -3171,6 +3221,54 @@ Private Function RoomIconPayloadFromWire(ByVal packetPayload As String) As Strin
 
 BuildFailed:
     RoomIconPayloadFromWire = vbNullString
+End Function
+
+Private Function RoomEventCreatePayloadFromWire(ByVal packetPayload As String, ByRef categoryId As Long, ByRef categoryName As String, ByRef eventName As String, ByRef eventDescription As String, ByRef tagOne As String, ByRef tagTwo As String) As Boolean
+    Dim offset As Long
+    Dim tagCount As Long
+    Dim tagIndex As Long
+    Dim tagText As String
+
+    On Error GoTo ParseFailed
+
+    offset = 1
+    categoryId = ReadWireLong(packetPayload, offset)
+    If categoryId < 1 Then GoTo ParseFailed
+
+    categoryName = CStr(Proc_8_11_8069B0(categoryId, 0, 0))
+    If Len(categoryName) = 0 Then GoTo ParseFailed
+
+    eventName = CStr(Proc_10_10_80A7F0(ReadWireString(packetPayload, offset), 0, 0))
+    If Len(eventName) < 3 Then GoTo ParseFailed
+
+    eventDescription = CStr(Proc_10_10_80A7F0(ReadWireString(packetPayload, offset), 0, 0))
+    If Len(eventDescription) < 3 Then GoTo ParseFailed
+
+    tagCount = ReadWireLong(packetPayload, offset)
+    If tagCount < 0 Or tagCount > 2 Then GoTo ParseFailed
+
+    For tagIndex = 1 To tagCount
+        tagText = LCase$(Left$(CStr(Proc_10_10_80A7F0(ReadWireString(packetPayload, offset), 0, 0)), 30))
+        If tagIndex = 1 Then
+            tagOne = tagText
+        ElseIf tagIndex = 2 Then
+            tagTwo = tagText
+        End If
+    Next tagIndex
+
+    RoomEventCreatePayloadFromWire = True
+    Exit Function
+
+ParseFailed:
+    RoomEventCreatePayloadFromWire = False
+End Function
+
+Private Function NullableSqlText(ByVal valueText As String) As String
+    If Len(valueText) = 0 Then
+        NullableSqlText = "null"
+    Else
+        NullableSqlText = "'" & Proc_10_11_80A9C0(valueText, 0, 0) & "'"
+    End If
 End Function
 
 Private Function NavigatorListLimit() As Long
