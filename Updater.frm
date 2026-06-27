@@ -672,6 +672,10 @@ End
 Attribute VB_Name = "Updater"
 Option Explicit
 
+Private pendingHeightTarget As Long
+Private pendingAnimationInterval As Long
+Private pendingProgressWidth As Long
+
 ' Reconstructed code shell generated from decompiled output.
 ' Source reference: /opt/git/AlphaSeries_cracked/DECOMPILED/Updater.frm
 ' Event bodies are inert until each handler is manually reconstructed.
@@ -688,12 +692,37 @@ End Sub
 
 ' Original declaration: Private Sub Timer1_Timer() '823220
 Private Sub Timer1_Timer()
-    ' TODO: Reconstruct behavior from decompiled reference.
+    On Error Resume Next
+    Timer1.Enabled = False
+    If pendingAnimationInterval <= 0 Then pendingAnimationInterval = 1
+    Timer2.Interval = pendingAnimationInterval
+    Timer2.Enabled = True
 End Sub
 
 ' Original declaration: Private Sub Timer2_Timer() '823420
 Private Sub Timer2_Timer()
-    ' TODO: Reconstruct behavior from decompiled reference.
+    On Error Resume Next
+
+    If pendingHeightTarget <= 0 Then
+        Timer2.Enabled = False
+        Exit Sub
+    End If
+
+    If Height < pendingHeightTarget Then
+        Height = Height + 50
+        If Height >= pendingHeightTarget Then
+            Height = pendingHeightTarget
+            Timer2.Enabled = False
+        End If
+    ElseIf Height > pendingHeightTarget Then
+        Height = Height - 50
+        If Height <= pendingHeightTarget Then
+            Height = pendingHeightTarget
+            Timer2.Enabled = False
+        End If
+    Else
+        Timer2.Enabled = False
+    End If
 End Sub
 
 ' Original declaration: Private Sub Form_Load() '822330
@@ -715,5 +744,44 @@ End Sub
 
 ' Original declaration: Private Sub walkPerCent_Timer() '824C00
 Private Sub walkPerCent_Timer()
-    ' TODO: Reconstruct behavior from decompiled reference.
+    On Error GoTo ProgressFailed
+    walkPerCent.Enabled = False
+
+    If pendingProgressWidth <= 0 Then
+        walkPerCent.Enabled = False
+        Exit Sub
+    End If
+
+    If Image1.Width < pendingProgressWidth Then
+        Image1.Width = Image1.Width + 50
+        If Image1.Width > pendingProgressWidth Then Image1.Width = pendingProgressWidth
+    ElseIf Image1.Width > pendingProgressWidth Then
+        Image1.Width = pendingProgressWidth
+    End If
+
+    If Image1.Width >= 11535 And Timer3.Enabled = False Then
+        Hide
+        MsgBox "Update erfolgreich heruntergeladen. Die Datei wurde nach """ & App.EXEName & ".exe"" benannt." & vbCrLf & vbCrLf & "Bitte schauen Sie doch einmal in unserem User Voice Forum nach neuen Meldungen. Die Webseite wurde automatisch geöffnet.", vbInformation
+        End
+    End If
+
+    walkPerCent.Enabled = True
+    Exit Sub
+
+ProgressFailed:
+    On Error Resume Next
+    Hide
+    MsgBox "Es ist ein Fehler aufgetreten. Versuche es erneut!", vbCritical
+    End
+End Sub
+
+Private Sub QueueHeightAnimation(ByVal targetHeight As Long, ByVal animationInterval As Long)
+    pendingHeightTarget = targetHeight
+    pendingAnimationInterval = animationInterval
+    Timer1.Enabled = True
+End Sub
+
+Private Sub QueueProgressWidth(ByVal targetWidth As Long)
+    pendingProgressWidth = targetWidth
+    walkPerCent.Enabled = True
 End Sub
