@@ -94,7 +94,43 @@ End Function
 
 ' Original declaration: Private Sub Proc_5_6_6D7090
 Public Function Proc_5_6_6D7090(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim userId As String
+    Dim roomId As Long
+    Dim roomRow As String
+    Dim eventRow As String
+    Dim roomFields() As String
+    Dim eventFields() As String
+    Dim payload As String
+
+    On Error GoTo RoomInfoFailed
+
+    socketIndex = MySqlSocketIndex(args)
+    packetPayload = MySqlPacketPayload(args)
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "GK" Then requestPayload = Mid$(requestPayload, 3)
+
+    userId = MySqlUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo RoomInfoFailed
+    If Not MySqlUserHasPermission(userId, "fuse_mod") Then GoTo RoomInfoFailed
+
+    roomId = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    If roomId <= 0 Then GoTo RoomInfoFailed
+
+    roomRow = CStr(Proc_5_2_6D4690("SELECT rooms.id,rooms.visitors_now,users.id,users.name,rooms.name,rooms.description,rooms.tag_1,rooms.tag_2 FROM rooms,users WHERE rooms.id='" & _
+        CStr(roomId) & "' AND users.id=rooms.id_owner LIMIT 1", 0, 0))
+    If Len(roomRow) = 0 Then GoTo RoomInfoFailed
+
+    roomFields = Split(roomRow, Chr$(9))
+    eventRow = CStr(Proc_5_2_6D4690("SELECT name,description,tag_1,tag_2 FROM rooms_events WHERE id_room='" & CStr(roomId) & "' LIMIT 1", 0, 0))
+    If Len(eventRow) > 0 Then eventFields = Split(eventRow, Chr$(9))
+
+    payload = "HZ" & MySqlRoomInfoPayload(roomFields, eventFields)
+    Proc_6_244_801E80 socketIndex, payload, 0
+
+RoomInfoFailed:
     Proc_5_6_6D7090 = Empty
 End Function
 
@@ -257,6 +293,50 @@ Private Function MySqlRoomChatLogRows(ByVal chatRows As String) As String
 
 BuildFailed:
     MySqlRoomChatLogRows = payload
+End Function
+
+Private Function MySqlRoomInfoPayload(ByRef roomFields() As String, ByRef eventFields() As String) As String
+    Dim payload As String
+    Dim fieldIndex As Long
+    Dim roomId As Long
+    Dim visitorCount As Long
+    Dim ownerId As Long
+    Dim hasEvent As Long
+
+    On Error GoTo BuildFailed
+    If UBound(roomFields) < 7 Then GoTo BuildFailed
+
+    roomId = CLng(Val(CStr(roomFields(0))))
+    visitorCount = CLng(Val(CStr(roomFields(1))))
+    ownerId = CLng(Val(CStr(roomFields(2))))
+
+    payload = CStr(Proc_3_0_6D2AF0(roomId, Empty, vbNullString))
+    payload = payload & CStr(Proc_3_0_6D2AF0(visitorCount, Empty, vbNullString))
+    payload = payload & CStr(Proc_3_0_6D2AF0(ownerId, Empty, vbNullString))
+    For fieldIndex = 3 To 7
+        payload = payload & CStr(roomFields(fieldIndex)) & Chr$(2)
+    Next fieldIndex
+
+    On Error Resume Next
+    hasEvent = IIf(UBound(eventFields) >= 3, 1, 0)
+    If Err.Number <> 0 Then
+        Err.Clear
+        hasEvent = 0
+    End If
+    On Error GoTo BuildFailed
+
+    payload = payload & CStr(Proc_3_0_6D2AF0(hasEvent, Empty, vbNullString))
+    If hasEvent <> 0 Then
+        For fieldIndex = 0 To 3
+            payload = payload & CStr(eventFields(fieldIndex)) & Chr$(2)
+        Next fieldIndex
+    End If
+
+    MySqlRoomInfoPayload = payload
+    Exit Function
+
+BuildFailed:
+    MySqlRoomInfoPayload = payload
 End Function
 
 Private Function IsIgnorableSqlArg(ByVal value As String) As Boolean
