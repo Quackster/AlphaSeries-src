@@ -5340,7 +5340,73 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_176_7C4EE0
 Public Function Proc_6_176_7C4EE0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim rows As Variant
+    Dim fields As Variant
+    Dim rowIndex As Long
+    Dim friendCount As Long
+    Dim friendPayload As String
+    Dim payload As String
+    Dim dateFormat As String
+    Dim timeFormat As String
+    Dim maxFriends0 As Long
+    Dim maxFriends1 As Long
+    Dim maxFriends2 As Long
+    Dim queryLimit As Long
+    Dim friendUserId As String
+    Dim friendSocketIndex As Integer
+    Dim friendOnline As Long
+    Dim callerSummary As String
+
+    On Error GoTo ListFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo ListFailed
+
+    maxFriends0 = MessengerMaxFriends(0)
+    maxFriends1 = MessengerMaxFriends(2)
+    maxFriends2 = MessengerMaxFriends(4)
+    queryLimit = maxFriends2
+    If queryLimit <= 0 Then queryLimit = 200
+
+    dateFormat = CStr(Proc_10_0_809570("com.mysql.format.date", "%d-%m-%Y", 0))
+    timeFormat = CStr(Proc_10_0_809570("com.mysql.format.time", "%H:%i", 0))
+    rows = Split(CStr(Proc_5_2_6D4690("SELECT users.id,users.name,users.id_socket,users.figure,users.motto,users.level,DATE_FORMAT(FROM_UNIXTIME(users.lastonline_time), '" & _
+        Proc_10_11_80A9C0(dateFormat & " " & timeFormat, 0, 0) & "') FROM friendships,users WHERE friendships.has_accept='1' AND friendships.id_user='" & _
+        Proc_10_11_80A9C0(userId, 0, 0) & "' AND users.id=friendships.id_friend LIMIT " & CStr(queryLimit), 0, 0)), Chr$(13))
+
+    callerSummary = MessengerFriendSummaryPayload(userId, 1)
+
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(CStr(rows(rowIndex))) > 0 Then
+            fields = Split(CStr(rows(rowIndex)), Chr$(9))
+            If UBound(fields) >= 6 Then
+                friendUserId = CStr(fields(0))
+                friendSocketIndex = CInt(Val(CStr(fields(2))))
+                friendOnline = IIf(friendSocketIndex > 0 And Proc_11_2_821390(friendSocketIndex, 0, 0) = 1, 1, 0)
+                friendPayload = friendPayload & CStr(Proc_6_166_7BE940(CLng(Val(friendUserId)), CStr(fields(1)), CStr(fields(4)), CStr(fields(3)), _
+                    CLng(Val(CStr(fields(5)))), IIf(friendOnline = 1, 2, 0), friendOnline, CStr(fields(6)), 1))
+                friendCount = friendCount + 1
+
+                If friendOnline = 1 And Len(callerSummary) > 0 Then
+                    Proc_6_244_801E80 friendSocketIndex, "@MHIH" & callerSummary, 0
+                End If
+            End If
+        End If
+    Next rowIndex
+
+    payload = CStr(Proc_3_0_6D2AF0(maxFriends0, Empty, "@L"))
+    payload = payload & CStr(Proc_3_0_6D2AF0(maxFriends1, Empty, vbNullString))
+    payload = payload & CStr(Proc_3_0_6D2AF0(maxFriends2, Empty, vbNullString))
+    payload = payload & CStr(Proc_3_0_6D2AF0(friendCount, Empty, vbNullString)) & friendPayload & "PYH"
+    Proc_6_244_801E80 socketIndex, payload, 0
+
+    Proc_6_176_7C4EE0 = payload
+    Exit Function
+
+ListFailed:
     Proc_6_176_7C4EE0 = Empty
 End Function
 
@@ -6836,6 +6902,16 @@ Private Function MessengerSearchResultPayload(ByVal userId As String, ByVal user
 
 BuildFailed:
     MessengerSearchResultPayload = vbNullString
+End Function
+
+Private Function MessengerMaxFriends(ByVal configIndex As Long) As Long
+    On Error GoTo LookupFailed
+
+    MessengerMaxFriends = CLng(Val(CStr(global_0082927C(configIndex))))
+    Exit Function
+
+LookupFailed:
+    MessengerMaxFriends = 0
 End Function
 
 Private Function HandlingUserHasRoomRight(ByVal userId As String, ByVal roomId As Long) As Boolean
