@@ -4116,7 +4116,56 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_140_769400
 Public Function Proc_6_140_769400(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim userId As String
+    Dim rowText As String
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim furnitureId As Long
+    Dim productId As Long
+    Dim itemData As String
+    Dim secondaryValue As Long
+    Dim productType As Long
+    Dim regularCount As Long
+    Dim iconCount As Long
+    Dim regularPayload As String
+    Dim iconPayload As String
+
+    On Error GoTo InventoryFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Then GoTo InventoryFailed
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT id,id_product,sign,id_secondary FROM furnitures WHERE id_owner='" & Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_room IS NULL LIMIT 1000", 0, 0))
+    If Len(rowText) > 0 Then
+        rows = Split(rowText, Chr$(13))
+        For rowIndex = LBound(rows) To UBound(rows)
+            If Len(rows(rowIndex)) > 0 Then
+                fields = Split(rows(rowIndex), Chr$(9))
+                furnitureId = CLng(Val(NavigatorField(fields, 0)))
+                productId = CLng(Val(NavigatorField(fields, 1)))
+                itemData = NavigatorField(fields, 2)
+                secondaryValue = CLng(Val(NavigatorField(fields, 3)))
+                productType = CLng(Val(CStr(Proc_8_12_806C30(productId, 0, 0))))
+
+                If productType = 9 Then
+                    iconPayload = iconPayload & CStr(Proc_6_138_7678A0(furnitureId, productId, itemData, secondaryValue))
+                    iconCount = iconCount + 1
+                Else
+                    regularPayload = regularPayload & CStr(Proc_6_138_7678A0(furnitureId, productId, itemData, secondaryValue))
+                    regularCount = regularCount + 1
+                End If
+            End If
+        Next rowIndex
+    End If
+
+    Proc_6_244_801E80 socketIndex, Chr$(2) & CStr(Proc_3_0_6D2AF0(regularCount, Empty, "BLS" & Chr$(2) & "II")) & regularPayload, 0
+    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(iconCount, Empty, "BL" & global_004096B0 & Chr$(2) & "II")) & iconPayload, 0
+    Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(0, Empty, CStr(Proc_3_0_6D2AF0(0, Empty, CStr(Proc_3_0_6D2AF0(0, Empty, CStr(Proc_3_0_6D2AF0(0, Empty, "Id")) & "HHH"))))) & "H", 0
+
+InventoryFailed:
     Proc_6_140_769400 = Empty
 End Function
 
