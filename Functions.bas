@@ -309,14 +309,123 @@ End Function
 
 ' Original declaration: Private Sub Proc_10_14_80B010
 Public Function Proc_10_14_80B010(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_10_14_80B010 = Empty
+    Dim furnitureId As Long
+    Dim rowText As String
+    Dim fields() As String
+    Dim productId As Long
+    Dim ownerId As Long
+    Dim itemData As String
+    Dim secondaryValue As Long
+    Dim cachePath As String
+    Dim cacheText As String
+    Dim cacheRecord As String
+    Dim socketIndex As Long
+    Dim payload As String
+
+    On Error GoTo AddFailed
+    If UBound(args) < 0 Then GoTo AddFailed
+
+    furnitureId = CLng(Val(CStr(args(0))))
+    If furnitureId <= 0 Then GoTo AddFailed
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT id_product,id_owner,sign,id_secondary FROM furnitures WHERE id ='" & CStr(furnitureId) & "' LIMIT 1", 0, 0))
+    If Len(rowText) = 0 Then GoTo AddFailed
+
+    fields = Split(rowText, Chr$(9))
+    If UBound(fields) < 1 Then GoTo AddFailed
+
+    productId = CLng(Val(CStr(fields(0))))
+    ownerId = CLng(Val(CStr(fields(1))))
+    If UBound(fields) >= 2 Then itemData = CStr(fields(2))
+    If UBound(fields) >= 3 Then secondaryValue = CLng(Val(CStr(fields(3))))
+    If ownerId <= 0 Then GoTo AddFailed
+
+    cachePath = App.Path & "\cache\users\" & CStr(ownerId) & ".cache"
+    cacheText = TrimInventoryCache(CStr(Proc_6_239_7FC170(cachePath, 0, 0)))
+    cacheRecord = InventoryCacheRecord(furnitureId, productId, itemData, secondaryValue)
+    If InStr(1, cacheText, Chr$(1) & CStr(furnitureId) & Chr$(9), vbBinaryCompare) = 0 Then
+        cacheText = cacheText & cacheRecord
+        Proc_6_240_7FC2B0 cachePath, cacheText
+    End If
+
+    socketIndex = CLng(Val(CStr(Proc_9_9_808AC0(ownerId, 0, 0))))
+    If socketIndex > 0 Then
+        payload = "Ab" & CStr(Proc_6_138_7678A0(furnitureId, productId, itemData, secondaryValue)) & Chr$(1)
+        Proc_12_1_821AA0 CInt(socketIndex), payload, 0
+    End If
+
+    Proc_10_14_80B010 = 1
+    Exit Function
+
+AddFailed:
+    Proc_10_14_80B010 = 0
 End Function
 
 ' Original declaration: Private Sub Proc_10_15_80BA40
 Public Function Proc_10_15_80BA40(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_10_15_80BA40 = Empty
+    Dim furnitureId As Long
+    Dim rowText As String
+    Dim fields() As String
+    Dim ownerId As Long
+    Dim cachePath As String
+    Dim cacheText As String
+    Dim marker As String
+    Dim recordStart As Long
+    Dim recordEnd As Long
+    Dim socketIndex As Long
+    Dim payload As String
+
+    On Error GoTo RemoveFailed
+    If UBound(args) < 0 Then GoTo RemoveFailed
+
+    furnitureId = CLng(Val(CStr(args(0))))
+    If furnitureId <= 0 Then GoTo RemoveFailed
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT id_product,id_owner,sign FROM furnitures WHERE id ='" & CStr(furnitureId) & "' LIMIT 1", 0, 0))
+    If Len(rowText) = 0 Then GoTo RemoveFailed
+
+    fields = Split(rowText, Chr$(9))
+    If UBound(fields) < 1 Then GoTo RemoveFailed
+
+    ownerId = CLng(Val(CStr(fields(1))))
+    If ownerId <= 0 Then GoTo RemoveFailed
+
+    cachePath = App.Path & "\cache\users\" & CStr(ownerId) & ".cache"
+    cacheText = TrimInventoryCache(CStr(Proc_6_239_7FC170(cachePath, 0, 0)))
+    marker = Chr$(1) & CStr(furnitureId) & Chr$(9)
+    recordStart = InStr(1, cacheText, marker, vbBinaryCompare)
+    If recordStart > 0 Then
+        recordEnd = InStr(recordStart, cacheText, Chr$(2), vbBinaryCompare)
+        If recordEnd > 0 Then
+            cacheText = Left$(cacheText, recordStart - 1) & Mid$(cacheText, recordEnd + 1)
+            Proc_6_240_7FC2B0 cachePath, cacheText
+        End If
+    End If
+
+    socketIndex = CLng(Val(CStr(Proc_9_9_808AC0(ownerId, 0, 0))))
+    If socketIndex > 0 Then
+        payload = CStr(Proc_3_0_6D2AF0(furnitureId, Empty, "Ac"))
+        Proc_12_1_821AA0 CInt(socketIndex), payload, 0
+    End If
+
+    Proc_10_15_80BA40 = 1
+    Exit Function
+
+RemoveFailed:
+    Proc_10_15_80BA40 = 0
+End Function
+
+Private Function InventoryCacheRecord(ByVal furnitureId As Long, ByVal productId As Long, ByVal itemData As String, ByVal secondaryValue As Long) As String
+    InventoryCacheRecord = Chr$(1) & CStr(furnitureId) & Chr$(9) & _
+        CStr(productId) & Chr$(9) & itemData & Chr$(9) & _
+        CStr(secondaryValue) & Chr$(2)
+End Function
+
+Private Function TrimInventoryCache(ByVal cacheText As String) As String
+    Do While Len(cacheText) > 0 And (Right$(cacheText, 1) = vbCr Or Right$(cacheText, 1) = vbLf)
+        cacheText = Left$(cacheText, Len(cacheText) - 1)
+    Loop
+    TrimInventoryCache = cacheText
 End Function
 
 ' Original declaration: Private Sub Proc_10_16_80C480
