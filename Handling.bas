@@ -6689,7 +6689,54 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_194_7D3180
 Public Function Proc_6_194_7D3180(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim userId As String
+    Dim offset As Long
+    Dim slotIndex As Long
+    Dim hasBadge As Long
+    Dim badgeId As String
+    Dim equippedPayload As String
+    Dim roomId As Long
+
+    On Error GoTo BadgeUpdateFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex <= 0 Then GoTo BadgeUpdateFailed
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "B^" Then requestPayload = Mid$(requestPayload, 3)
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo BadgeUpdateFailed
+
+    Proc_5_0_6D3CD0 "UPDATE users_badges SET id_slot='0' WHERE id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "'", 0, 0
+
+    offset = 1
+    For slotIndex = 1 To 5
+        hasBadge = ReadWireLong(requestPayload, offset)
+        If hasBadge = 1 Then
+            badgeId = CStr(Proc_10_11_80A9C0(ReadWireString(requestPayload, offset), 0, 0))
+            If Len(badgeId) > 0 Then
+                Proc_5_0_6D3CD0 "UPDATE users_badges SET id_slot='" & CStr(slotIndex) & "' WHERE id_badge='" & _
+                    badgeId & "' AND id_user='" & Proc_10_11_80A9C0(userId, 0, 0) & "'", 0, 0
+            End If
+        End If
+    Next slotIndex
+
+    equippedPayload = CStr(Proc_6_195_7D38D0(userId, 0, 0))
+    Proc_6_244_801E80 socketIndex, "Cd" & CStr(Proc_3_0_6D2AF0(CLng(Val(userId)), Empty, vbNullString)) & equippedPayload, 0
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId > 0 Then Proc_6_247_8027E0 socketIndex, "Cd" & CStr(Proc_3_0_6D2AF0(CLng(Val(userId)), Empty, vbNullString)) & equippedPayload, 0
+
+    Proc_6_194_7D3180 = equippedPayload
+    Exit Function
+
+BadgeUpdateFailed:
     Proc_6_194_7D3180 = Empty
 End Function
 
@@ -7676,6 +7723,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_191_7D18B0 socketIndex, "DG", packetPayload
         Case "B]"
             Proc_6_193_7D2BB0 socketIndex, "B]", packetPayload
+        Case "B^"
+            Proc_6_194_7D3180 socketIndex, "B^", packetPayload
         Case "n" & Chr$(127)
             Proc_6_177_7C6580 socketIndex, "n" & Chr$(127), packetPayload
         Case "ny"
