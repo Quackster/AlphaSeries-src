@@ -4722,7 +4722,84 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_168_7C05F0
 Public Function Proc_6_168_7C05F0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim userId As String
+    Dim roomId As Long
+    Dim targetCount As Long
+    Dim targetIndex As Long
+    Dim targetUserId As String
+    Dim targetSocketIndex As Integer
+    Dim targetList As String
+    Dim targetIds As Variant
+    Dim inviteText As String
+    Dim filteredText As String
+    Dim payload As String
+    Dim offset As Long
+    Dim friendshipRow As String
+
+    On Error GoTo InviteFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "@b" Then requestPayload = Mid$(requestPayload, 3)
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo InviteFailed
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId <= 0 Then GoTo InviteFailed
+
+    offset = 1
+    targetCount = ReadWireLong(requestPayload, offset)
+    If targetCount <= 0 Then GoTo InviteFailed
+    If targetCount > 150 Then targetCount = 150
+
+    For targetIndex = 1 To targetCount
+        targetUserId = CStr(ReadWireLong(requestPayload, offset))
+        If Len(targetUserId) > 0 And targetUserId <> "0" Then
+            If InStr(1, "," & targetList & ",", "," & targetUserId & ",", vbBinaryCompare) = 0 Then
+                friendshipRow = CStr(Proc_5_2_6D4690("SELECT id_user FROM friendships WHERE has_accept='1' AND ((id_user='" & _
+                    Proc_10_11_80A9C0(userId, 0, 0) & "' AND id_friend='" & Proc_10_11_80A9C0(targetUserId, 0, 0) & "') OR (id_user='" & _
+                    Proc_10_11_80A9C0(targetUserId, 0, 0) & "' AND id_friend='" & Proc_10_11_80A9C0(userId, 0, 0) & "')) LIMIT 1", 0, 0))
+                If Len(friendshipRow) > 0 Then
+                    targetSocketIndex = HandlingSocketFromUserId(targetUserId)
+                    If targetSocketIndex > 0 Then
+                        If Len(targetList) > 0 Then targetList = targetList & ","
+                        targetList = targetList & targetUserId
+                    End If
+                End If
+            End If
+        End If
+    Next targetIndex
+
+    inviteText = Mid$(CStr(Proc_10_7_80A190(requestPayload, 0, 0)), 1, 122)
+    If Len(inviteText) = 0 Then inviteText = Mid$(ReadWireString(requestPayload, offset), 1, 122)
+    filteredText = CStr(Proc_6_22_6E9300(inviteText, 0, 0))
+    payload = CStr(Proc_3_0_6D2AF0(CLng(Val(userId)), Empty, "BG")) & filteredText & Chr$(2)
+
+    If Len(targetList) > 0 Then
+        targetIds = Split(targetList, ",")
+        For targetIndex = LBound(targetIds) To UBound(targetIds)
+            targetUserId = CStr(targetIds(targetIndex))
+            targetSocketIndex = HandlingSocketFromUserId(targetUserId)
+            If targetSocketIndex > 0 Then
+                Proc_6_244_801E80 targetSocketIndex, payload, 0
+                Proc_5_1_6D4110 "INSERT INTO logs_chat(id_user,id_room,timestamp,description,id_type,id_session) VALUES('" & _
+                    Proc_10_11_80A9C0(userId, 0, 0) & "','" & CStr(roomId) & "',UNIX_TIMESTAMP(),'" & _
+                    Proc_10_11_80A9C0("(Invite To: " & CStr(HandlingUserName(targetUserId)) & ") -- " & inviteText, 0, 0) & "','4','" & CStr(socketIndex) & "')", 0, 0
+            End If
+        Next targetIndex
+    End If
+
+    Proc_6_168_7C05F0 = payload
+    Exit Function
+
+InviteFailed:
     Proc_6_168_7C05F0 = Empty
 End Function
 
@@ -6003,6 +6080,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_173_7C3430 socketIndex, "@a", packetPayload
         Case "Ci"
             Proc_6_175_7C4800 socketIndex, "Ci", packetPayload
+        Case "@b"
+            Proc_6_168_7C05F0 socketIndex, "@b", packetPayload
         Case "E["
             Proc_6_45_714B60 socketIndex, "E[", packetPayload
         Case "A_"
