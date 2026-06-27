@@ -437,7 +437,51 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_12_6DFE90
 Public Function Proc_6_12_6DFE90(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim callerUserId As String
+    Dim targetUserId As String
+    Dim targetSocketIndex As Integer
+    Dim currentRoomId As Long
+    Dim alertMessage As String
+    Dim offset As Long
+
+    On Error GoTo DirectAlertFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "GN" Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    targetUserId = CStr(ReadWireLong(requestPayload, offset))
+    If Len(targetUserId) = 0 Or targetUserId = "0" Then targetUserId = CStr(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    If Len(targetUserId) = 0 Or targetUserId = "0" Then GoTo DirectAlertFailed
+
+    alertMessage = ReadWireString(requestPayload, offset)
+    If Len(alertMessage) = 0 Then alertMessage = CStr(Proc_10_7_80A190(requestPayload, 0, 0))
+    If Len(alertMessage) = 0 Then GoTo DirectAlertFailed
+
+    callerUserId = HandlingUserIdFromSocket(socketIndex)
+    If Len(callerUserId) = 0 Or callerUserId = "0" Then GoTo DirectAlertFailed
+    If Not HandlingUserHasPermission(callerUserId, "fuse_mod") Then GoTo DirectAlertFailed
+    If Not HandlingUserHasPermission(callerUserId, "fuse_alert") Then GoTo DirectAlertFailed
+    If ContainsUnsafeStaffAlert(alertMessage) Then GoTo DirectAlertFailed
+
+    targetSocketIndex = HandlingSocketFromUserId(targetUserId)
+    If targetSocketIndex <= 0 Then GoTo DirectAlertFailed
+
+    currentRoomId = HandlingCurrentRoomId(socketIndex, callerUserId)
+    Proc_5_1_6D4110 "INSERT INTO logs_moderation(id_type,id_user,id_target,id_target_2,timestamp,message,id_session) VALUES('3','" & _
+        Proc_10_11_80A9C0(callerUserId, 0, 0) & "','" & Proc_10_11_80A9C0(targetUserId, 0, 0) & "','" & CStr(currentRoomId) & "',UNIX_TIMESTAMP(),'" & _
+        Proc_10_11_80A9C0(alertMessage, 0, 0) & "','" & CStr(socketIndex) & "')", 0, 0
+
+    Proc_6_244_801E80 targetSocketIndex, "Ba" & alertMessage & Chr$(2), 0
+
+DirectAlertFailed:
     Proc_6_12_6DFE90 = Empty
 End Function
 
