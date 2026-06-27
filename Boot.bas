@@ -244,7 +244,37 @@ End Function
 
 ' Original declaration: Private Sub Proc_1_10_6C7690
 Public Function Proc_1_10_6C7690(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim rankIndex As Long
+    Dim hcLevel As Long
+    Dim callForHelpMessages As String
+    Dim categoryPayload As String
+    Dim moderatorMessages As String
+    Dim payload As String
+
+    On Error GoTo BuildFailed
+
+    callForHelpMessages = BuildStaffMessageList(1)
+    categoryPayload = BuildStaffCategoryPayload()
+    moderatorMessages = BuildStaffMessageList(2)
+
+    ReDim global_008292D8(0 To 20, 0 To 2)
+    For rankIndex = 0 To 20
+        For hcLevel = 0 To 2
+            payload = vbNullString
+            payload = payload & AppendPermissionPayload(rankIndex, hcLevel, "fuse_mod", callForHelpMessages & categoryPayload)
+            payload = payload & AppendPermissionPayload(rankIndex, hcLevel, "fuse_receive_calls_for_help", callForHelpMessages)
+            payload = payload & AppendPermissionPayload(rankIndex, hcLevel, "fuse_chatlog", vbNullString)
+            payload = payload & AppendPermissionPayload(rankIndex, hcLevel, "fuse_alert", vbNullString)
+            payload = payload & AppendPermissionPayload(rankIndex, hcLevel, "fuse_kick", vbNullString)
+            payload = payload & AppendPermissionPayload(rankIndex, hcLevel, "fuse_ban", vbNullString)
+            payload = payload & AppendPermissionPayload(rankIndex, hcLevel, "fuse_room_alert", vbNullString)
+            payload = payload & AppendPermissionPayload(rankIndex, hcLevel, "fuse_room_kick", vbNullString)
+            payload = payload & AppendPermissionPayload(rankIndex, hcLevel, "fuse_edit_localizations", moderatorMessages)
+            global_008292D8(rankIndex, hcLevel) = payload
+        Next hcLevel
+    Next rankIndex
+
+BuildFailed:
     Proc_1_10_6C7690 = Empty
 End Function
 
@@ -635,3 +665,75 @@ Private Sub BuildCampaignReplacementCache()
 
 CacheFailed:
 End Sub
+
+Private Function BuildStaffMessageList(ByVal messageType As Long) As String
+    Dim rows() As String
+    Dim rowIndex As Long
+    Dim payload As String
+
+    On Error GoTo BuildFailed
+    rows = Split(CStr(Proc_5_2_6D4690("SELECT message FROM staff_predefined_messages WHERE id_type='" & CStr(messageType) & "'", 0, 0)), Chr$(13))
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(rows(rowIndex)) > 0 Then
+            payload = payload & CStr(rows(rowIndex)) & Chr$(2)
+        End If
+    Next rowIndex
+
+BuildFailed:
+    BuildStaffMessageList = payload
+End Function
+
+Private Function BuildStaffCategoryPayload() As String
+    Dim rootRows() As String
+    Dim rootFields() As String
+    Dim childRows() As String
+    Dim childFields() As String
+    Dim rootIndex As Long
+    Dim childIndex As Long
+    Dim rootId As Long
+    Dim childCount As Long
+    Dim childPayload As String
+    Dim payload As String
+
+    On Error GoTo BuildFailed
+    rootRows = Split(CStr(Proc_5_2_6D4690("SELECT id,description FROM staff_predefined_categories WHERE id_parent='0'", 0, 0)), Chr$(13))
+    For rootIndex = LBound(rootRows) To UBound(rootRows)
+        If Len(rootRows(rootIndex)) > 0 Then
+            rootFields = Split(rootRows(rootIndex), Chr$(9))
+            If UBound(rootFields) >= 1 Then
+                rootId = CLng(Val(CStr(rootFields(0))))
+                childCount = 0
+                childPayload = vbNullString
+                childRows = Split(CStr(Proc_5_2_6D4690("SELECT id,description FROM staff_predefined_categories WHERE id_parent='" & CStr(rootId) & "'", 0, 0)), Chr$(13))
+                For childIndex = LBound(childRows) To UBound(childRows)
+                    If Len(childRows(childIndex)) > 0 Then
+                        childFields = Split(childRows(childIndex), Chr$(9))
+                        If UBound(childFields) >= 1 Then
+                            childCount = childCount + 1
+                            childPayload = childPayload & CStr(Proc_3_0_6D2AF0(CLng(Val(CStr(childFields(0)))), Empty, vbNullString)) & CStr(childFields(1)) & Chr$(2)
+                        End If
+                    End If
+                Next childIndex
+
+                payload = payload & CStr(Proc_3_0_6D2AF0(rootId, Empty, vbNullString)) & CStr(rootFields(1)) & Chr$(2)
+                payload = payload & CStr(Proc_3_0_6D2AF0(childCount, Empty, vbNullString)) & childPayload
+            End If
+        End If
+    Next rootIndex
+
+BuildFailed:
+    BuildStaffCategoryPayload = payload
+End Function
+
+Private Function AppendPermissionPayload(ByVal rankIndex As Long, ByVal hcLevel As Long, ByVal permissionName As String, ByVal payload As String) As String
+    On Error GoTo BuildFailed
+    If CBool(Proc_10_1_809790(rankIndex, vbNullString, permissionName, hcLevel)) Then
+        AppendPermissionPayload = permissionName & Chr$(2) & payload
+    Else
+        AppendPermissionPayload = vbNullString
+    End If
+    Exit Function
+
+BuildFailed:
+    AppendPermissionPayload = vbNullString
+End Function
