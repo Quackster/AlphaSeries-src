@@ -1249,7 +1249,44 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_77_727590
 Public Function Proc_6_77_727590(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim roomId As Long
+    Dim rowText As String
+    Dim fields() As String
+    Dim requiredFiles As String
+    Dim roomCaption As String
+    Dim payload As String
+    Dim offset As Long
+
+    On Error GoTo SendFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "FD" Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    roomId = ReadWireLong(requestPayload, offset)
+    If roomId <= 0 Then GoTo SendFailed
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT rooms.id,rooms_official.id,models.required_files,rooms_official.caption FROM rooms_official,rooms,models WHERE rooms.id='" & CStr(roomId) & "' AND rooms_official.id_room=rooms.id AND models.id=rooms.id_model AND models.type='1' LIMIT 1", 0, 0))
+    If Len(rowText) = 0 Then GoTo SendFailed
+
+    fields = Split(rowText, Chr$(9))
+    requiredFiles = HandlingField(fields, 2)
+    roomCaption = HandlingField(fields, 3)
+
+    payload = CStr(Proc_3_0_6D2AF0(roomId, Empty, "GE"))
+    payload = payload & requiredFiles & Chr$(2)
+    payload = CStr(Proc_3_0_6D2AF0(roomId, Empty, payload))
+    payload = payload & roomCaption & Chr$(2)
+    Proc_6_244_801E80 socketIndex, payload, 0
+
+SendFailed:
     Proc_6_77_727590 = Empty
 End Function
 
@@ -3149,6 +3186,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_64_721650 socketIndex, "D" & Chr$(127), packetPayload
         Case "Es"
             Proc_6_76_726CE0 socketIndex, "Es", packetPayload
+        Case "FD"
+            Proc_6_77_727590 socketIndex, "FD", packetPayload
         Case "A`"
             Proc_6_65_721A10 socketIndex, "A`", packetPayload
         Case "FA"
