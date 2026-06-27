@@ -395,7 +395,36 @@ End Sub
 
 ' Original declaration: Private Sub Form_Initialize() '68B530
 Private Sub Form_Initialize()
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim configText As String
+    Dim configParts() As String
+    Dim productKeyLines() As String
+
+    global_0082904C = &HFFFFFF
+    global_00829038 = "ALPHASERIES_FINAL (PREMIUM)"
+    global_0082903C = &H17
+    global_00829034 = False
+
+    On Error Resume Next
+    If CLng(Proc_3_3_6D3240("K", -1, Me)) <> 3 Then
+        Mistake.Show vbModal, Me
+        End
+    End If
+
+    Proc_11_1_821240 App.Path & "/CACHE/ROOMS", 0, 0
+    Proc_11_1_821240 App.Path & "/CACHE/PATHFINDER", 0, 0
+    Proc_11_1_821240 App.Path & "/CACHE/USERS", 0, 0
+
+    Main.Caption = Replace(Main.Caption, "%%", global_00829038, 1, -1, vbBinaryCompare)
+    global_008290AC = &HFFFFFF
+
+    configText = CStr(Proc_6_239_7FC170(App.Path & "/config.ini", 0, 7))
+    configParts = Split(configText, "=", -1, vbBinaryCompare)
+    If UBound(configParts) >= 7 Then
+        productKeyLines = Split(CStr(configParts(7)), vbCrLf, -1, vbBinaryCompare)
+        If UBound(productKeyLines) >= 0 Then productKey.Caption = CStr(productKeyLines(0))
+    End If
+
+    runServer
 End Sub
 
 ' Original declaration: Private Sub tmrRollers_Timer(Index As Integer) '6B5900
