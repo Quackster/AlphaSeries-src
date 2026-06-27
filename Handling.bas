@@ -8003,7 +8003,96 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_163_7B3480
 Public Function Proc_6_163_7B3480(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim loginTicket As String
+    Dim escapedTicket As String
+    Dim userRow As String
+    Dim fields() As String
+    Dim userId As String
+    Dim userName As String
+    Dim rankIndex As Long
+    Dim oldSocketIndex As Integer
+    Dim homeRoomId As Long
+    Dim emailValidated As Long
+    Dim updateAgeDays As Long
+    Dim pointIndex As Long
+    Dim pointValues(0 To 4) As Long
+    Dim creditsValue As Long
+    Dim sessionRecord As String
+    Dim groupRow As String
+    Dim groupFields() As String
+    Dim groupPayload As String
+
+    On Error GoTo LoginFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 1 Then packetPayload = CStr(args(1))
+    loginTicket = HandlingLoginTicketFromPayload(packetPayload)
+    If Len(loginTicket) = 0 Or UCase$(loginTicket) = "NULL" Then GoTo LoginFailed
+
+    escapedTicket = CStr(Proc_10_11_80A9C0(loginTicket, 0, 0))
+    userRow = CStr(Proc_5_2_6D4690("SELECT id,name,level,figure,motto,gender,activitypoints_0,credits,level_hc,hc_days,hc2_days,hc_presents,id_socket,nickname,homeroom,respect_amount,scratch_amount,language,hc_periods,hc2_periods,respect_received,respect_given,ROUND(online_time/60,0),ROUND((UNIX_TIMESTAMP()-create_time)/60/60/24,0),gifts_given,gifts_received,ROUND((UNIX_TIMESTAMP()-update_time)/60/60/24,0),hc_startperiod,ROUND((UNIX_TIMESTAMP()-hc_startperiod)/60/60/24,0),merge_name,tutorial_name,tutorial_clothes,tutorial_guide,login_session,achievement_score,activitypoints_1,id_favgroup,privileges_extra,accept_friends,activitypoints_2,amount_staffpicked,email_validated,email,settings_sound,online_time,activitypoints_3,activitypoints_4,ip_last FROM users WHERE login_ticket = '" & escapedTicket & "' LIMIT 1", 0, 0))
+    If Len(userRow) = 0 Then GoTo LoginFailed
+
+    fields = Split(userRow, Chr$(9))
+    userId = CStr(Val(HandlingField(fields, 0)))
+    If Len(userId) = 0 Or userId = "0" Then GoTo LoginFailed
+
+    oldSocketIndex = CInt(Val(HandlingField(fields, 12)))
+    If oldSocketIndex > 0 And oldSocketIndex <> socketIndex Then Proc_6_243_7FFEB0 oldSocketIndex, 0, 0
+
+    userName = HandlingField(fields, 1)
+    rankIndex = CLng(Val(HandlingField(fields, 2)))
+    creditsValue = CLng(Val(HandlingField(fields, 7)))
+    homeRoomId = CLng(Val(HandlingField(fields, 14)))
+    updateAgeDays = CLng(Val(HandlingField(fields, 26)))
+    emailValidated = CLng(Val(HandlingField(fields, 41)))
+    pointValues(0) = CLng(Val(HandlingField(fields, 6)))
+    pointValues(1) = CLng(Val(HandlingField(fields, 35)))
+    pointValues(2) = CLng(Val(HandlingField(fields, 39)))
+    pointValues(3) = CLng(Val(HandlingField(fields, 45)))
+    pointValues(4) = CLng(Val(HandlingField(fields, 46)))
+
+    Proc_5_0_6D3CD0 "UPDATE users SET login_ticket=NULL,id_socket='" & CStr(socketIndex) & "' WHERE id='" & Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 1", 0, 0
+    If updateAgeDays > 0 Then
+        Proc_5_0_6D3CD0 "UPDATE users SET respect_amount='5',scratch_amount='5',update_time=UNIX_TIMESTAMP() WHERE id='" & Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 1", 0, 0
+    End If
+
+    sessionRecord = userId & Chr$(2) & CStr(socketIndex) & Chr$(2) & userName & Chr$(2) & CStr(rankIndex) & Chr$(2) & loginTicket & Chr$(2)
+    HandlingStoreSocketSession socketIndex, sessionRecord
+
+    Proc_6_244_801E80 socketIndex, "@C", 0
+    Proc_6_20_6E88E0 socketIndex, 0, 0
+    Proc_6_244_801E80 socketIndex, "@F" & CStr(creditsValue) & ".0" & Chr$(2), 0
+    For pointIndex = 0 To 4
+        Proc_6_244_801E80 socketIndex, HandlingLoginActivityPointPayload(pointIndex, pointValues(pointIndex)), 0
+    Next pointIndex
+
+    If homeRoomId > 0 Then Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(homeRoomId, Empty, "GG")), 0
+    If emailValidated > 0 Then Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(emailValidated, Empty, "DX")), 0
+
+    Proc_6_244_801E80 socketIndex, "Cd" & CStr(Proc_3_0_6D2AF0(CLng(Val(userId)), Empty, vbNullString)) & CStr(Proc_6_195_7D38D0(userId, 0, 0)), 0
+    Proc_6_244_801E80 socketIndex, "E^" & CStr(Proc_3_0_6D2AF0(CLng(Val(userId)), Empty, vbNullString)) & CStr(Proc_6_196_7D3ED0(userId, 0, 0)), 0
+
+    If CLng(Val(HandlingField(fields, 36))) > 0 Then
+        groupRow = CStr(Proc_5_3_6D4CF0("SELECT group_name,group_description,id_badge,id_room FROM users_groups WHERE id='" & CStr(CLng(Val(HandlingField(fields, 36)))) & "' LIMIT 1", 0, 0))
+        If Len(groupRow) > 0 Then
+            groupFields = Split(groupRow, Chr$(9))
+            groupPayload = CStr(Proc_3_0_6D2AF0(CLng(Val(HandlingField(fields, 36))), Empty, "Dt"))
+            groupPayload = groupPayload & HandlingField(groupFields, 0) & Chr$(2)
+            groupPayload = groupPayload & HandlingField(groupFields, 1) & Chr$(2)
+            groupPayload = groupPayload & HandlingField(groupFields, 2) & Chr$(2)
+            groupPayload = groupPayload & CStr(Proc_3_0_6D2AF0(CLng(Val(HandlingField(groupFields, 3))), Empty, vbNullString)) & "H"
+            Proc_6_244_801E80 socketIndex, groupPayload, 0
+        End If
+    End If
+
+    Proc_6_163_7B3480 = userId
+    Exit Function
+
+LoginFailed:
+    If socketIndex > 0 Then Proc_6_243_7FFEB0 socketIndex, 0, 0
     Proc_6_163_7B3480 = Empty
 End Function
 
@@ -12591,6 +12680,49 @@ Private Function HandlingSocketIndex(ByRef args() As Variant) As Integer
 
 DefaultIndex:
     HandlingSocketIndex = 0
+End Function
+
+Private Function HandlingLoginTicketFromPayload(ByVal packetPayload As String) As String
+    Dim requestPayload As String
+
+    On Error GoTo TicketFailed
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "F_" Then requestPayload = Mid$(requestPayload, 3)
+    requestPayload = Trim$(CStr(Proc_10_10_80A7F0(requestPayload, 0, 0)))
+
+    If Left$(requestPayload, 2) = "F_" Then requestPayload = Mid$(requestPayload, 3)
+    HandlingLoginTicketFromPayload = requestPayload
+    Exit Function
+
+TicketFailed:
+    HandlingLoginTicketFromPayload = vbNullString
+End Function
+
+Private Sub HandlingStoreSocketSession(ByVal socketIndex As Integer, ByVal sessionRecord As String)
+    Dim marker As String
+    Dim startAt As Long
+    Dim endAt As Long
+
+    On Error GoTo StoreFailed
+    If socketIndex <= 0 Or Len(sessionRecord) = 0 Then Exit Sub
+
+    marker = "[1:" & CStr(socketIndex) & Chr$(1)
+    startAt = InStr(1, global_00829268, marker, vbTextCompare)
+    Do While startAt > 0
+        endAt = InStr(startAt + Len(marker), global_00829268, "]", vbBinaryCompare)
+        If endAt = 0 Then endAt = Len(global_00829268)
+        global_00829268 = Left$(global_00829268, startAt - 1) & Mid$(global_00829268, endAt + 1)
+        startAt = InStr(1, global_00829268, marker, vbTextCompare)
+    Loop
+
+    global_00829268 = global_00829268 & marker & sessionRecord & "]"
+
+StoreFailed:
+End Sub
+
+Private Function HandlingLoginActivityPointPayload(ByVal pointType As Long, ByVal pointsValue As Long) As String
+    HandlingLoginActivityPointPayload = CStr(Proc_3_0_6D2AF0(pointType, Empty, CStr(Proc_3_0_6D2AF0(pointsValue, Empty, "Fv")) & "H"))
 End Function
 
 Private Function HandlingUserIdFromSocket(ByVal socketIndex As Integer) As String
