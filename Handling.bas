@@ -6046,8 +6046,86 @@ End Function
 
 ' Original declaration: Private  Proc_6_185_7CC2D0(arg_C) '7CC2D0
 Public Function Proc_6_185_7CC2D0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_6_185_7CC2D0 = Empty
+    Dim botEntityId As Long
+    Dim botId As Long
+    Dim experienceDelta As Long
+    Dim petRow As String
+    Dim petFields() As String
+    Dim petName As String
+    Dim petFigure As String
+    Dim petLevel As Long
+    Dim petExperience As Long
+    Dim petEnergy As Long
+    Dim petNutrition As Long
+    Dim petScratches As Long
+    Dim roomId As Long
+    Dim nextLevel As Long
+    Dim maxExperience As Long
+    Dim payload As String
+    Dim levelSpeech As String
+
+    On Error GoTo ExperienceFailed
+    If UBound(args) < 0 Then GoTo ExperienceFailed
+
+    botEntityId = CLng(Val(CStr(args(0))))
+    If UBound(args) >= 1 Then experienceDelta = CLng(Val(CStr(args(1)))) Else experienceDelta = 0
+    If botEntityId <= 0 Then GoTo ExperienceFailed
+
+    botId = RepresentedBotRecordLong(botEntityId, 1)
+    If botId <= 0 Then
+        botId = botEntityId
+        botEntityId = RepresentedBotEntityFromBotId(botId)
+    End If
+    If botId <= 0 Then GoTo ExperienceFailed
+
+    petRow = CStr(Proc_5_2_6D4690("SELECT bots.name,bots.figure,bots_petdata.id_level,bots_petdata.experience,bots_petdata.energy,bots_petdata.nutrition,bots_petdata.scratches,bots.id_room FROM bots,bots_petdata WHERE bots.id='" & _
+        CStr(botId) & "' AND bots_petdata.id_bot=bots.id LIMIT 1", 0, 0))
+    If Len(petRow) = 0 Then GoTo ExperienceFailed
+
+    petFields = Split(petRow, Chr$(9))
+    If UBound(petFields) < 7 Then GoTo ExperienceFailed
+
+    petName = CStr(petFields(0))
+    petFigure = CStr(petFields(1))
+    petLevel = CLng(Val(CStr(petFields(2))))
+    petExperience = CLng(Val(CStr(petFields(3)))) + experienceDelta
+    petEnergy = CLng(Val(CStr(petFields(4))))
+    petNutrition = CLng(Val(CStr(petFields(5))))
+    petScratches = CLng(Val(CStr(petFields(6))))
+    roomId = CLng(Val(CStr(petFields(7))))
+    If petExperience < 0 Then petExperience = 0
+
+    maxExperience = RepresentedPetLevelMaxExperience(petLevel)
+    If maxExperience > 0 And petExperience >= maxExperience Then
+        nextLevel = petLevel + 1
+        If RepresentedPetLevelMaxExperience(nextLevel) > 0 Then
+            petLevel = nextLevel
+            petExperience = 0
+            levelSpeech = CStr(Proc_10_0_809570("com.client.bot.pet.level_up.speech", "gst sml", 0))
+            If roomId > 0 Then Proc_6_248_802B80 roomId, "@X" & CStr(Proc_3_0_6D2AF0(botEntityId, Empty, vbNullString)) & levelSpeech & Chr$(2) & "H", 0
+        End If
+    End If
+
+    Proc_5_0_6D3CD0 "UPDATE bots_petdata SET id_level='" & CStr(petLevel) & "',experience='" & CStr(petExperience) & _
+        "' WHERE id_bot='" & CStr(botId) & "'", 0, 0
+
+    If botEntityId <= 0 Then botEntityId = botId
+    payload = "IY" & CStr(Proc_3_0_6D2AF0(botEntityId, Empty, vbNullString)) & petName & Chr$(2)
+    payload = payload & CStr(Proc_3_0_6D2AF0(petLevel, Empty, vbNullString))
+    payload = payload & CStr(Proc_3_0_6D2AF0(petExperience, Empty, vbNullString))
+    payload = payload & CStr(Proc_3_0_6D2AF0(petEnergy, Empty, vbNullString))
+    payload = payload & CStr(Proc_3_0_6D2AF0(petNutrition, Empty, vbNullString))
+    payload = payload & CStr(Proc_3_0_6D2AF0(petScratches, Empty, vbNullString)) & petFigure & Chr$(2)
+    If roomId > 0 Then Proc_6_248_802B80 roomId, payload, 0
+
+    If roomId > 0 Then Proc_6_248_802B80 roomId, "Ia" & CStr(Proc_3_0_6D2AF0(botEntityId, Empty, vbNullString)) & _
+        CStr(Proc_3_0_6D2AF0(experienceDelta, Empty, vbNullString)) & CStr(Proc_3_0_6D2AF0(petExperience, Empty, vbNullString)), 0
+
+    Proc_6_185_7CC2D0 = petLevel
+    Exit Function
+
+ExperienceFailed:
+    Proc_6_185_7CC2D0 = 0
 End Function
 
 ' Original declaration: Private Sub Proc_6_186_7CD040
@@ -7869,6 +7947,32 @@ Private Function RepresentedPetCommandPayloadFromSql(ByVal petLevel As Long, ByV
 
 BuildFailed:
     RepresentedPetCommandPayloadFromSql = vbNullString
+End Function
+
+Private Function RepresentedPetLevelMaxExperience(ByVal petLevel As Long) As Long
+    Dim fields() As String
+
+    On Error GoTo LookupFailed
+    If petLevel < 0 Then GoTo LookupFailed
+
+    If IsArray(global_008292D0) Then
+        If petLevel >= LBound(global_008292D0) And petLevel <= UBound(global_008292D0) Then
+            If Len(CStr(global_008292D0(petLevel))) > 0 Then
+                fields = Split(CStr(global_008292D0(petLevel)), Chr$(9))
+                If UBound(fields) >= 1 Then
+                    RepresentedPetLevelMaxExperience = CLng(Val(CStr(fields(1))))
+                    Exit Function
+                End If
+            End If
+        End If
+    End If
+
+    RepresentedPetLevelMaxExperience = CLng(Val(CStr(Proc_5_2_6D4690("SELECT max_exp FROM bots_petlevels WHERE id_level='" & _
+        CStr(petLevel) & "' LIMIT 1", 0, 0))))
+    Exit Function
+
+LookupFailed:
+    RepresentedPetLevelMaxExperience = 0
 End Function
 
 Private Function IsRepresentedBotAllocated(ByVal roomSlot As Long, ByVal botId As Long) As Boolean
