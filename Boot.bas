@@ -114,7 +114,45 @@ End Function
 
 ' Original declaration: Private Sub Proc_1_13_6C9820
 Public Function Proc_1_13_6C9820(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim rows() As String
+    Dim rowIndex As Long
+    Dim wrapId As Long
+    Dim wrapCount As Long
+    Dim accessoryCount As Long
+    Dim colorCount As Long
+    Dim optionIndex As Long
+    Dim wrapPayload As String
+    Dim accessoryPayload As String
+    Dim colorPayload As String
+
+    On Error GoTo BuildFailed
+
+    global_0082925C = vbCr & CStr(Proc_5_2_6D4690("SELECT id FROM products WHERE sprite LIKE 'present_wrap*" & Chr$(37) & "'", Chr$(13), 0)) & vbCr
+    rows = Split(global_0082925C, vbCr)
+
+    For rowIndex = LBound(rows) To UBound(rows)
+        wrapId = CLng(Val(CStr(rows(rowIndex))))
+        If wrapId <> 0 Then
+            wrapCount = wrapCount + 1
+            wrapPayload = CStr(Proc_3_0_6D2AF0(wrapId, Empty, wrapPayload))
+        End If
+    Next rowIndex
+
+    accessoryCount = CLng(Val(CStr(Proc_10_0_809570("com.client.catalog.gifts.wrap.count.accessories", wrapCount, 0))))
+    For optionIndex = 1 To accessoryCount
+        accessoryPayload = CStr(Proc_3_0_6D2AF0(optionIndex, Empty, accessoryPayload))
+    Next optionIndex
+
+    colorCount = CLng(Val(CStr(Proc_10_0_809570("com.client.catalog.gifts.wrap.count.colors", 0, 0))))
+    For optionIndex = 1 To colorCount
+        colorPayload = CStr(Proc_3_0_6D2AF0(optionIndex, Empty, colorPayload))
+    Next optionIndex
+
+    global_00829260 = CStr(Proc_3_0_6D2AF0(accessoryCount, Empty, vbNullString)) & accessoryPayload
+    global_00829260 = CStr(Proc_3_0_6D2AF0(wrapCount, Empty, global_00829260)) & wrapPayload
+    global_00829260 = CStr(Proc_3_0_6D2AF0(colorCount, Empty, global_00829260)) & colorPayload
+
+BuildFailed:
     Proc_1_13_6C9820 = Empty
 End Function
 
