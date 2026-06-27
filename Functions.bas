@@ -548,8 +548,35 @@ End Function
 
 ' Original declaration: Private Sub Proc_10_19_80CCD0
 Public Function Proc_10_19_80CCD0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
-    Proc_10_19_80CCD0 = Empty
+    Dim userId As String
+    Dim socketIndex As Long
+    Dim emailState As Long
+    Dim payload As String
+
+    On Error GoTo ConfirmFailed
+    If UBound(args) < 0 Then GoTo ConfirmFailed
+
+    userId = CStr(Val(CStr(args(0))))
+    If userId = "0" Then GoTo ConfirmFailed
+
+    Proc_5_0_6D3CD0 "UPDATE users SET email_validated='1' WHERE id='" & Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 1", 0, 0
+    socketIndex = CLng(Val(CStr(Proc_9_9_808AC0(userId, 0, 0))))
+    If socketIndex <= 0 Then GoTo ConfirmFailed
+
+    emailState = CLng(Val(CStr(Proc_5_2_6D4690("SELECT email_validated FROM users WHERE id='" & Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 1", 0, 0))))
+    If emailState = 0 Then emailState = 1
+
+    payload = "L}" & CStr(emailState) & Chr$(2)
+    payload = payload & CStr(Proc_3_0_6D2AF0(1, Empty, vbNullString))
+    payload = payload & CStr(Proc_3_0_6D2AF0(1, Empty, vbNullString))
+    payload = payload & "HH"
+
+    Proc_12_1_821AA0 CInt(socketIndex), payload, 0
+    Proc_10_19_80CCD0 = 1
+    Exit Function
+
+ConfirmFailed:
+    Proc_10_19_80CCD0 = 0
 End Function
 
 ' Original declaration: Private  Proc_10_20_80CF60(arg_C, arg_10) '80CF60
