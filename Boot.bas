@@ -13,7 +13,47 @@ End Function
 
 ' Original declaration: Private Sub Proc_1_1_6BB340
 Public Function Proc_1_1_6BB340(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim productQuery As String
+    Dim catalogQuery As String
+    Dim maxProductId As Long
+    Dim maxCatalogId As Long
+
+    On Error GoTo BuildFailed
+
+    maxProductId = CLng(Val(CStr(Proc_5_2_6D4690("SELECT MAX(id) FROM products", 0, 0))))
+    If maxProductId < 0 Then maxProductId = 0
+    ReDim global_008292BC(0 To maxProductId)
+
+    productQuery = "SELECT id,id_type,action,NULL,NULL,default_sign,status_max,handitems,distance_allowed,is_tradeable,is_recycleable,is_signable,default_sign,min_roomrights,name,description,NULL,NULL,sprite,is_iconstack,id_deco,time_rent,square_x,square_y,square_z,NULL,effect,receive_badge,wire,id_counter,square_rotation,status_walkon,status_walkoff,NULL,has_charge,charge_price_credits,charge_price_activitypoints,charge_price_activitypoints_type,charge_size,NULL,is_marketofferable,is_badgeshop FROM products ORDER BY id ASC"
+    CacheRowsById global_008292BC, CStr(Proc_5_2_6D4690(productQuery, 0, 0))
+
+    maxCatalogId = CLng(Val(CStr(Proc_5_2_6D4690("SELECT MAX(id) FROM catalog_products", 0, 0))))
+    If maxCatalogId < 0 Then maxCatalogId = 0
+    ReDim global_008292C0(0 To maxCatalogId)
+
+    catalogQuery = "SELECT id,sprite,id_product,ctlg_pageid,type_secondary,amount,receive_badge,price_credits,price_activitypoints,type_activitypoints,allow_gifts,min_hc_level_required,replace_defaultsign FROM catalog_products ORDER BY id ASC"
+    CacheRowsById global_008292C0, CStr(Proc_5_2_6D4690(catalogQuery, 0, 0))
+
+    global_00829258 = vbCr & CStr(Proc_5_2_6D4690("SELECT id,items FROM products_deals ORDER BY id ASC", Chr$(13), 0)) & Chr$(13)
+    global_0082916C = CLng(Val(CStr(Proc_5_2_6D4690("SELECT id FROM products WHERE sprite='ecotron_box' LIMIT 1", 0, 0))))
+
+    Proc_1_17_6CCDC0 0, 0, 0
+    Proc_1_15_6CA000 0, 0, 0
+    Proc_7_0_8034A0 "Fy"
+    Proc_1_18_6CE9C0 0, 0, 0
+
+    global_008290A0 = Replace(CStr(Proc_5_2_6D4690("SELECT id FROM products WHERE id_counter IS NOT NULL", 0, 0)), Chr$(13), Chr$(9), 1, -1, vbBinaryCompare)
+    global_008290A4 = CLng(Val(CStr(Proc_5_2_6D4690("SELECT id FROM products WHERE id_type='11' LIMIT 1", 0, 0))))
+    global_008290A8 = CLng(Val(CStr(Proc_5_2_6D4690("SELECT id FROM products WHERE id_type='19' LIMIT 1", 0, 0))))
+
+    Proc_1_13_6C9820 0, 0, 0
+    BuildCampaignReplacementCache
+
+    global_00829078 = CStr(Proc_5_2_6D4690("SELECT id_product,type_secondary,id_contain,type_check FROM packages", 0, 0))
+    global_0082907C = CStr(Proc_5_2_6D4690("SELECT id,id_pet,id_race,color FROM packages_pets", 0, 0))
+    global_00829084 = vbCr & CStr(Proc_5_2_6D4690("SELECT id_product,months,level FROM products_containshc", Chr$(13), 0)) & Chr$(13)
+
+BuildFailed:
     Proc_1_1_6BB340 = Empty
 End Function
 
@@ -481,3 +521,50 @@ Public Function Proc_1_23_6D1480(ParamArray args() As Variant) As Variant
 LogFailed:
     Proc_1_23_6D1480 = Empty
 End Function
+
+Private Sub CacheRowsById(ByRef targetCache As Variant, ByVal rowText As String)
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim cacheIndex As Long
+
+    On Error GoTo CacheFailed
+    rows = Split(rowText, Chr$(13))
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(rows(rowIndex)) > 0 Then
+            fields = Split(rows(rowIndex), Chr$(9))
+            If UBound(fields) >= 0 Then
+                cacheIndex = CLng(Val(CStr(fields(0))))
+                If cacheIndex >= LBound(targetCache) And cacheIndex <= UBound(targetCache) Then
+                    targetCache(cacheIndex) = rows(rowIndex)
+                End If
+            End If
+        End If
+    Next rowIndex
+
+CacheFailed:
+End Sub
+
+Private Sub BuildCampaignReplacementCache()
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim payload As String
+    Dim replacementCount As Long
+
+    On Error GoTo CacheFailed
+    rows = Split(CStr(Proc_5_2_6D4690("SELECT sprite_default,sprite_replacement FROM products_campaign WHERE is_active='1'", 0, 0)), Chr$(13))
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(rows(rowIndex)) > 0 Then
+            fields = Split(rows(rowIndex), Chr$(9))
+            If UBound(fields) >= 1 Then
+                payload = payload & CStr(fields(0)) & Chr$(2) & CStr(fields(1)) & Chr$(2)
+                replacementCount = replacementCount + 1
+            End If
+        End If
+    Next rowIndex
+
+    global_00829094 = CStr(Proc_3_0_6D2AF0(replacementCount, Empty, vbNullString)) & payload
+
+CacheFailed:
+End Sub
