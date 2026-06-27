@@ -4825,7 +4825,105 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_130_75B770
 Public Function Proc_6_130_75B770(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim requestedSprite As String
+    Dim userId As String
+    Dim rowText As String
+    Dim userFields() As String
+    Dim hcLevel As Long
+    Dim hcDays As Long
+    Dim vipDays As Long
+    Dim presentsAvailable As Long
+    Dim daysSinceStart As Long
+    Dim activeDays As Long
+    Dim catalogProductId As Long
+    Dim productId As Long
+    Dim requiredDays As Long
+    Dim giftRows() As String
+    Dim giftParts() As String
+    Dim giftIndex As Long
+    Dim insertedFurnitureId As Long
+    Dim itemData As String
+    Dim itemClass As String
+    Dim responsePayload As String
+
+    On Error GoTo ClaimFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "G[" Then requestPayload = Mid$(requestPayload, 3)
+
+    requestedSprite = CStr(Proc_10_7_80A190(requestPayload, 0, 0))
+    If Len(requestedSprite) = 0 Then requestedSprite = CStr(Proc_10_6_809F10(requestPayload, 0, 0))
+    If Len(requestedSprite) = 0 Then requestedSprite = Trim$(Replace(Replace(requestPayload, Chr$(2), vbNullString, 1, -1, vbBinaryCompare), Chr$(0), vbNullString, 1, -1, vbBinaryCompare))
+    If Len(requestedSprite) = 0 Then GoTo ClaimFailed
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If socketIndex <= 0 Or Len(userId) = 0 Or userId = "0" Then GoTo ClaimFailed
+
+    If Len(global_00829178) = 0 Or Len(global_0082917C) = 0 Then Proc_1_18_6CE9C0 0, 0, 0
+
+    catalogProductId = CLng(Val(CStr(Proc_5_2_6D4690("SELECT id FROM catalog_products WHERE sprite='" & _
+        Proc_10_11_80A9C0(requestedSprite, 0, 0) & "' LIMIT 1", 0, 0))))
+    If catalogProductId <= 0 Then GoTo ClaimFailed
+
+    giftRows = Split(Replace(global_0082917C, "[", vbNullString, 1, -1, vbBinaryCompare), "]")
+    For giftIndex = LBound(giftRows) To UBound(giftRows)
+        If Len(giftRows(giftIndex)) > 0 Then
+            giftParts = Split(Replace(CStr(giftRows(giftIndex)), Chr$(1), Chr$(0), 1, -1, vbBinaryCompare), Chr$(0))
+            If UBound(giftParts) >= 2 Then
+                If CLng(Val(CStr(giftParts(0)))) = catalogProductId Then
+                    productId = CLng(Val(CStr(giftParts(1))))
+                    requiredDays = CLng(Val(CStr(giftParts(2))))
+                    Exit For
+                End If
+            End If
+        End If
+    Next giftIndex
+    If productId <= 0 Then GoTo ClaimFailed
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT level_hc,hc_days,hc2_days,hc_presents,ROUND((UNIX_TIMESTAMP()-hc_startperiod)/60/60/24,0) FROM users WHERE id='" & _
+        Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 1", 0, 0))
+    If Len(rowText) = 0 Then GoTo ClaimFailed
+
+    userFields = Split(rowText, Chr$(9))
+    hcLevel = CLng(Val(HandlingField(userFields, 0)))
+    hcDays = CLng(Val(HandlingField(userFields, 1)))
+    vipDays = CLng(Val(HandlingField(userFields, 2)))
+    presentsAvailable = CLng(Val(HandlingField(userFields, 3)))
+    daysSinceStart = CLng(Val(HandlingField(userFields, 4)))
+    If hcLevel > 1 Then
+        activeDays = vipDays
+    Else
+        activeDays = hcDays
+    End If
+    activeDays = activeDays - daysSinceStart
+    If activeDays < 0 Then activeDays = 0
+    If presentsAvailable <= 0 Or activeDays < requiredDays Then GoTo ClaimFailed
+
+    itemData = CStr(Proc_8_12_806C30(productId, 24, 0))
+    Proc_5_0_6D3CD0 "INSERT INTO furnitures(id_product,id_ctlgproduct,id_owner,task_owner,task_time,position_r,sign) VALUES('" & _
+        CStr(productId) & "','" & CStr(catalogProductId) & "','" & Proc_10_11_80A9C0(userId, 0, 0) & "','" & _
+        Proc_10_11_80A9C0(userId, 0, 0) & "',UNIX_TIMESTAMP(),'0','" & Proc_10_11_80A9C0(itemData, 0, 0) & "')", 0, 0
+    insertedFurnitureId = CLng(Val(CStr(Proc_5_2_6D4690("SELECT id FROM furnitures WHERE id_owner='" & Proc_10_11_80A9C0(userId, 0, 0) & _
+        "' AND id_product='" & CStr(productId) & "' ORDER BY id DESC LIMIT 1", 0, 0))))
+
+    itemClass = "i"
+    If CLng(Val(CStr(Proc_8_12_806C30(productId, 0, 0)))) = 9 Then itemClass = "I"
+    responsePayload = CStr(Proc_3_0_6D2AF0(productId, Empty, "AC"))
+    responsePayload = responsePayload & CStr(Proc_8_12_806C30(productId, 24, 0)) & Chr$(2)
+    responsePayload = responsePayload & "HHHI" & itemClass & Chr$(2)
+    responsePayload = CStr(Proc_3_0_6D2AF0(insertedFurnitureId, Empty, responsePayload)) & Chr$(2) & "IH"
+    Proc_6_244_801E80 socketIndex, responsePayload, 0
+
+    Proc_5_0_6D3CD0 "UPDATE users SET hc_presents=hc_presents-1 WHERE id='" & Proc_10_11_80A9C0(userId, 0, 0) & "'", 0, 0
+    Proc_6_140_769400 socketIndex, "FT", vbNullString
+
+ClaimFailed:
     Proc_6_130_75B770 = Empty
 End Function
 
