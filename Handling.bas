@@ -7308,7 +7308,76 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_150_777FA0
 Public Function Proc_6_150_777FA0(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim offset As Long
+    Dim furnitureId As Long
+    Dim userId As String
+    Dim roomId As Long
+    Dim rowText As String
+    Dim fields() As String
+    Dim productId As Long
+    Dim packageRow As String
+    Dim packageFields() As String
+    Dim packageType As String
+    Dim containedId As Long
+    Dim actionText As String
+
+    On Error GoTo UseDone
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex <= 0 Then GoTo UseDone
+
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "FH" Then requestPayload = Mid$(requestPayload, 3)
+
+    offset = 1
+    furnitureId = ReadWireLong(requestPayload, offset)
+    If furnitureId <= 0 Then furnitureId = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    If furnitureId <= 0 Then GoTo UseDone
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo UseDone
+
+    roomId = HandlingCurrentRoomId(socketIndex, userId)
+    If roomId <= 0 Then GoTo UseDone
+
+    rowText = CStr(Proc_5_2_6D4690("SELECT id_product FROM furnitures WHERE id='" & CStr(furnitureId) & "' AND id_room='" & CStr(roomId) & "' AND position_wall IS NULL LIMIT 1", 0, 0))
+    If Len(rowText) = 0 Then GoTo UseDone
+
+    fields = Split(rowText, Chr$(9))
+    productId = CLng(Val(HandlingField(fields, 0)))
+    If productId <= 0 Then GoTo UseDone
+
+    packageRow = CStr(Proc_5_2_6D4690("SELECT id_product,type_secondary,id_contain,type_check FROM packages WHERE id_product='" & CStr(productId) & "' LIMIT 1", 0, 0))
+    If Len(packageRow) > 0 Then
+        packageFields = Split(packageRow, Chr$(9))
+        packageType = LCase$(HandlingField(packageFields, 1))
+        containedId = CLng(Val(HandlingField(packageFields, 2)))
+        If packageType = "packages_pets" And containedId > 0 Then
+            Proc_6_150_777FA0 = Proc_6_86_73B0D0(socketIndex, "FH", requestPayload)
+            Exit Function
+        ElseIf Len(packageType) > 0 Then
+            Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(furnitureId, Empty, CStr(Proc_3_0_6D2AF0(productId, Empty, "L}" & packageType & Chr$(2))))) & "H", 0
+            Proc_6_150_777FA0 = furnitureId
+            Exit Function
+        End If
+    End If
+
+    actionText = UCase$(CStr(Proc_8_12_806C30(productId, 7, 0)))
+    If actionText = "CLICK_ON" Or actionText = "SWITCH_ITEMSTATE" Or Len(actionText) = 0 Then
+        Proc_6_149_775C10 socketIndex, "Ch", requestPayload
+    Else
+        Proc_6_149_775C10 socketIndex, "Ch", requestPayload
+    End If
+
+    Proc_6_150_777FA0 = furnitureId
+    Exit Function
+
+UseDone:
     Proc_6_150_777FA0 = Empty
 End Function
 
@@ -11885,6 +11954,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_159_79FCD0 socketIndex, "AI", packetPayload
         Case "Ch"
             Proc_6_149_775C10 socketIndex, "Ch", packetPayload
+        Case "FH"
+            Proc_6_150_777FA0 socketIndex, "FH", packetPayload
         Case "@B"
             Proc_6_78_7279A0 socketIndex, "@B", packetPayload
         Case "rv"
