@@ -3749,7 +3749,20 @@ End Function
 
 ' Original declaration: Private Sub Proc_6_123_754020
 Public Function Proc_6_123_754020(ParamArray args() As Variant) As Variant
-    ' TODO: Reconstruct behavior from decompiled reference.
+    Dim socketIndex As Integer
+    Dim queryText As String
+    Dim rowText As String
+    Dim payload As String
+
+    On Error GoTo NavigatorFailed
+
+    socketIndex = HandlingSocketIndex(args)
+    queryText = OfficialNavigatorQuery()
+    rowText = CStr(Proc_5_2_6D4690(queryText, 0, 0))
+    payload = OfficialNavigatorPayload(rowText)
+    Proc_6_244_801E80 socketIndex, "GB" & payload, 0
+
+NavigatorFailed:
     Proc_6_123_754020 = Empty
 End Function
 
@@ -6389,6 +6402,93 @@ Private Function NavigatorSearchTerm(ByVal rawText As String) As String
 
     escapedText = CStr(Proc_10_11_80A9C0(rawText, 0, 0))
     NavigatorSearchTerm = Replace(escapedText, "%", vbNullString)
+End Function
+
+Private Function OfficialNavigatorQuery() As String
+    Dim queryText As String
+    Dim separator As String
+
+    separator = " UNION ALL "
+
+    queryText = "SELECT rooms_official.id_type,rooms_official.id_style,rooms_official.icon,"
+    queryText = queryText & "rooms_official.caption,rooms_official.caption_2,rooms_official.caption_3,"
+    queryText = queryText & "NULL,rooms.id,rooms.name,users.name,rooms.status_door,rooms.visitors_now,"
+    queryText = queryText & "rooms.visitors_max,rooms.description,rooms_categories.has_trading,NULL,"
+    queryText = queryText & "rooms.rate,rooms.id_category,rooms.icon,rooms.tag_1,rooms.tag_2,"
+    queryText = queryText & "rooms.allow_otherspets,NULL,NULL,NULL,rooms_official.id_parent,"
+    queryText = queryText & "rooms_official.id,rooms_official.requires_level_in FROM users,rooms,"
+    queryText = queryText & "rooms_categories,rooms_official WHERE rooms_official.id_type='2' "
+    queryText = queryText & "AND rooms_official.id_room IS NOT NULL AND rooms.id=rooms_official.id_room "
+    queryText = queryText & "AND users.id=rooms.id_owner AND rooms_categories.id=rooms.id_category "
+    queryText = queryText & "GROUP BY rooms_official.id"
+
+    queryText = queryText & separator & "SELECT rooms_official.id_type,rooms_official.id_style,"
+    queryText = queryText & "rooms_official.icon,rooms_official.caption,rooms_official.caption_2,"
+    queryText = queryText & "rooms_official.caption_3,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,"
+    queryText = queryText & "NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,rooms_official.id_parent,"
+    queryText = queryText & "rooms_official.id,rooms_official.requires_level_in FROM rooms_official "
+    queryText = queryText & "WHERE rooms_official.id_type='1' GROUP BY rooms_official.id"
+
+    queryText = queryText & separator & "SELECT rooms_official.id_type,rooms_official.id_style,"
+    queryText = queryText & "rooms_official.icon,rooms_official.caption,rooms_official.caption_2,"
+    queryText = queryText & "rooms_official.caption_3,NULL,rooms.id,rooms.name,NULL,rooms.status_door,"
+    queryText = queryText & "rooms.visitors_now,rooms.visitors_max,rooms.description,"
+    queryText = queryText & "rooms_categories.has_trading,NULL,rooms.rate,rooms.id_category,rooms.icon,"
+    queryText = queryText & "rooms.tag_1,rooms.tag_2,rooms.allow_otherspets,models.name,"
+    queryText = queryText & "models.required_files,models.visitors_max,rooms_official.id_parent,"
+    queryText = queryText & "rooms_official.id,rooms_official.requires_level_in FROM models,rooms,"
+    queryText = queryText & "rooms_categories,rooms_official WHERE rooms_official.id_type='3' "
+    queryText = queryText & "AND rooms_official.id_room IS NOT NULL AND rooms.id=rooms_official.id_room "
+    queryText = queryText & "AND models.id=rooms.id_model AND rooms_categories.id=rooms.id_category "
+    queryText = queryText & "GROUP BY rooms_official.id"
+
+    queryText = queryText & separator & "SELECT rooms_official.id_type,rooms_official.id_style,"
+    queryText = queryText & "rooms_official.icon,rooms_official.caption,rooms_official.caption_2,"
+    queryText = queryText & "rooms_official.caption_3,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,"
+    queryText = queryText & "NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,rooms_official.id_parent,"
+    queryText = queryText & "rooms_official.id,rooms_official.requires_level_in FROM rooms_official "
+    queryText = queryText & "WHERE rooms_official.id_type='4' GROUP BY rooms_official.id "
+    queryText = queryText & "ORDER BY 27 ASC LIMIT 255"
+
+    OfficialNavigatorQuery = queryText
+End Function
+
+Private Function OfficialNavigatorPayload(ByVal roomRows As String) As String
+    Dim rows() As String
+    Dim fields() As String
+    Dim rowIndex As Long
+    Dim fieldIndex As Long
+    Dim itemCount As Long
+    Dim rowPayload As String
+    Dim payload As String
+
+    On Error GoTo BuildFailed
+
+    If Len(roomRows) = 0 Then GoTo BuildFailed
+    rows = Split(roomRows, Chr$(13))
+    For rowIndex = LBound(rows) To UBound(rows)
+        If Len(rows(rowIndex)) > 0 Then
+            fields = Split(rows(rowIndex), Chr$(9))
+            If UBound(fields) >= 26 Then
+                rowPayload = CStr(Proc_3_0_6D2AF0(CLng(Val(NavigatorField(fields, 0))), Empty, vbNullString))
+                rowPayload = rowPayload & CStr(Proc_3_0_6D2AF0(CLng(Val(NavigatorField(fields, 1))), Empty, vbNullString))
+                rowPayload = rowPayload & CStr(Proc_3_0_6D2AF0(CLng(Val(NavigatorField(fields, 2))), Empty, vbNullString))
+                For fieldIndex = 3 To 24
+                    rowPayload = rowPayload & NavigatorField(fields, fieldIndex) & Chr$(2)
+                Next fieldIndex
+                rowPayload = rowPayload & CStr(Proc_3_0_6D2AF0(CLng(Val(NavigatorField(fields, 25))), Empty, vbNullString))
+                rowPayload = rowPayload & CStr(Proc_3_0_6D2AF0(CLng(Val(NavigatorField(fields, 26))), Empty, vbNullString))
+                If UBound(fields) >= 27 Then
+                    rowPayload = rowPayload & CStr(Proc_3_0_6D2AF0(CLng(Val(NavigatorField(fields, 27))), Empty, vbNullString))
+                End If
+                payload = payload & rowPayload
+                itemCount = itemCount + 1
+            End If
+        End If
+    Next rowIndex
+
+BuildFailed:
+    OfficialNavigatorPayload = CStr(Proc_3_0_6D2AF0(itemCount, Empty, vbNullString)) & payload
 End Function
 
 Private Function RecommendedRoomPayload(ByVal treeIndex As Long) As String
