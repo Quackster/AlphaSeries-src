@@ -12412,8 +12412,10 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_124_754D90 socketIndex, "E~", packetPayload
         Case "EY"
             Proc_6_46_714D50 socketIndex, "EY", packetPayload
+        Case "Gj"
+            Proc_6_88_73E4F0 socketIndex, "Gj", packetPayload
         Case "@L"
-            Proc_6_88_73E4F0 socketIndex, "@L", packetPayload
+            Proc_6_176_7C4EE0 socketIndex, "@L", packetPayload
         Case "@f"
             Proc_6_170_7C1100 socketIndex, "@f", packetPayload
         Case "DF"
