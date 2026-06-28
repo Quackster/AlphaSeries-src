@@ -8023,6 +8023,7 @@ Public Function Proc_6_163_7B3480(ParamArray args() As Variant) As Variant
     Dim groupRow As String
     Dim groupFields() As String
     Dim groupPayload As String
+    Dim motdMessage As String
 
     On Error GoTo LoginFailed
 
@@ -8054,7 +8055,7 @@ Public Function Proc_6_163_7B3480(ParamArray args() As Variant) As Variant
     pointValues(3) = CLng(Val(HandlingField(fields, 45)))
     pointValues(4) = CLng(Val(HandlingField(fields, 46)))
 
-    Proc_5_0_6D3CD0 "UPDATE users SET login_ticket=NULL,id_socket='" & CStr(socketIndex) & "' WHERE id='" & Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 1", 0, 0
+    Proc_5_0_6D3CD0 "UPDATE users SET login_ticket=null,id_socket = '" & CStr(socketIndex) & "' WHERE id = '" & Proc_10_11_80A9C0(userId, 0, 0) & "'", 0, 0
     If updateAgeDays > 0 Then
         Proc_5_0_6D3CD0 "UPDATE users SET respect_amount='5',scratch_amount='5',update_time=UNIX_TIMESTAMP() WHERE id='" & Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 1", 0, 0
     End If
@@ -8071,6 +8072,11 @@ Public Function Proc_6_163_7B3480(ParamArray args() As Variant) As Variant
 
     If homeRoomId > 0 Then Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(homeRoomId, Empty, "GG")), 0
     If emailValidated > 0 Then Proc_6_244_801E80 socketIndex, CStr(Proc_3_0_6D2AF0(emailValidated, Empty, "DX")), 0
+    Proc_6_244_801E80 socketIndex, "@a" & "com.server.socket.location" & Chr$(2) & "invalid.location" & Chr$(2), 0
+    If CLng(Val(CStr(Proc_10_0_809570("com.client.motd.message.enabled", 0, 0)))) <> 0 Then
+        motdMessage = Replace(CStr(Proc_10_0_809570("com.client.motd.message", vbNullString, 0)), "\n", Chr$(10), 1, -1, vbBinaryCompare)
+        If Len(motdMessage) > 0 Then Proc_6_244_801E80 socketIndex, CStr(Proc_2_4_6D28B0(Len(motdMessage), 0, 0)) & " " & motdMessage & Chr$(2), 0
+    End If
 
     Proc_6_244_801E80 socketIndex, "Cd" & CStr(Proc_3_0_6D2AF0(CLng(Val(userId)), Empty, vbNullString)) & CStr(Proc_6_195_7D38D0(userId, 0, 0)), 0
     Proc_6_244_801E80 socketIndex, "E^" & CStr(Proc_3_0_6D2AF0(CLng(Val(userId)), Empty, vbNullString)) & CStr(Proc_6_196_7D3ED0(userId, 0, 0)), 0

@@ -89,7 +89,7 @@ End Function
 Public Function Proc_8_4_804970(ParamArray args() As Variant) As Variant
     On Error Resume Next
     Main.Hide
-    MsgBox "Das Lizenzsystem ist zurzeit nicht erreichbar. Versuch es spaeter wieder!", vbCritical
+    MsgBox "Das Lizenzsystem ist zurzeit nicht erreichbar. Versuch es sp" & Chr$(228) & "ter wieder!", vbCritical
     End
     Proc_8_4_804970 = Empty
 End Function
