@@ -11586,6 +11586,29 @@ MottoFailed:
     Proc_6_230_7F3D20 = Empty
 End Function
 
+' Original declaration: Private Sub Proc_7F44D0
+Public Function Proc_7F44D0(ParamArray args() As Variant) As Variant
+    Dim packetPayload As String
+    Dim requestPayload As String
+    Dim firstValue As Long
+
+    On Error GoTo ParseDone
+
+    If UBound(args) >= 2 Then packetPayload = CStr(args(2))
+    If Len(packetPayload) = 0 And UBound(args) >= 1 Then packetPayload = CStr(args(1))
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "oL" Then requestPayload = Mid$(requestPayload, 3)
+
+    If Len(packetPayload) >= 3 Then Proc_10_5_809D80 packetPayload, 3, 0
+    firstValue = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    Proc_7F44D0 = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    Exit Function
+
+ParseDone:
+    Proc_7F44D0 = Empty
+End Function
+
 ' Original declaration: Private Sub Proc_6_231_7F4510
 Public Function Proc_6_231_7F4510(ParamArray args() As Variant) As Variant
     Dim socketIndex As Integer
@@ -12073,6 +12096,23 @@ SendFailed:
     Proc_6_237_7F9ED0 = Empty
 End Function
 
+' Original declaration: Private Sub Proc_7FA5A0
+Public Function Proc_7FA5A0(ParamArray args() As Variant) As Variant
+    Dim socketIndex As Integer
+
+    On Error GoTo GuardDone
+
+    socketIndex = HandlingSocketIndex(args)
+    If socketIndex <= 0 Then GoTo GuardDone
+
+    ' The original toggles a hidden per-session guard at offset +428h and only
+    ' falls through to cleanup when that guard is already clear. The recreated
+    ' session record has no equivalent slot, so keep this route non-destructive.
+
+GuardDone:
+    Proc_7FA5A0 = Empty
+End Function
+
 ' Original declaration: Private Sub Proc_6_238_7FA670
 Public Function Proc_6_238_7FA670(ParamArray args() As Variant) As Variant
     Dim socketIndex As Integer
@@ -12173,6 +12213,7 @@ Public Function Proc_6_241_7FC380(ParamArray args() As Variant) As Variant
     Dim packetLength As Long
     Dim packetPayload As String
     Dim packetCode As String
+    Dim packetCount As Long
 
     On Error GoTo DispatchDone
     If UBound(args) < 1 Then GoTo DispatchDone
@@ -12181,7 +12222,7 @@ Public Function Proc_6_241_7FC380(ParamArray args() As Variant) As Variant
     packetBuffer = CStr(Proc_10_9_80A680(CStr(args(1)), 0, 0))
     If Proc_11_2_821390(socketIndex, 0, 0) <> 1 Then GoTo DispatchDone
 
-    Do While Len(packetBuffer) > 2
+    Do While Len(packetBuffer) > 2 And packetCount < 10
         packetBuffer = Mid$(packetBuffer, 2)
         packetLength = CLng(Val(CStr(Proc_3_4_6D3620(Mid$(packetBuffer, 1, 2)))))
         If packetLength <= 0 Or Len(packetBuffer) < packetLength + 2 Then Exit Do
@@ -12194,6 +12235,7 @@ Public Function Proc_6_241_7FC380(ParamArray args() As Variant) As Variant
         End If
 
         DispatchPreReadyPacket socketIndex, packetCode, packetPayload
+        packetCount = packetCount + 1
         packetBuffer = Mid$(packetBuffer, packetLength + 3)
     Loop
 
@@ -12203,6 +12245,8 @@ End Function
 
 Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode As String, ByVal packetPayload As String)
     Select Case packetCode
+        Case "~" & Chr$(228)
+            End
         Case "oD"
             Proc_6_231_7F4510 socketIndex, packetPayload, 0
         Case "Gd"
@@ -12234,6 +12278,10 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_142_76B310 socketIndex, "rv", packetPayload
         Case "pa"
             Proc_6_244_801E80 socketIndex, "J|H", 0
+        Case "Ce"
+            DispatchPreReadySoundSetting socketIndex, packetPayload
+        Case "Cy"
+            ' Recovered as a session-cache guard before quest packet routes.
         Case "pb"
             Proc_6_234_7F75C0 socketIndex, "pb", packetPayload
         Case "p^"
@@ -12276,8 +12324,12 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_98_747D80 socketIndex, "EU", packetPayload
         Case "Er"
             Proc_6_206_7DA450 socketIndex, "Er", packetPayload
+        Case "CD"
+            Proc_7FA5A0 socketIndex, "CD", packetPayload
         Case "@G"
             Proc_6_237_7F9ED0 socketIndex, "@G", packetPayload
+        Case "D{", "Fe"
+            ' Recovered as guard-only branches before the effects handlers.
         Case "@t"
             Proc_6_26_7034C0 socketIndex, "@t", packetPayload
         Case "@w"
@@ -12286,10 +12338,14 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_28_709DA0 socketIndex, "@x", packetPayload
         Case "Cd"
             Proc_6_101_749540 socketIndex, "EA", packetPayload
+        Case "Et", "Eu"
+            Proc_6_102_749C50 socketIndex, packetCode, packetPayload
         Case "@Z"
             Proc_6_19_6E8040 socketIndex, global_0082912C, "Gz"
         Case "oW"
             Proc_6_18_6E7480 socketIndex, "GY", packetPayload
+        Case "Cn"
+            Proc_6_30_70DC90 socketIndex, packetPayload, "EG"
         Case "A^"
             Proc_6_13_6E0A80 socketIndex, "A^", packetPayload
         Case "A]"
@@ -12306,12 +12362,22 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_36_70F7B0 socketIndex, "Fc", packetPayload
         Case "Fd"
             Proc_6_35_70F630 socketIndex, "Fd", packetPayload
+        Case "Ae"
+            DispatchPreReadyCatalogIndex socketIndex
         Case "FC"
             Proc_6_104_74AB60 socketIndex, "FC", packetPayload
         Case "@]"
             Proc_6_105_74AD50 socketIndex, "@]", packetPayload
         Case "Af"
             Proc_6_136_765F10 socketIndex, "Af", packetPayload
+        Case "Fv"
+            Proc_6_125_755650 socketIndex, "Fv", packetPayload
+        Case "FG"
+            Proc_6_58_71FCA0 socketIndex, "FG", packetPayload
+        Case "Bv"
+            Proc_6_59_71FEE0 socketIndex, "Bv", packetPayload
+        Case "@{"
+            Proc_6_79_72A430 socketIndex, "@{", packetPayload
         Case "Ew"
             Proc_6_15_6E1900 socketIndex, "Ew", packetPayload
         Case "Ex"
@@ -12333,7 +12399,9 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
         Case "Gc"
             Proc_6_107_74B7E0 socketIndex, "Gc", packetPayload
         Case "GG"
-            Proc_6_47_714F60 socketIndex, "GG", packetPayload
+            Proc_6_10_6DE1D0 socketIndex, "GG", packetPayload
+        Case "F@"
+            Proc_6_47_714F60 socketIndex, "F@", packetPayload
         Case "FB"
             Proc_6_44_7145E0 socketIndex, "FB", packetPayload
         Case "Ab"
@@ -12342,6 +12410,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_48_7151E0 socketIndex, "EZ", packetPayload
         Case "E\"
             Proc_6_49_715D30 socketIndex, "E\", packetPayload
+        Case "FP"
+            Proc_6_43_713680 socketIndex, "FF", packetPayload
         Case "FF"
             Proc_6_43_713680 socketIndex, "FF", packetPayload
         Case "FQ"
@@ -12374,6 +12444,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_11_6DF4A0 socketIndex, "GJ", packetPayload
         Case "GM"
             Proc_6_1_6D8B70 socketIndex, "GM", packetPayload
+        Case "GN"
+            Proc_6_12_6DFE90 socketIndex, "GN", packetPayload
         Case "GO"
             Proc_6_2_6D9880 socketIndex, "GO", packetPayload
         Case "GP"
@@ -12416,10 +12488,18 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_88_73E4F0 socketIndex, "Gj", packetPayload
         Case "@L"
             Proc_6_176_7C4EE0 socketIndex, "@L", packetPayload
+        Case "@u", "Ao"
+            Proc_6_53_718E00 socketIndex, packetCode, packetPayload
+        Case "@j"
+            Proc_6_182_7CAAD0 socketIndex, "@j", packetPayload
         Case "@f"
             Proc_6_170_7C1100 socketIndex, "@f", packetPayload
         Case "DF"
             Proc_6_169_7C0DC0 socketIndex, "DF", packetPayload
+        Case "@O"
+            ' Recovered as an explicit guard before D}/D~ room-user state broadcasts.
+        Case "D}", "D~"
+            DispatchPreReadyRoomUserState socketIndex
         Case "@a"
             Proc_6_173_7C3430 socketIndex, "@a", packetPayload
         Case "Ci"
@@ -12448,10 +12528,20 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_193_7D2BB0 socketIndex, "B]", packetPayload
         Case "B^"
             Proc_6_194_7D3180 socketIndex, "B^", packetPayload
+        Case "pg"
+            ' Original updates a hidden four-slot session counter from the packet value.
         Case "AK"
             Proc_6_197_7D43C0 socketIndex, "AK", packetPayload
         Case "AO"
             Proc_6_198_7D4B70 socketIndex, "AO", packetPayload
+        Case "AG"
+            Proc_6_93_745D90 socketIndex, "AG", packetPayload
+        Case "FT"
+            Proc_6_140_769400 socketIndex, "FT", packetPayload
+        Case "AB"
+            Proc_6_139_768100 socketIndex, "AB", packetPayload
+        Case "BA"
+            Proc_6_137_766470 socketIndex, "BA", packetPayload
         Case "n" & Chr$(127)
             Proc_6_177_7C6580 socketIndex, "n" & Chr$(127), packetPayload
         Case "ny"
@@ -12482,6 +12572,8 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_64_721650 socketIndex, "D" & Chr$(127), packetPayload
         Case "EB"
             Proc_6_75_7269D0 socketIndex, "EB", packetPayload
+        Case "Bw"
+            Proc_6_73_725540 socketIndex, "Bw", packetPayload
         Case "Aa"
             Proc_6_74_7265B0 socketIndex, "Aa", packetPayload
         Case "B["
@@ -12500,15 +12592,80 @@ Private Sub DispatchPreReadyPacket(ByVal socketIndex As Long, ByVal packetCode A
             Proc_6_67_722940 socketIndex, "AS", packetPayload
         Case "AU"
             Proc_6_68_723170 socketIndex, "AU", packetPayload
+        Case "A~", "CW", "Cf"
+            ' Recovered as explicit guard-only catalog/room branches.
         Case "FA"
             Proc_6_60_720060 socketIndex, "FA", packetPayload
         Case "FI"
             Proc_6_70_724190 socketIndex, "FI", packetPayload
         Case "AN"
             Proc_6_69_723630 socketIndex, "AN", packetPayload
-        Case "oL", "CD"
-            ' Decompiled targets Proc_7F44D0 and Proc_7FA5A0 were not generated as valid symbols.
+        Case "Aq", "AE", "FS", "AF"
+            Proc_6_244_801E80 socketIndex, CStr(Proc_10_0_809570("com.client.park.infobus.theme.title", "AQ")) & Chr$(2), 0
+        Case "oL"
+            Proc_7F44D0 socketIndex, "oL", packetPayload
+        Case Else
+            If global_00829034 Then
+                Proc_2_0_6D1510 packetPayload, "UNHANDLED -- index: " & CStr(socketIndex), CStr(255)
+            End If
     End Select
+End Sub
+
+Private Sub DispatchPreReadySoundSetting(ByVal socketIndex As Long, ByVal packetPayload As String)
+    Dim requestPayload As String
+    Dim soundSetting As Long
+    Dim userId As String
+
+    On Error GoTo SoundSettingDone
+
+    requestPayload = packetPayload
+    If Left$(requestPayload, 2) = "Ce" Then requestPayload = Mid$(requestPayload, 3)
+
+    Proc_10_5_809D80 packetPayload, 3
+    soundSetting = CLng(Val(CStr(Proc_10_6_809F10(requestPayload, 0, 0))))
+    If soundSetting <= 0 Or soundSetting >= 101 Then GoTo SoundSettingDone
+
+    userId = HandlingUserIdFromSocket(socketIndex)
+    If Len(userId) = 0 Or userId = "0" Then GoTo SoundSettingDone
+
+    Proc_5_0_6D3CD0 "UPDATE users SET settings_sound='" & CStr(soundSetting) & "' WHERE id='" & Proc_10_11_80A9C0(userId, 0, 0) & "' LIMIT 1", 0, 0
+
+SoundSettingDone:
+End Sub
+
+Private Sub DispatchPreReadyCatalogIndex(ByVal socketIndex As Long)
+    Dim payload As String
+
+    On Error GoTo CatalogIndexDone
+
+    payload = "A~" & "IHHM" & Chr$(2)
+    If IsArray(global_008292F4) Then
+        If 0 >= LBound(global_008292F4, 1) And 0 <= UBound(global_008292F4, 1) Then
+            If 0 >= LBound(global_008292F4, 2) And 0 <= UBound(global_008292F4, 2) Then
+                payload = payload & CStr(global_008292F4(0, 0))
+            End If
+        End If
+    End If
+    Proc_6_244_801E80 socketIndex, payload, 0
+
+CatalogIndexDone:
+End Sub
+
+Private Sub DispatchPreReadyRoomUserState(ByVal socketIndex As Long)
+    Dim userId As String
+    Dim roomUserIndex As Long
+
+    On Error GoTo RoomUserStateDone
+
+    userId = HandlingUserIdFromSocket(CInt(socketIndex))
+    If Len(userId) = 0 Or userId = "0" Then GoTo RoomUserStateDone
+
+    roomUserIndex = RepresentedRoomUserIndex(CInt(socketIndex), userId)
+    If roomUserIndex <= 0 Then GoTo RoomUserStateDone
+
+    Proc_6_247_8027E0 socketIndex, CStr(Proc_3_0_6D2AF0(roomUserIndex, Empty, "Ei")) & global_004096B0, 0
+
+RoomUserStateDone:
 End Sub
 
 ' Original declaration: Private Sub Proc_6_242_7FF0D0
